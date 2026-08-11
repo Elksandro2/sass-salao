@@ -19,7 +19,14 @@ import { getApiErrorMessage } from '../../../utils/apiError';
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
 
-export const Employees = () => {
+interface EmployeesProps {
+  /** Quando embutido na aba Equipe: some com o cabeçalho e o botão de vincular — a criação
+   * de funcionária/gerente passou a ser feita pelo cadastro completo (StaffRegistration),
+   * esta tela vira só o editor de remuneração de quem já foi cadastrado. */
+  embedded?: boolean;
+}
+
+export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const [showForm, setShowForm] = useState(false);
@@ -35,6 +42,8 @@ export const Employees = () => {
   const [userResults, setUserResults] = useState<UserData[]>([]);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [selectedUserLabel, setSelectedUserLabel] = useState('');
+  const [selectedRole, setSelectedRole] = useState<EmployeeData['roleName']>(undefined);
+  const isManager = selectedRole === 'GERENTE_DE_ATENDIMENTO';
   const userSearchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
@@ -75,6 +84,7 @@ export const Employees = () => {
     const label = `${user.name} (${user.email})`;
     setUserQuery(label);
     setSelectedUserLabel(label);
+    setSelectedRole(user.role as EmployeeData['roleName']);
     setShowUserDropdown(false);
     setUserResults([]);
   };
@@ -107,6 +117,7 @@ export const Employees = () => {
         : String(employee.userId);
       setUserQuery(label);
       setSelectedUserLabel(label);
+      setSelectedRole(employee.roleName);
       setValue('bio', employee.bio || '');
       setValue('remunerationType', employee.remunerationType ?? '');
       setValue('commissionScope', employee.commissionScope ?? '');
@@ -121,6 +132,7 @@ export const Employees = () => {
     } else {
       setEditingEmployee(null);
       setSelectedUserLabel('');
+      setSelectedRole(undefined);
     }
     setShowForm(true);
   };
@@ -271,14 +283,24 @@ export const Employees = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="font-heading text-2xl font-bold text-[#3b3036]">Gerenciar Funcionários(as)</h2>
-        <PermissionGate method="POST" endpoint="/v1/employees">
-          <button onClick={() => handleOpenForm()} className="btn-premium">
-            <Plus size={18} /> Vincular Funcionário(a)
-          </button>
-        </PermissionGate>
-      </div>
+      {embedded ? (
+        <div>
+          <h3 className="font-heading text-lg font-bold text-[#3b3036]">Remuneração</h3>
+          <p className="text-xs text-[#3b3036]/60 mt-1">
+            Edite o modelo de remuneração de quem já foi cadastrado acima. Para cadastrar
+            alguém novo, use "Novo cadastro".
+          </p>
+        </div>
+      ) : (
+        <div className="flex justify-between items-center">
+          <h2 className="font-heading text-2xl font-bold text-[#3b3036]">Gerenciar Funcionários(as)</h2>
+          <PermissionGate method="POST" endpoint="/v1/employees">
+            <button onClick={() => handleOpenForm()} className="btn-premium">
+              <Plus size={18} /> Vincular Funcionário(a)
+            </button>
+          </PermissionGate>
+        </div>
+      )}
 
       <DataTable
         columns={columns}
@@ -337,27 +359,38 @@ export const Employees = () => {
               <span className="text-xs text-rose-500 font-semibold">{errors.userId.message}</span>
             )}
           </div>
-          <div>
-            <label className={labelCls}>Biografia / Especialidade</label>
-            <textarea rows={3} maxLength={1000} className={`${inputCls} resize-none`} {...register('bio')} />
-          </div>
+          {!isManager && (
+            <div>
+              <label className={labelCls}>Biografia / Especialidade</label>
+              <textarea rows={3} maxLength={1000} className={`${inputCls} resize-none`} {...register('bio')} />
+            </div>
+          )}
 
           <div className="border-t border-[#eae1e1]/50 pt-4">
             <h4 className="font-heading font-semibold text-sm text-[#3b3036] mb-3">
               Modelo de Remuneração
             </h4>
+            {isManager && (
+              <p className="text-xs text-gray-400 -mt-2 mb-3">
+                Gerente de atendimento não presta serviço ao cliente, então só recebe salário fixo — sem comissão.
+              </p>
+            )}
             <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className={labelCls}>Tipo de Remuneração</label>
                 <select className={inputCls} {...register('remunerationType')}>
                   <option value="">Não definido</option>
                   <option value="SALARIO_FIXO">Salário Fixo</option>
-                  <option value="COMISSIONADO">Comissionado</option>
-                  <option value="FIXO_E_COMISSIONADO">Salário Fixo + Comissionado</option>
+                  {!isManager && (
+                    <>
+                      <option value="COMISSIONADO">Comissionado</option>
+                      <option value="FIXO_E_COMISSIONADO">Salário Fixo + Comissionado</option>
+                    </>
+                  )}
                 </select>
               </div>
 
-              {(remunerationType === 'COMISSIONADO' ||
+              {!isManager && (remunerationType === 'COMISSIONADO' ||
                 remunerationType === 'FIXO_E_COMISSIONADO') && (
                 <div>
                   <label className={labelCls}>Escopo da Comissão *</label>

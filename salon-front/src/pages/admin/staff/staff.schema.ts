@@ -118,12 +118,30 @@ export const staffFormSchema = z
       }
     }
 
-    // --- Remuneração: obrigatória e com regras próprias só para FUNCIONARIA ---
-    if (data.roleName === 'FUNCIONARIA') {
+    // --- Remuneração: obrigatória pros dois papéis; gerente só pode ter Salário Fixo, sem
+    // comissão (não presta serviço, então não há base pra calcular comissão sobre nada) ---
+    if (data.roleName === 'GERENTE_DE_ATENDIMENTO') {
+      if (data.remunerationType && data.remunerationType !== 'SALARIO_FIXO') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Gerente de atendimento só pode ter remuneração do tipo Salário Fixo',
+          path: ['remunerationType'],
+        });
+      }
+      if (data.commissionScope || data.commissionValue) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Dados de comissão não se aplicam ao papel de gerente de atendimento',
+          path: ['remunerationType'],
+        });
+      }
+    }
+
+    if (data.roleName === 'FUNCIONARIA' || data.roleName === 'GERENTE_DE_ATENDIMENTO') {
       if (!data.remunerationType) {
         ctx.addIssue({
           code: 'custom',
-          message: 'O tipo de remuneração é obrigatório para funcionárias',
+          message: 'O tipo de remuneração é obrigatório',
           path: ['remunerationType'],
         });
         return;
@@ -174,18 +192,6 @@ export const staffFormSchema = z
           });
         }
       }
-    } else if (
-      data.remunerationType ||
-      data.commissionScope ||
-      data.remunerationValue ||
-      data.commissionValue
-    ) {
-      // GERENTE_DE_ATENDIMENTO não tem remuneração/comissão — recusa em vez de ignorar.
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Dados de remuneração não se aplicam ao papel de gerente de atendimento',
-        path: ['remunerationType'],
-      });
     }
   });
 

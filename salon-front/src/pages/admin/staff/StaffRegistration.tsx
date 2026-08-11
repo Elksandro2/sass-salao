@@ -122,12 +122,9 @@ export const StaffRegistration = () => {
         pixKey: values.pixKey || null,
         hiredAt: values.hiredAt || null,
         notes: values.notes || null,
-        remunerationType: values.roleName === 'FUNCIONARIA' ? values.remunerationType || null : null,
+        remunerationType: values.remunerationType || null,
         commissionScope: values.roleName === 'FUNCIONARIA' ? values.commissionScope || null : null,
-        remunerationValue:
-          values.roleName === 'FUNCIONARIA' && values.remunerationValue
-            ? Number(values.remunerationValue)
-            : null,
+        remunerationValue: values.remunerationValue ? Number(values.remunerationValue) : null,
         commissionValue:
           values.roleName === 'FUNCIONARIA' && values.commissionValue
             ? Number(values.commissionValue)
@@ -431,8 +428,8 @@ export const StaffRegistration = () => {
                     </div>
                   </div>
 
-                  {/* Remuneração — só FUNCIONARIA */}
-                  {roleName === 'FUNCIONARIA' && (
+                  {/* Remuneração — FUNCIONARIA e GERENTE_DE_ATENDIMENTO (gerente só Salário Fixo) */}
+                  {(roleName === 'FUNCIONARIA' || roleName === 'GERENTE_DE_ATENDIMENTO') && (
                     <>
                       <h4 className={sectionTitleCls}>
                         <Landmark size={16} className="text-[#be8a83]" /> Remuneração
@@ -443,14 +440,23 @@ export const StaffRegistration = () => {
                           <select id="staff-remunerationType" className={inputCls} {...register('remunerationType')}>
                             <option value="">Selecione</option>
                             <option value="SALARIO_FIXO">Salário fixo</option>
-                            <option value="COMISSIONADO">Comissionado</option>
-                            <option value="FIXO_E_COMISSIONADO">Fixo + comissão</option>
+                            {roleName === 'FUNCIONARIA' && (
+                              <>
+                                <option value="COMISSIONADO">Comissionado</option>
+                                <option value="FIXO_E_COMISSIONADO">Fixo + comissão</option>
+                              </>
+                            )}
                           </select>
+                          {roleName === 'GERENTE_DE_ATENDIMENTO' && (
+                            <p className="text-xs text-gray-400 mt-1">
+                              Gerente não presta serviço ao cliente, então só recebe salário fixo — sem comissão.
+                            </p>
+                          )}
                           {errors.remunerationType && (
                             <span className="text-xs text-rose-500 font-semibold">{errors.remunerationType.message}</span>
                           )}
                         </div>
-                        {isCommissioned && (
+                        {roleName === 'FUNCIONARIA' && isCommissioned && (
                           <div>
                             <label htmlFor="staff-commissionScope" className={labelCls}>Escopo da comissão</label>
                             <select id="staff-commissionScope" className={inputCls} {...register('commissionScope')}>
@@ -481,10 +487,12 @@ export const StaffRegistration = () => {
                             )}
                           </div>
                         )}
-                        <div className="md:col-span-2">
-                          <label htmlFor="staff-bio" className={labelCls}>Bio (opcional)</label>
-                          <textarea id="staff-bio" rows={2} maxLength={1000} className={inputCls} {...register('bio')} />
-                        </div>
+                        {roleName === 'FUNCIONARIA' && (
+                          <div className="md:col-span-2">
+                            <label htmlFor="staff-bio" className={labelCls}>Bio (opcional)</label>
+                            <textarea id="staff-bio" rows={2} maxLength={1000} className={inputCls} {...register('bio')} />
+                          </div>
+                        )}
                       </div>
                     </>
                   )}
