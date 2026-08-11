@@ -1,5 +1,14 @@
 @import 'tailwindcss';
 
+/* Tailwind v4 troca o variant `dark:` para seguir prefers-color-scheme do SO por padrão —
+ * mudou do v3, onde `darkMode: 'class'` no config já bastava. Sem esta linha, TODO `dark:`
+ * do Tailwind no projeto inteiro ignora o toggle de tema em ThemeContext.tsx (que só liga/
+ * desliga a classe .dark no <html>) e segue cegamente o SO, dessincronizando do restante do
+ * app (que usa as variáveis CSS customizadas abaixo, essas sim reagindo à classe .dark).
+ * Isso é o que causava telas/modais com cores trocadas quando o tema do app e o do SO
+ * divergiam — ex.: app no claro com SO no escuro, ou vice-versa. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-primary: var(--primary-color);
   --color-primary-hover: var(--primary-hover);
