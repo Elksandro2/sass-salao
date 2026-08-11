@@ -58,19 +58,19 @@ jobs:
           BUILDX_NO_DEFAULT_ATTESTATIONS: 1
 
   deploy:
-    name: Deploy na VPS do Professor
+    name: Deploy na VPS
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Acionar Gatilho de Pull/Deploy no Servidor do Professor
+      - name: Disparar Deploy via SSH
         run: |
           mkdir -p ~/.ssh
-
-          # Usando o nome correto do seu secret: SSH_KEY
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          # Usando o nome correto do seu secret: SSH_USER
+          # A chave usada aqui tem "command=" forçado no authorized_keys do servidor:
+          # não importa o que mandarmos, ele só executa
+          # "docker compose -f docker-compose.prod.yml pull && ... up -d" no diretório do projeto.
+          # Isso é proposital — a chave do CI/CD não tem shell livre no servidor.
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"

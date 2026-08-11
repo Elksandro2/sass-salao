@@ -1,17 +1,16 @@
 services:
-  salon-app:
-    image: ghcr.io/des-sist-corp-ufpb/projeto-eq03:latest
-    container_name: salon-app
+  app:
+    image: ghcr.io/elksandro2/sass-salao:latest
+    container_name: sass-salao-app
+    restart: always
     env_file:
       - .env
-    ports:
-      - "8103:8080"
-    restart: always
     networks:
-      - salon-network
-
-volumes: {}
+      - proxy_network
+      - db_network
 
 networks:
-  salon-network:
+  proxy_network:
+    external: true
+  db_network:
     external: true
