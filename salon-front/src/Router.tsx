@@ -16,10 +16,8 @@ import { ForgotPassword } from './pages/auth/ForgotPassword';
 import { ResetPassword } from './pages/auth/ResetPassword';
 import { AdminServices } from './pages/admin/services/AdminServices';
 import { Products } from './pages/admin/products/Products';
-import { Users } from './pages/admin/users/Users';
-import { StaffRegistration } from './pages/admin/staff/StaffRegistration';
+import { Team } from './pages/admin/team/Team';
 import { Clients } from './pages/admin/clients/Clients';
-import { Employees } from './pages/admin/employees/Employees';
 import { PublicServices } from './pages/services/PublicServices';
 import { PublicHome } from './pages/home/PublicHome';
 import { PublicAppointment } from './pages/appointments/PublicAppointment';
@@ -162,29 +160,17 @@ export const Router = () => {
           }
         />
         <Route
-          path="/admin/users"
+          path="/admin/team"
           element={
             <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE_DE_ATENDIMENTO']}>
-              <Users />
+              <Team />
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/admin/employees"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE_DE_ATENDIMENTO']}>
-              <Employees />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/staff"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE_DE_ATENDIMENTO']}>
-              <StaffRegistration />
-            </ProtectedRoute>
-          }
-        />
+        {/* Rotas antigas (bookmarks, links salvos) redirecionam pra aba única nova */}
+        <Route path="/admin/users" element={<Navigate to="/admin/team" replace />} />
+        <Route path="/admin/employees" element={<Navigate to="/admin/team" replace />} />
+        <Route path="/admin/staff" element={<Navigate to="/admin/team" replace />} />
         <Route
           path="/admin/services"
           element={

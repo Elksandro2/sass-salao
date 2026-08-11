@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class StaffRoleStrategyFactoryTest {
 
     private final FuncionariaStrategy funcionariaStrategy = new FuncionariaStrategy(null);
-    private final GerenteDeAtendimentoStrategy gerenteStrategy = new GerenteDeAtendimentoStrategy();
+    private final GerenteDeAtendimentoStrategy gerenteStrategy = new GerenteDeAtendimentoStrategy(null);
     private final StaffRoleStrategyFactory factory =
             new StaffRoleStrategyFactory(List.of(funcionariaStrategy, gerenteStrategy));
 

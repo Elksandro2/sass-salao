@@ -39,4 +39,12 @@ public class Employee {
 
     @Column(name = "commission_value", precision = 10, scale = 2)
     private java.math.BigDecimal commissionValue;
+
+    /**
+     * Separa "recebe remuneração via Employee" de "pode ser escalado num agendamento".
+     * FUNCIONARIA é sempre bookable; GERENTE_DE_ATENDIMENTO pode ter Employee (pra registrar
+     * salário fixo no relatório financeiro) sem nunca aparecer no seletor de atendimento.
+     */
+    @Column(name = "bookable", nullable = false)
+    private boolean bookable = true;
 }

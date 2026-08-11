@@ -53,7 +53,9 @@ export const Users = () => {
       setEditingUser(null);
       setValue('_isEdit', false);
       setValue('active', true);
-      setValue('roleId', 3);
+      // Criação de FUNCIONARIA/GERENTE agora é feita pelo cadastro completo (aba Equipe →
+      // Funcionárias(os) & Gerentes) — esta tela só cria conta administrativa daqui em diante.
+      setValue('roleId', 1);
     }
     setShowForm(true);
   };
@@ -239,12 +241,17 @@ export const Users = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="font-heading text-2xl font-bold text-[#3b3036] dark:text-white">
-          Equipe Interna
-        </h2>
+        <div>
+          <h2 className="font-heading text-2xl font-bold text-[#3b3036] dark:text-white">
+            Contas Administrativas
+          </h2>
+          <p className="text-xs text-[#3b3036]/60 dark:text-gray-400 mt-1">
+            Login, senha e status de acesso de qualquer conta da equipe.
+          </p>
+        </div>
         <PermissionGate method="POST" endpoint="/v1/users">
           <button onClick={() => handleOpenForm()} className="btn-premium font-semibold">
-            <Plus size={18} /> Novo Usuário
+            <Plus size={18} /> Nova Conta Administrativa
           </button>
         </PermissionGate>
       </div>
@@ -296,10 +303,23 @@ export const Users = () => {
               className={`input-premium ${errors.roleId ? 'border-rose-300 focus:border-rose-500' : ''}`}
               {...register('roleId', { setValueAs: (v) => Number(v) })}
             >
-              <option value="3">Funcionário(a)</option>
-              <option value="2">Gerente</option>
               <option value="1">Administrador(a)</option>
+              {/* Funcionária/Gerente só se editava aqui por herança do cadastro simples antigo —
+                  a criação foi centralizada em Equipe → Funcionárias(os) & Gerentes. Mantemos as
+                  opções na edição para não travar contas que já existiam com esses papéis. */}
+              {editingUser && (
+                <>
+                  <option value="2">Gerente</option>
+                  <option value="3">Funcionário(a)</option>
+                </>
+              )}
             </select>
+            {!editingUser && (
+              <p className="text-xs text-gray-400 mt-1">
+                Para cadastrar funcionária(o) ou gerente, use Equipe → Funcionárias(os) & Gerentes —
+                o cadastro completo com dados pessoais, endereço e remuneração.
+              </p>
+            )}
             {errors.roleId && (
               <span className="text-xs text-rose-500 font-semibold">{errors.roleId.message}</span>
             )}

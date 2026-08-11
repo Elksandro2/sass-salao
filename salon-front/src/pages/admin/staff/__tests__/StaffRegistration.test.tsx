@@ -100,7 +100,7 @@ describe('StaffRegistration', () => {
     expect(screen.getByText('Remuneração')).toBeInTheDocument();
   });
 
-  it('advances to step 2 after choosing GERENTE_DE_ATENDIMENTO, hiding remuneration fields', async () => {
+  it('advances to step 2 after choosing GERENTE_DE_ATENDIMENTO, showing only Salário Fixo', async () => {
     await act(async () => {
       renderPage();
     });
@@ -109,7 +109,11 @@ describe('StaffRegistration', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Gerente de Atendimento/ }));
 
     expect(screen.getByText('Novo cadastro — Gerente de Atendimento')).toBeInTheDocument();
-    expect(screen.queryByText('Remuneração')).not.toBeInTheDocument();
+    expect(screen.getByText('Remuneração')).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Comissionado' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Fixo + comissão' })).not.toBeInTheDocument();
+    // Gerente não é FUNCIONARIA, então o campo de Bio (específico de quem atende cliente) some.
+    expect(screen.queryByLabelText('Bio (opcional)')).not.toBeInTheDocument();
   });
 
   it('lets the user go back to step 1 to change the role', async () => {
@@ -170,6 +174,50 @@ describe('StaffRegistration', () => {
     // Nenhuma chave PIX foi informada: os campos de PIX devem ir nulos, não omitidos ou vazios.
     expect(payload.pixKeyType).toBeNull();
     expect(payload.pixKey).toBeNull();
+  });
+
+  it('submits a valid GERENTE_DE_ATENDIMENTO form with Salário Fixo and no bio/commission', async () => {
+    vi.mocked(staffApi.create).mockResolvedValue(mockStaffList[0] as any);
+
+    await act(async () => {
+      renderPage();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Novo Cadastro/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Gerente de Atendimento/ }));
+
+    fireEvent.change(screen.getByLabelText('Nome de exibição'), { target: { value: 'Ana' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ana@example.com' } });
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'Senha@123' } });
+    fireEvent.change(screen.getByLabelText('Confirmar senha'), { target: { value: 'Senha@123' } });
+    fireEvent.change(screen.getByLabelText('Nome completo'), { target: { value: 'Ana Souza' } });
+    fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '111.444.777-35' } });
+    fireEvent.change(screen.getByLabelText('Data de nascimento'), { target: { value: '1988-01-01' } });
+    fireEvent.change(screen.getByLabelText('Telefone'), { target: { value: '(81) 99999-9999' } });
+    fireEvent.change(screen.getByLabelText('CEP'), { target: { value: '50000-000' } });
+    fireEvent.change(screen.getByLabelText('Logradouro'), { target: { value: 'Rua A' } });
+    fireEvent.change(screen.getByLabelText('Número'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('Bairro'), { target: { value: 'Boa Vista' } });
+    fireEvent.change(screen.getByLabelText('Cidade'), { target: { value: 'Recife' } });
+    fireEvent.change(screen.getByLabelText('UF'), { target: { value: 'PE' } });
+    fireEvent.change(screen.getByLabelText('Tipo de remuneração'), { target: { value: 'SALARIO_FIXO' } });
+    fireEvent.change(screen.getByLabelText('Valor (R$)'), { target: { value: '3000' } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Criar Cadastro/i }));
+    });
+
+    await waitFor(() => expect(staffApi.create).toHaveBeenCalled());
+
+    const payload = vi.mocked(staffApi.create).mock.calls[0][0];
+    expect(payload).toMatchObject({
+      roleName: 'GERENTE_DE_ATENDIMENTO',
+      remunerationType: 'SALARIO_FIXO',
+      remunerationValue: 3000,
+    });
+    expect(payload.commissionScope).toBeNull();
+    expect(payload.commissionValue).toBeNull();
+    expect(payload.bio).toBeNull();
   });
 
   it('does not submit when the CPF is invalid', async () => {

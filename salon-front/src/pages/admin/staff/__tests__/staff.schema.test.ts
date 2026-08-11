@@ -27,10 +27,18 @@ describe('staffFormSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts a valid GERENTE_DE_ATENDIMENTO submission without remuneration', () => {
+  it('accepts a valid GERENTE_DE_ATENDIMENTO submission with Salário Fixo', () => {
+    const result = staffFormSchema.safeParse({ ...validBase, roleName: 'GERENTE_DE_ATENDIMENTO' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects GERENTE_DE_ATENDIMENTO without remuneration', () => {
     const { remunerationType: _remunerationType, remunerationValue: _remunerationValue, ...rest } = validBase;
     const result = staffFormSchema.safeParse({ ...rest, roleName: 'GERENTE_DE_ATENDIMENTO' });
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path.includes('remunerationType'))).toBe(true);
+    }
   });
 
   it('rejects an invalid CPF', () => {
@@ -89,12 +97,26 @@ describe('staffFormSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects GERENTE_DE_ATENDIMENTO with remuneration fields set', () => {
-    const result = staffFormSchema.safeParse({ ...validBase, roleName: 'GERENTE_DE_ATENDIMENTO' });
+  it('rejects GERENTE_DE_ATENDIMENTO with COMISSIONADO (não presta serviço, sem comissão)', () => {
+    const result = staffFormSchema.safeParse({
+      ...validBase,
+      roleName: 'GERENTE_DE_ATENDIMENTO',
+      remunerationType: 'COMISSIONADO',
+      commissionScope: 'GLOBAL',
+    });
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues.some((i) => i.path.includes('remunerationType'))).toBe(true);
     }
+  });
+
+  it('rejects GERENTE_DE_ATENDIMENTO with commissionScope set', () => {
+    const result = staffFormSchema.safeParse({
+      ...validBase,
+      roleName: 'GERENTE_DE_ATENDIMENTO',
+      commissionScope: 'GLOBAL',
+    });
+    expect(result.success).toBe(false);
   });
 
   it('rejects a missing UF', () => {

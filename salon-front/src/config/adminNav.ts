@@ -1,9 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Users,
-  UserCheck,
   UserCog,
-  UserPlus,
   Scissors,
   Package,
   Calendar,
@@ -29,9 +27,7 @@ export interface AdminNavItem {
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { to: '/admin/reports', label: 'Relatórios', icon: FileBarChart, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
   { to: '/admin/clients', label: 'Clientes', icon: Users, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
-  { to: '/admin/users', label: 'Equipe', icon: UserCog, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
-  { to: '/admin/employees', label: 'Funcionários(as)', icon: UserCheck, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
-  { to: '/admin/staff', label: 'Cadastro de Equipe', icon: UserPlus, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
+  { to: '/admin/team', label: 'Equipe', icon: UserCog, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
   { to: '/admin/services', label: 'Serviços', icon: Scissors, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
   { to: '/admin/products', label: 'Produtos', icon: Package, allowedRoles: ['ADMIN'] },
   { to: '/admin/appointments', label: 'Agendamentos', icon: Calendar, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO', 'FUNCIONARIA'] },

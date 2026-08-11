@@ -16,7 +16,7 @@ const ROLES: { value: StaffRoleName; label: string; description: string; icon: t
   {
     value: 'GERENTE_DE_ATENDIMENTO',
     label: 'Gerente de Atendimento',
-    description: 'Gerencia a operação do salão. Sem remuneração/comissão neste cadastro.',
+    description: 'Gerencia a operação do salão. Recebe salário fixo, sem comissão.',
     icon: UserCog,
   },
 ];

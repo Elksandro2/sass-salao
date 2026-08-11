@@ -13,6 +13,6 @@ import java.util.Optional;
 public interface EmployeeRepository extends JpaRepository<Employee, Long>, JpaSpecificationExecutor<Employee> {
     Optional<Employee> findByUserId(Long userId);
 
-    @Query("SELECT e FROM Employee e WHERE e.user.active = true AND e.user.role.name IN ('FUNCIONARIA', 'ADMIN')")
+    @Query("SELECT e FROM Employee e WHERE e.user.active = true AND e.bookable = true AND e.user.role.name IN ('FUNCIONARIA', 'ADMIN')")
     List<Employee> findAllActiveForBooking();
 }
