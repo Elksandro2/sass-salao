@@ -64,7 +64,7 @@ class EmployeeControllerTest extends BaseControllerTest {
     @WithMockUser
     void findAllReturnsPageOfEmployees() throws Exception {
         EmployeeResponse response = new EmployeeResponse(
-                1L, 1L, "Alice", "alice@example.com", "Bio details",
+                1L, 1L, "Alice", "alice@example.com", "FUNCIONARIA", "Bio details",
                 RemunerationType.COMISSIONADO, CommissionScope.INDIVIDUAL,
                 BigDecimal.ZERO, BigDecimal.TEN
         );
@@ -94,7 +94,7 @@ class EmployeeControllerTest extends BaseControllerTest {
     @WithMockUser(roles = { "ADMIN" })
     void updateReturnsUpdatedEmployee() throws Exception {
         EmployeeResponse response = new EmployeeResponse(
-                2L, 1L, "Alice", "alice@example.com", "Bio details",
+                2L, 1L, "Alice", "alice@example.com", "FUNCIONARIA", "Bio details",
                 RemunerationType.SALARIO_FIXO, null,
                 BigDecimal.TEN, BigDecimal.ZERO
         );

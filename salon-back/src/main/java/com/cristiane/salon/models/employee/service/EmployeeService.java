@@ -58,14 +58,18 @@ public class EmployeeService {
         User user = userRepository.findById(request.userId())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-        if (!"FUNCIONARIA".equals(user.getRoleName()) && !"ADMIN".equals(user.getRoleName())) {
+        if (!"FUNCIONARIA".equals(user.getRoleName()) && !"ADMIN".equals(user.getRoleName())
+                && !"GERENTE_DE_ATENDIMENTO".equals(user.getRoleName())) {
             throw new BadRequestException("O usuário não tem o papel adequado para ser funcionária");
         }
 
         Employee employee = new Employee();
         employee.setUser(user);
         employee.setBio(request.bio());
-        validateAndMapRemuneration(employee, request);
+        // Gerente não atende cliente, então nunca entra no seletor de agendamento — só
+        // FUNCIONARIA/ADMIN ficam "bookable" (ver findAllActiveForBooking).
+        employee.setBookable(!"GERENTE_DE_ATENDIMENTO".equals(user.getRoleName()));
+        validateAndMapRemuneration(employee, request, user.getRoleName());
 
         return EmployeeResponse.fromEntity(employeeRepository.save(employee));
     }
@@ -88,15 +92,20 @@ public class EmployeeService {
             employee.setBio(request.bio());
         }
 
-        validateAndMapRemuneration(employee, request);
+        validateAndMapRemuneration(employee, request, employee.getUser().getRoleName());
 
         return EmployeeResponse.fromEntity(employeeRepository.save(employee));
     }
 
-    private void validateAndMapRemuneration(Employee employee, EmployeeRequest request) {
+    private void validateAndMapRemuneration(Employee employee, EmployeeRequest request, String roleName) {
         if (request.remunerationType() != null) {
+            if ("GERENTE_DE_ATENDIMENTO".equals(roleName) && request.remunerationType() != RemunerationType.SALARIO_FIXO) {
+                throw new BadRequestException(
+                        "Gerente de atendimento só pode ter remuneração do tipo Salário Fixo — não presta serviço, então não há comissão");
+            }
+
             employee.setRemunerationType(request.remunerationType());
-            
+
             if (request.remunerationType() == RemunerationType.COMISSIONADO 
                     || request.remunerationType() == RemunerationType.FIXO_E_COMISSIONADO) {
                 if (request.commissionScope() == null) {
