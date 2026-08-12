@@ -106,6 +106,18 @@ public class AppointmentService {
     }
 
     /**
+     * Quem pode criar um agendamento em nome de um cliente (com horário definido na hora).
+     *
+     * <p>ADMIN/GERENTE cobrem qualquer profissional. FUNCIONARIA também entra aqui — cliente
+     * chega no salão, ela cadastra na hora — mas fica restrita a se atribuir como a profissional
+     * do próprio atendimento (ver checagem em {@link #create}); ela não pode agendar em nome de
+     * uma colega, diferente de ADMIN/GERENTE.
+     */
+    private boolean canCreateForClient(User user) {
+        return isStaff(user) || "FUNCIONARIA".equals(user.getRoleName());
+    }
+
+    /**
      * A funcionária é a profissional atribuída a este atendimento?
      *
      * <p>Compara pelo usuário e não pelo id de Employee porque é o usuário que está autenticado;
@@ -189,7 +201,7 @@ public class AppointmentService {
             throw new AccessDeniedException("O portal do cliente está temporariamente desativado.");
         }
 
-        boolean staffCreatesForClient = isStaff(currentUser) && request.clientId() != null;
+        boolean staffCreatesForClient = canCreateForClient(currentUser) && request.clientId() != null;
 
         if (!staffCreatesForClient && !featureFlagService.isEnabled("CLIENT_BOOKING")) {
             throw new BadRequestException("Agendamentos online para clientes estão temporariamente desativados.");
@@ -205,6 +217,11 @@ public class AppointmentService {
 
         Employee employee = employeeRepository.findById(request.employeeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Profissional não encontrado"));
+
+        if (staffCreatesForClient && "FUNCIONARIA".equals(currentUser.getRoleName())
+                && (employee.getUser() == null || !employee.getUser().getId().equals(currentUser.getId()))) {
+            throw new UnauthorizedException("Você só pode criar agendamentos em que você é a profissional responsável");
+        }
 
         List<AppointmentServiceRequest> serviceRequests = request.services();
         List<SalonService> resolvedServices = serviceRequests.stream()
@@ -363,6 +380,22 @@ public class AppointmentService {
         emailService.sendCancellationNotification(saved);
         pushService.sendToUser(saved.getClient().getId(), "Agendamento cancelado",
                 "Seu agendamento de " + saved.getServiceNames() + " foi cancelado.", "/my-appointments");
+        return AppointmentResponse.fromEntity(saved);
+    }
+
+    /**
+     * Observação interna da equipe sobre o atendimento — separada de clientNotes (o que o
+     * cliente escreveu). Editável em qualquer status do agendamento, não só na criação, porque
+     * costuma ser preenchida DEPOIS do atendimento acontecer (ver histórico do cliente).
+     */
+    @Transactional
+    public AppointmentResponse updateInternalNotes(Long id, String internalNotes) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
+        assertCanManage(appointment, "anotar em");
+
+        appointment.setInternalNotes(internalNotes);
+        Appointment saved = appointmentRepository.save(appointment);
         return AppointmentResponse.fromEntity(saved);
     }
 

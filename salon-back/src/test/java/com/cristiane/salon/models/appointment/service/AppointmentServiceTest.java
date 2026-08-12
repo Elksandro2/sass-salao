@@ -410,6 +410,54 @@ class AppointmentServiceTest {
         verify(salonProfileService, never()).isDayOpen(any());
     }
 
+    @Test
+    void create_whenFuncionariaCreatesForHerself_shouldSucceed() {
+        // Arrange — cliente chega no salão, a própria funcionária cadastra o atendimento dela.
+        mockAuthenticatedUser(professionalUser);
+        when(userRepository.findById(10L)).thenReturn(Optional.of(clientUser));
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
+        when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
+        when(appointmentRepository.findActiveAppointmentsByEmployeeAndDate(eq(5L), any(), any()))
+                .thenReturn(List.of());
+
+        LocalDateTime targetTime = salonClock.now().plusDays(1);
+        Appointment saved = new Appointment();
+        saved.setId(101L);
+        saved.setClient(clientUser);
+        saved.setEmployee(employee);
+        withService(saved, salonService);
+        saved.setScheduledAt(targetTime);
+        saved.setStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.save(any(Appointment.class))).thenReturn(saved);
+
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), targetTime, null, null, 10L);
+
+        AppointmentResponse result = appointmentService.create(request);
+
+        assertThat(result.id()).isEqualTo(101L);
+        verify(appointmentRepository).save(any(Appointment.class));
+    }
+
+    @Test
+    void create_whenFuncionariaCreatesForAnotherEmployee_shouldThrowUnauthorized() {
+        // Arrange — ela não pode agendar em nome de uma colega, só de si mesma.
+        Employee colleagueEmployee = new Employee();
+        colleagueEmployee.setId(6L);
+        colleagueEmployee.setUser(otherProfessionalUser);
+
+        mockAuthenticatedUser(professionalUser);
+        when(userRepository.findById(10L)).thenReturn(Optional.of(clientUser));
+        when(employeeRepository.findById(6L)).thenReturn(Optional.of(colleagueEmployee));
+
+        LocalDateTime targetTime = salonClock.now().plusDays(1);
+        AppointmentRequest request = new AppointmentRequest(6L, List.of(new AppointmentServiceRequest(8L, null, null, null)), targetTime, null, null, 10L);
+
+        assertThatThrownBy(() -> appointmentService.create(request))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("profissional responsável");
+        verify(appointmentRepository, never()).save(any());
+    }
+
     // --- Serviço como template (customPrice/customDurationMin/customServiceNotes) ---
 
     @Test
@@ -1080,6 +1128,69 @@ class AppointmentServiceTest {
         // Assert
         assertThat(result.status()).isEqualTo(AppointmentStatus.DECLINED.name());
         verify(emailService).sendCancellationNotification(apt);
+    }
+
+    // --- updateInternalNotes ---
+
+    @Test
+    void updateInternalNotes_whenStaff_shouldSaveNoteRegardlessOfStatus() {
+        // Arrange — nota interna é preenchida com frequência DEPOIS do atendimento (histórico
+        // do cliente), então precisa funcionar em qualquer status, não só REQUESTED/CONFIRMED.
+        mockAuthenticatedUser(staffUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setStatus(AppointmentStatus.DONE);
+        apt.setEmployee(employee);
+        apt.setClient(clientUser);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        AppointmentResponse result = appointmentService.updateInternalNotes(1L, "Cliente trouxe foto de referência");
+
+        // Assert
+        assertThat(result.internalNotes()).isEqualTo("Cliente trouxe foto de referência");
+    }
+
+    @Test
+    void updateInternalNotes_whenAssignedProfessional_shouldBeAllowed() {
+        mockAuthenticatedUser(professionalUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setStatus(AppointmentStatus.CONFIRMED);
+        apt.setEmployee(employee);
+        apt.setClient(clientUser);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AppointmentResponse result = appointmentService.updateInternalNotes(1L, "nota");
+
+        assertThat(result.internalNotes()).isEqualTo("nota");
+    }
+
+    @Test
+    void updateInternalNotes_whenOtherProfessionalsAppointment_shouldThrowUnauthorizedException() {
+        mockAuthenticatedUser(otherProfessionalUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setStatus(AppointmentStatus.CONFIRMED);
+        apt.setEmployee(employee);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        assertThatThrownBy(() -> appointmentService.updateInternalNotes(1L, "nota"))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("profissional responsável");
+        verify(appointmentRepository, never()).save(any());
+    }
+
+    @Test
+    void updateInternalNotes_whenAppointmentNotFound_shouldThrowResourceNotFoundException() {
+        mockAuthenticatedUser(staffUser);
+        when(appointmentRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> appointmentService.updateInternalNotes(99L, "nota"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Agendamento não encontrado");
     }
 
     // --- getMyAppointments ---

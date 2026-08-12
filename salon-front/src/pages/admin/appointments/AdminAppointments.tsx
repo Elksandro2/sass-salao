@@ -14,6 +14,7 @@ import type { EmployeeData } from '../employees/services/employees';
 import type { UserData } from '../users/services/users';
 import { clientsApi } from '../clients/services/clients';
 import { usePermission } from '../../../hooks/usePermission';
+import { useAuth } from '../../../hooks/useAuth';
 import { useAlert } from '../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import {
@@ -97,6 +98,19 @@ export const AdminAppointments = () => {
 
   const { error: showError, confirm } = useAlert();
   const canCreateAppointment = usePermission('POST', '/v1/appointments');
+  const { user } = useAuth();
+  const isFuncionaria = user?.role === 'FUNCIONARIA';
+  // FUNCIONARIA só pode criar agendamento pra si mesma (imposto no backend também) — trava o
+  // seletor pra ela nem tentar escolher uma colega e levar erro.
+  const ownEmployeeId = isFuncionaria
+    ? employees.find((e) => e.userId === user?.userId)?.id
+    : undefined;
+
+  useEffect(() => {
+    if (showModal && isFuncionaria && ownEmployeeId != null) {
+      setSelectedEmployee(String(ownEmployeeId));
+    }
+  }, [showModal, isFuncionaria, ownEmployeeId]);
 
   const loadAppointments = async () => {
     setIsLoading(true);
@@ -681,7 +695,8 @@ export const AdminAppointments = () => {
                       value={selectedEmployee}
                       onChange={(e) => setSelectedEmployee(e.target.value)}
                       required
-                      className={selectCls}
+                      disabled={isFuncionaria}
+                      className={`${selectCls} ${isFuncionaria ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
                       <option value="">Selecione a profissional</option>
                       {employees.map((e) => (
@@ -690,6 +705,11 @@ export const AdminAppointments = () => {
                         </option>
                       ))}
                     </select>
+                    {isFuncionaria && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Você só pode criar agendamentos pra você mesma.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label htmlFor="create-datetime" className={labelCls}>
@@ -841,7 +861,14 @@ export const AdminAppointments = () => {
         </div>
       )}
 
-      <AppointmentDetailModal appointment={detailTarget} onClose={() => setDetailTarget(null)} />
+      <AppointmentDetailModal
+        appointment={detailTarget}
+        onClose={() => setDetailTarget(null)}
+        onNotesSaved={(updated) => {
+          setDetailTarget(updated);
+          setAppointments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+        }}
+      />
 
       <ConfirmDialog
         show={showConfirm}
