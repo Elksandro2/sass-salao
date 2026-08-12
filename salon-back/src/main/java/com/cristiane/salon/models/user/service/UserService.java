@@ -94,7 +94,6 @@ public class UserService {
         if ("FUNCIONARIA".equals(savedUser.getRoleName())) {
             Employee employee = new Employee();
             employee.setUser(savedUser);
-            employee.setBio("Profissional especialista");
             employeeRepository.save(employee);
         }
 
@@ -139,7 +138,6 @@ public class UserService {
             if (employeeRepository.findByUserId(savedUser.getId()).isEmpty()) {
                 Employee employee = new Employee();
                 employee.setUser(savedUser);
-                employee.setBio("Profissional especialista");
                 employeeRepository.save(employee);
             }
         }

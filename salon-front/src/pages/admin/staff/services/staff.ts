@@ -54,7 +54,6 @@ export interface StaffProfileCreatePayload {
   commissionScope?: CommissionScope | null;
   remunerationValue?: number | null;
   commissionValue?: number | null;
-  bio?: string | null;
 }
 
 /** Resposta da API. Nunca contém CPF nem chave PIX em texto claro — só versões mascaradas. */

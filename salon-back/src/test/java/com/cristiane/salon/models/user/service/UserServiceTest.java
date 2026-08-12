@@ -321,7 +321,6 @@ class UserServiceTest {
         verify(employeeRepository).save(employeeCaptor.capture());
         Employee savedEmployee = employeeCaptor.getValue();
         assertThat(savedEmployee.getUser()).isEqualTo(savedUser);
-        assertThat(savedEmployee.getBio()).isEqualTo("Profissional especialista");
     }
 
     @Test

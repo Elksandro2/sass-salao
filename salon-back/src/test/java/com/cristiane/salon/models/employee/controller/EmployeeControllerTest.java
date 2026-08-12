@@ -64,7 +64,7 @@ class EmployeeControllerTest extends BaseControllerTest {
     @WithMockUser
     void findAllReturnsPageOfEmployees() throws Exception {
         EmployeeResponse response = new EmployeeResponse(
-                1L, 1L, "Alice", "alice@example.com", "FUNCIONARIA", "Bio details",
+                1L, 1L, "Alice", "alice@example.com", "FUNCIONARIA",
                 RemunerationType.COMISSIONADO, CommissionScope.INDIVIDUAL,
                 BigDecimal.ZERO, BigDecimal.TEN
         );
@@ -81,7 +81,7 @@ class EmployeeControllerTest extends BaseControllerTest {
     @Test
     @WithMockUser
     void findAllForBookingReturnsEmployees() throws Exception {
-        EmployeeBookingResponse response = new EmployeeBookingResponse(1L, 1L, "Bob", "Bio details");
+        EmployeeBookingResponse response = new EmployeeBookingResponse(1L, 1L, "Bob");
         when(employeeService.findAllForBooking()).thenReturn(List.of(response));
 
         mvc.perform(get("/v1/employees/booking")
@@ -94,7 +94,7 @@ class EmployeeControllerTest extends BaseControllerTest {
     @WithMockUser(roles = { "ADMIN" })
     void updateReturnsUpdatedEmployee() throws Exception {
         EmployeeResponse response = new EmployeeResponse(
-                2L, 1L, "Alice", "alice@example.com", "FUNCIONARIA", "Bio details",
+                2L, 1L, "Alice", "alice@example.com", "FUNCIONARIA",
                 RemunerationType.SALARIO_FIXO, null,
                 BigDecimal.TEN, BigDecimal.ZERO
         );

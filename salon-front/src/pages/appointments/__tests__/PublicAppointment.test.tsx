@@ -89,7 +89,7 @@ const mockServices = [
   },
 ];
 
-const mockEmployees = [{ id: 10, userId: 100, name: 'Mariana', bio: 'Cabelos e Penteados' }];
+const mockEmployees = [{ id: 10, userId: 100, name: 'Mariana' }];
 
 const mockServicesPage = (content: typeof mockServices) => ({
   content,

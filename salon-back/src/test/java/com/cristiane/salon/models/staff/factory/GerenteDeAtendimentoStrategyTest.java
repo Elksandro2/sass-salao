@@ -44,7 +44,7 @@ class GerenteDeAtendimentoStrategyTest {
                 null, null,
                 LocalDate.now(), null,
                 type, scope,
-                value, null, null
+                value, null
         );
     }
 

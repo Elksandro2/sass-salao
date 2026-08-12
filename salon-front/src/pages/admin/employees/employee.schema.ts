@@ -6,7 +6,6 @@ const commissionScopeSchema = z.enum(['', 'INDIVIDUAL', 'GLOBAL']);
 export const employeeFormSchema = z
   .object({
     userId: z.string().min(1, 'ID do usuário é obrigatório'),
-    bio: z.string().max(1000, 'Máximo de 1000 caracteres').optional(),
     remunerationType: remunerationTypeSchema.optional(),
     commissionScope: commissionScopeSchema.optional(),
     remunerationValue: z.string().optional(),

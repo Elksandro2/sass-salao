@@ -128,10 +128,7 @@ public record StaffProfileRequest(
 
         @DecimalMin(value = "0.0", message = "O valor de comissão não pode ser negativo")
         @Digits(integer = 8, fraction = 2, message = "Valor de comissão inválido")
-        BigDecimal commissionValue,
-
-        @Size(max = 1000, message = "A bio deve ter no máximo 1000 caracteres")
-        String bio
+        BigDecimal commissionValue
 ) {
     /** CPF só com dígitos — usado para cifrar e para gerar o hash de duplicidade. */
     public String cpfDigitsOnly() {

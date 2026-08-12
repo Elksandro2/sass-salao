@@ -65,7 +65,6 @@ public class EmployeeService {
 
         Employee employee = new Employee();
         employee.setUser(user);
-        employee.setBio(request.bio());
         // Gerente não atende cliente, então nunca entra no seletor de agendamento — só
         // FUNCIONARIA/ADMIN ficam "bookable" (ver findAllActiveForBooking).
         employee.setBookable(!"GERENTE_DE_ATENDIMENTO".equals(user.getRoleName()));
@@ -86,10 +85,6 @@ public class EmployeeService {
             User user = userRepository.findById(request.userId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
             employee.setUser(user);
-        }
-
-        if (request.bio() != null) {
-            employee.setBio(request.bio());
         }
 
         validateAndMapRemuneration(employee, request, employee.getUser().getRoleName());

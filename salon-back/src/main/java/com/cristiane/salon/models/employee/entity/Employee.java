@@ -23,9 +23,6 @@ public class Employee {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(columnDefinition = "TEXT")
-    private String bio;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "remuneration_type")
     private RemunerationType remunerationType;

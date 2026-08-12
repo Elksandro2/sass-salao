@@ -129,7 +129,6 @@ export const StaffRegistration = () => {
           values.roleName === 'FUNCIONARIA' && values.commissionValue
             ? Number(values.commissionValue)
             : null,
-        bio: values.roleName === 'FUNCIONARIA' ? values.bio || null : null,
       } as Parameters<typeof staffApi.create>[0]);
 
       await showSuccess('Cadastro de equipe criado com sucesso');
@@ -485,12 +484,6 @@ export const StaffRegistration = () => {
                             {errors.commissionValue && (
                               <span className="text-xs text-rose-500 font-semibold">{errors.commissionValue.message}</span>
                             )}
-                          </div>
-                        )}
-                        {roleName === 'FUNCIONARIA' && (
-                          <div className="md:col-span-2">
-                            <label htmlFor="staff-bio" className={labelCls}>Bio (opcional)</label>
-                            <textarea id="staff-bio" rows={2} maxLength={1000} className={inputCls} {...register('bio')} />
                           </div>
                         )}
                       </div>

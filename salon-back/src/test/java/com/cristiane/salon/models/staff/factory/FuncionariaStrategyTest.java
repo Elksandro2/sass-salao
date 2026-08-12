@@ -39,7 +39,7 @@ class FuncionariaStrategyTest {
                 "50000-000", "Rua A", "10", null, "Boa Vista", "Recife", null,
                 null, null,
                 LocalDate.now(), null,
-                type, scope, remunerationValue, commissionValue, "bio"
+                type, scope, remunerationValue, commissionValue
         );
     }
 

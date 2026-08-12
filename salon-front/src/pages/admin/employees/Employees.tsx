@@ -118,7 +118,6 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
       setUserQuery(label);
       setSelectedUserLabel(label);
       setSelectedRole(employee.roleName);
-      setValue('bio', employee.bio || '');
       setValue('remunerationType', employee.remunerationType ?? '');
       setValue('commissionScope', employee.commissionScope ?? '');
       setValue(
@@ -140,7 +139,6 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
   const onSubmit = async (data: EmployeeFormValues) => {
     const payload: EmployeeData = {
       userId: Number(data.userId),
-      bio: data.bio || undefined,
       remunerationType: data.remunerationType || undefined,
     };
 
@@ -359,12 +357,6 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
               <span className="text-xs text-rose-500 font-semibold">{errors.userId.message}</span>
             )}
           </div>
-          {!isManager && (
-            <div>
-              <label className={labelCls}>Biografia / Especialidade</label>
-              <textarea rows={3} maxLength={1000} className={`${inputCls} resize-none`} {...register('bio')} />
-            </div>
-          )}
 
           <div className="border-t border-[#eae1e1]/50 pt-4">
             <h4 className="font-heading font-semibold text-sm text-[#3b3036] mb-3">
@@ -508,15 +500,6 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
                       E-mail
                     </span>
                     <div className="text-base break-all">{selectedEmployee.email || '-'}</div>
-                  </div>
-                </div>
-
-                <div>
-                  <span className="font-semibold block text-xs text-[#3b3036]/60 uppercase tracking-wider mb-1">
-                    Biografia / Especialidade
-                  </span>
-                  <div className="bg-[#fcf9f9] border border-[#eae1e1] rounded-xl p-3 text-[#3b3036]/80 italic">
-                    {selectedEmployee.bio || 'Nenhuma biografia cadastrada.'}
                   </div>
                 </div>
 

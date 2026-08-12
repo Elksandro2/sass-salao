@@ -77,7 +77,6 @@ public class FuncionariaStrategy implements StaffRoleStrategy {
 
         Employee employee = new Employee();
         employee.setUser(user);
-        employee.setBio(request.bio());
         employee.setRemunerationType(type);
         employee.setRemunerationValue(request.remunerationValue());
         employee.setCommissionScope(isCommissioned ? request.commissionScope() : null);

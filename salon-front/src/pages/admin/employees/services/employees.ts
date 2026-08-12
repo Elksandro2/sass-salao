@@ -8,7 +8,6 @@ export interface EmployeeData {
   name?: string;
   email?: string;
   roleName?: 'FUNCIONARIA' | 'GERENTE_DE_ATENDIMENTO' | 'ADMIN';
-  bio?: string;
   remunerationType?: 'SALARIO_FIXO' | 'COMISSIONADO' | 'FIXO_E_COMISSIONADO';
   commissionScope?: 'INDIVIDUAL' | 'GLOBAL';
   remunerationValue?: number;

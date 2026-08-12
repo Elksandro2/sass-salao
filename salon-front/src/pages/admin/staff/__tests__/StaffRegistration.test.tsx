@@ -176,7 +176,7 @@ describe('StaffRegistration', () => {
     expect(payload.pixKey).toBeNull();
   });
 
-  it('submits a valid GERENTE_DE_ATENDIMENTO form with Salário Fixo and no bio/commission', async () => {
+  it('submits a valid GERENTE_DE_ATENDIMENTO form with Salário Fixo and no commission', async () => {
     vi.mocked(staffApi.create).mockResolvedValue(mockStaffList[0] as any);
 
     await act(async () => {
@@ -217,7 +217,6 @@ describe('StaffRegistration', () => {
     });
     expect(payload.commissionScope).toBeNull();
     expect(payload.commissionValue).toBeNull();
-    expect(payload.bio).toBeNull();
   });
 
   it('does not submit when the CPF is invalid', async () => {

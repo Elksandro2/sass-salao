@@ -49,7 +49,7 @@ class StaffProfileRequestValidationTest {
                 "50000-000", "Rua A", "10", null, "Boa Vista", "Recife", BrazilianState.PE,
                 PixKeyType.EMAIL, "maria@example.com",
                 LocalDate.now(), null,
-                RemunerationType.SALARIO_FIXO, null, new BigDecimal("2000"), null, "bio"
+                RemunerationType.SALARIO_FIXO, null, new BigDecimal("2000"), null
         );
     }
 
@@ -198,8 +198,7 @@ class StaffProfileRequestValidationTest {
                 v.cpf(), v.birthDate(), v.gender(), v.phone(), v.emergencyContactName(),
                 v.emergencyContactPhone(), v.zipCode(), v.street(), v.streetNumber(), v.complement(),
                 v.district(), v.city(), null, v.pixKeyType(), v.pixKey(), v.hiredAt(), v.notes(),
-                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue(),
-                v.bio()
+                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue()
         );
         assertThat(validator.validate(r)).anyMatch(cv -> cv.getPropertyPath().toString().equals("stateUf"));
     }
@@ -211,7 +210,7 @@ class StaffProfileRequestValidationTest {
                 v.socialName(), cpf, v.birthDate(), v.gender(), v.phone(), v.emergencyContactName(),
                 v.emergencyContactPhone(), v.zipCode(), v.street(), v.streetNumber(), v.complement(),
                 v.district(), v.city(), v.stateUf(), v.pixKeyType(), v.pixKey(), v.hiredAt(), v.notes(),
-                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue(), v.bio());
+                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue());
     }
 
     private StaffProfileRequest replaceEmail(StaffProfileRequest v, String email) {
@@ -219,7 +218,7 @@ class StaffProfileRequestValidationTest {
                 v.socialName(), v.cpf(), v.birthDate(), v.gender(), v.phone(), v.emergencyContactName(),
                 v.emergencyContactPhone(), v.zipCode(), v.street(), v.streetNumber(), v.complement(),
                 v.district(), v.city(), v.stateUf(), v.pixKeyType(), v.pixKey(), v.hiredAt(), v.notes(),
-                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue(), v.bio());
+                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue());
     }
 
     private StaffProfileRequest replacePassword(StaffProfileRequest v, String password) {
@@ -227,7 +226,7 @@ class StaffProfileRequestValidationTest {
                 v.socialName(), v.cpf(), v.birthDate(), v.gender(), v.phone(), v.emergencyContactName(),
                 v.emergencyContactPhone(), v.zipCode(), v.street(), v.streetNumber(), v.complement(),
                 v.district(), v.city(), v.stateUf(), v.pixKeyType(), v.pixKey(), v.hiredAt(), v.notes(),
-                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue(), v.bio());
+                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue());
     }
 
     private StaffProfileRequest replaceRole(StaffProfileRequest v, String roleName) {
@@ -235,7 +234,7 @@ class StaffProfileRequestValidationTest {
                 v.socialName(), v.cpf(), v.birthDate(), v.gender(), v.phone(), v.emergencyContactName(),
                 v.emergencyContactPhone(), v.zipCode(), v.street(), v.streetNumber(), v.complement(),
                 v.district(), v.city(), v.stateUf(), v.pixKeyType(), v.pixKey(), v.hiredAt(), v.notes(),
-                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue(), v.bio());
+                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue());
     }
 
     private StaffProfileRequest replaceBirthDate(StaffProfileRequest v, LocalDate birthDate) {
@@ -243,7 +242,7 @@ class StaffProfileRequestValidationTest {
                 v.socialName(), v.cpf(), birthDate, v.gender(), v.phone(), v.emergencyContactName(),
                 v.emergencyContactPhone(), v.zipCode(), v.street(), v.streetNumber(), v.complement(),
                 v.district(), v.city(), v.stateUf(), v.pixKeyType(), v.pixKey(), v.hiredAt(), v.notes(),
-                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue(), v.bio());
+                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue());
     }
 
     private StaffProfileRequest replacePhone(StaffProfileRequest v, String phone) {
@@ -251,7 +250,7 @@ class StaffProfileRequestValidationTest {
                 v.socialName(), v.cpf(), v.birthDate(), v.gender(), phone, v.emergencyContactName(),
                 v.emergencyContactPhone(), v.zipCode(), v.street(), v.streetNumber(), v.complement(),
                 v.district(), v.city(), v.stateUf(), v.pixKeyType(), v.pixKey(), v.hiredAt(), v.notes(),
-                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue(), v.bio());
+                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue());
     }
 
     private StaffProfileRequest replaceZipCode(StaffProfileRequest v, String zipCode) {
@@ -259,7 +258,7 @@ class StaffProfileRequestValidationTest {
                 v.socialName(), v.cpf(), v.birthDate(), v.gender(), v.phone(), v.emergencyContactName(),
                 v.emergencyContactPhone(), zipCode, v.street(), v.streetNumber(), v.complement(),
                 v.district(), v.city(), v.stateUf(), v.pixKeyType(), v.pixKey(), v.hiredAt(), v.notes(),
-                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue(), v.bio());
+                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue());
     }
 
     private StaffProfileRequest replacePix(StaffProfileRequest v, PixKeyType type, String key) {
@@ -267,6 +266,6 @@ class StaffProfileRequestValidationTest {
                 v.socialName(), v.cpf(), v.birthDate(), v.gender(), v.phone(), v.emergencyContactName(),
                 v.emergencyContactPhone(), v.zipCode(), v.street(), v.streetNumber(), v.complement(),
                 v.district(), v.city(), v.stateUf(), type, key, v.hiredAt(), v.notes(),
-                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue(), v.bio());
+                v.remunerationType(), v.commissionScope(), v.remunerationValue(), v.commissionValue());
     }
 }

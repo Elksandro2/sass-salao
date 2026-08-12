@@ -379,9 +379,6 @@ export const PublicAppointment = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h5 className="font-bold text-[#3b3036] mb-0.5">{emp.name}</h5>
-                      <p className="text-xs text-[#3b3036]/60 leading-snug">
-                        {emp.bio || 'Profissional especialista'}
-                      </p>
                     </div>
                     {selectedEmployee === emp.id && (
                       <CheckCircle size={20} className="shrink-0 text-[#be8a83]" />

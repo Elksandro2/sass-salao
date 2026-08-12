@@ -138,7 +138,6 @@ class MercadoPagoWebhookIntegrationTest {
         // Criar funcionário
         Employee employee = new Employee();
         employee.setUser(employeeUser);
-        employee.setBio("Cabeleireira profissional");
         employee.setRemunerationType(RemunerationType.COMISSIONADO);
         employee.setCommissionScope(CommissionScope.INDIVIDUAL);
         employee.setRemunerationValue(BigDecimal.ZERO);

@@ -5,15 +5,13 @@ import com.cristiane.salon.models.employee.entity.Employee;
 public record EmployeeBookingResponse(
         Long id,
         Long userId,
-        String name,
-        String bio
+        String name
 ) {
     public static EmployeeBookingResponse fromEntity(Employee employee) {
         return new EmployeeBookingResponse(
                 employee.getId(),
                 employee.getUser().getId(),
-                employee.getUser().getName(),
-                employee.getBio()
+                employee.getUser().getName()
         );
     }
 }

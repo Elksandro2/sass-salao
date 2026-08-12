@@ -90,7 +90,6 @@ export const staffFormSchema = z
     commissionScope: commissionScopeSchema.optional(),
     remunerationValue: z.string().optional(),
     commissionValue: z.string().optional(),
-    bio: z.string().max(1000, 'Máximo de 1000 caracteres').optional(),
   })
   .superRefine((data, ctx) => {
     if (data.confirmPassword !== data.password) {
