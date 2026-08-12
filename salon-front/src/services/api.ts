@@ -137,14 +137,10 @@ api.interceptors.response.use(
       }
     }
 
-    if (error.response?.status === 403) {
-      localStorage.removeItem('@Salon:token');
-      localStorage.removeItem('@Salon:refreshToken');
-      // React-friendly logout via Event Bus — sem hard reload
-      dispatchLogoutEvent(originalRequest);
-      return Promise.reject(error);
-    }
-
+    // 403 é "autenticado, mas sem permissão pra essa ação específica" (ex.: FUNCIONARIA
+    // batendo num endpoint restrito a ADMIN) — não é sessão inválida. Derrubar a sessão aqui
+    // deslogava qualquer usuário com permissões mais restritas a cada ação bloqueada, mesmo com
+    // token válido. Só 401 (tratado acima) indica sessão realmente expirada/inválida.
     return Promise.reject(error);
   }
 );

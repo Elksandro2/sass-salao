@@ -48,7 +48,7 @@ describe('api interceptors', () => {
       await expect(responseInterceptor.rejected(mockError)).rejects.toEqual(mockError);
     });
 
-    it('should clear localStorage and dispatch auth:logout Event Bus on 403', async () => {
+    it('should NOT clear the session nor dispatch auth:logout on 403 (permission denied, not an invalid session)', async () => {
       localStorage.setItem('@Salon:token', 'test-token');
       const mockError = {
         response: { status: 403 },
@@ -56,22 +56,10 @@ describe('api interceptors', () => {
       };
 
       await expect(responseInterceptor.rejected(mockError)).rejects.toEqual(mockError);
-      expect(localStorage.getItem('@Salon:token')).toBeNull();
-      // O Event Bus 'auth:logout' deve ser disparado em vez de hard reload (window.location.href)
-      expect(window.dispatchEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'auth:logout' })
-      );
-    });
-
-    it('should NOT dispatch auth:logout on 403 if endpoint is /auth/login (login failure)', async () => {
-      localStorage.setItem('@Salon:token', 'test-token');
-      const mockError = {
-        response: { status: 403 },
-        config: { url: '/auth/login' },
-      };
-
-      await expect(responseInterceptor.rejected(mockError)).rejects.toEqual(mockError);
-      // Endpoint de login não deve disparar o evento de logout
+      // Um 403 significa "autenticado, mas sem permissão pra essa ação" — não invalida a sessão.
+      // FUNCIONARIA (permissões restritas) batendo em endpoints sem permissão não pode ser
+      // deslogada por isso, senão qualquer ação bloqueada a expulsa do sistema.
+      expect(localStorage.getItem('@Salon:token')).toBe('test-token');
       expect(window.dispatchEvent).not.toHaveBeenCalledWith(
         expect.objectContaining({ type: 'auth:logout' })
       );
