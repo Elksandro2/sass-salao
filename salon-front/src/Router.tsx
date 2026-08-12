@@ -24,6 +24,7 @@ import { PublicAppointment } from './pages/appointments/PublicAppointment';
 import { MyAppointments } from './pages/appointments/MyAppointments';
 import { AdminAppointments } from './pages/admin/appointments/AdminAppointments';
 import { CashFlow } from './pages/admin/cashflow/CashFlow';
+import { GeneralNotes } from './pages/admin/general-notes/GeneralNotes';
 import { Recommendations } from './pages/admin/recommendations/Recommendations';
 import { EmailOutbox } from './pages/admin/email-outbox/EmailOutbox';
 import { SalonProfile } from './pages/admin/salon-profile/SalonProfile';
@@ -200,6 +201,14 @@ export const Router = () => {
           element={
             <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE_DE_ATENDIMENTO']}>
               <CashFlow />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/general-notes"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE_DE_ATENDIMENTO']}>
+              <GeneralNotes />
             </ProtectedRoute>
           }
         />

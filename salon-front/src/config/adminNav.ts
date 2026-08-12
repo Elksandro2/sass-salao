@@ -10,6 +10,7 @@ import {
   Lightbulb,
   Mail,
   Store,
+  StickyNote,
 } from 'lucide-react';
 
 export interface AdminNavItem {
@@ -32,6 +33,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { to: '/admin/products', label: 'Produtos', icon: Package, allowedRoles: ['ADMIN'] },
   { to: '/admin/appointments', label: 'Agendamentos', icon: Calendar, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO', 'FUNCIONARIA'] },
   { to: '/admin/cashflow', label: 'Fluxo de Caixa', icon: DollarSign, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
+  { to: '/admin/general-notes', label: 'Anotações Gerais', icon: StickyNote, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
   { to: '/admin/recommendations', label: 'Recomendações de IA', icon: Lightbulb, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
   { to: '/admin/email-outbox', label: 'Central de E-mails', icon: Mail, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
   { to: '/admin/salon-profile', label: 'Perfil do Salão', icon: Store, allowedRoles: ['ADMIN'] },
