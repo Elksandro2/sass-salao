@@ -60,6 +60,14 @@ public class Appointment {
     @Column(name = "client_notes", columnDefinition = "TEXT")
     private String clientNotes;
 
+    /**
+     * Observação interna da equipe sobre este atendimento específico — distinta de
+     * {@link #clientNotes} (o que o cliente escreveu). Editável a qualquer momento, não só na
+     * criação, e fica visível depois no histórico do cliente.
+     */
+    @Column(name = "internal_notes", columnDefinition = "TEXT")
+    private String internalNotes;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

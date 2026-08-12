@@ -6,6 +6,7 @@ import com.cristiane.salon.models.appointment.dto.AppointmentRequest;
 import com.cristiane.salon.models.appointment.dto.AppointmentResponse;
 import com.cristiane.salon.models.appointment.dto.ConfirmAppointmentRequest;
 import com.cristiane.salon.models.appointment.dto.GeneratePixRequest;
+import com.cristiane.salon.models.appointment.dto.UpdateInternalNotesRequest;
 import com.cristiane.salon.models.appointment.service.AppointmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -46,6 +47,16 @@ public class AppointmentController {
             @PathVariable Long id,
             @Valid @RequestBody ConfirmAppointmentRequest body) {
         return ResponseEntity.ok(appointmentService.confirm(id, body.scheduledAt()));
+    }
+
+    @PatchMapping("/{id}/internal-notes")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Auditable(action = "APPOINTMENT_INTERNAL_NOTES_UPDATED", entityType = "Appointment", captureArgs = true)
+    @Operation(summary = "Define a observação interna da equipe sobre o agendamento (Admin/Gerente/Funcionária responsável)")
+    public ResponseEntity<AppointmentResponse> updateInternalNotes(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateInternalNotesRequest body) {
+        return ResponseEntity.ok(appointmentService.updateInternalNotes(id, body.internalNotes()));
     }
 
     @PatchMapping("/{id}/decline")

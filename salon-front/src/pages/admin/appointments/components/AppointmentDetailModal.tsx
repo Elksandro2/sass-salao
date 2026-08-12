@@ -1,8 +1,14 @@
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { appointmentsApi } from '../../../appointments/services/appointments';
 import type { AppointmentResponse } from '../../../appointments/services/appointments';
 import { formatApiDate, formatApiDateTime } from '../../../../utils/datetime';
+import { PermissionGate } from '../../../../components/permissions/PermissionGate';
+import { useAlert } from '../../../../hooks/useAlert';
+import { getApiErrorMessage } from '../../../../utils/apiError';
 
 const labelCls = 'label-premium';
+const inputCls = 'input-premium';
 
 function formatMoney(value: number | null | undefined): string {
   return value != null ? `R$ ${value.toFixed(2)}` : '—';
@@ -15,12 +21,36 @@ function formatDuration(value: number | null | undefined): string {
 interface AppointmentDetailModalProps {
   appointment: AppointmentResponse | null;
   onClose: () => void;
+  /** Avisa o pai que a observação interna mudou, pra refletir na listagem/histórico. */
+  onNotesSaved?: (updated: AppointmentResponse) => void;
 }
 
-export const AppointmentDetailModal = ({ appointment, onClose }: AppointmentDetailModalProps) => {
+export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: AppointmentDetailModalProps) => {
+  const [internalNotes, setInternalNotes] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const { error: showError, success: showSuccess } = useAlert();
+
+  useEffect(() => {
+    setInternalNotes(appointment?.internalNotes ?? '');
+  }, [appointment?.id, appointment?.internalNotes]);
+
   if (!appointment) return null;
 
   const services = appointment.services;
+
+  const handleSaveNotes = async () => {
+    setIsSaving(true);
+    try {
+      const updated = await appointmentsApi.updateInternalNotes(appointment.id, internalNotes.trim());
+      onNotesSaved?.(updated);
+      await showSuccess('Observação interna salva');
+    } catch (err) {
+      const msg = getApiErrorMessage(err, 'Erro ao salvar observação interna');
+      await showError(msg);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#261f23]/40 backdrop-blur-md">
@@ -141,6 +171,44 @@ export const AppointmentDetailModal = ({ appointment, onClose }: AppointmentDeta
               <p className="text-sm text-[#3b3036] mt-1">{appointment.clientNotes}</p>
             </div>
           )}
+
+          <div className="border-t border-[#eae1e1] pt-4">
+            <label htmlFor="internal-notes" className={labelCls}>
+              Observação interna da equipe
+            </label>
+            <p className="text-xs text-gray-400 mb-2">
+              Só a equipe vê isso — não aparece pro cliente. Fica salva no histórico dele.
+            </p>
+            <PermissionGate
+              method="PATCH"
+              endpoint={`/v1/appointments/${appointment.id}/internal-notes`}
+              fallback={
+                <p className="text-sm text-[#3b3036] italic">
+                  {appointment.internalNotes || 'Nenhuma observação registrada.'}
+                </p>
+              }
+            >
+              <textarea
+                id="internal-notes"
+                rows={3}
+                maxLength={4000}
+                className={`${inputCls} resize-none`}
+                value={internalNotes}
+                onChange={(e) => setInternalNotes(e.target.value)}
+                placeholder="Ex.: cliente atrasou 15min, trouxe foto de referência..."
+              />
+              <div className="flex justify-end mt-2">
+                <button
+                  type="button"
+                  onClick={handleSaveNotes}
+                  disabled={isSaving || internalNotes === (appointment.internalNotes ?? '')}
+                  className="btn-premium text-xs px-4 py-2 disabled:opacity-50"
+                >
+                  {isSaving ? 'Salvando...' : 'Salvar observação'}
+                </button>
+              </div>
+            </PermissionGate>
+          </div>
         </div>
 
         <div className="flex justify-end px-6 py-4 border-t border-[#eae1e1] bg-[#fcf9f9]/50 shrink-0">

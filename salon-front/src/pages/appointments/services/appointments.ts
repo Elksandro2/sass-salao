@@ -45,6 +45,7 @@ export interface AppointmentResponse {
   scheduledAt: string | null;
   preferredDate?: string | null;
   clientNotes?: string | null;
+  internalNotes?: string | null;
   status: string;
   paymentStatus?: string | null;
   paymentId?: number | null;
@@ -127,6 +128,13 @@ export const appointmentsApi = {
 
   decline: async (id: number) => {
     const { data } = await api.patch<AppointmentResponse>(`/appointments/${id}/decline`);
+    return data;
+  },
+
+  updateInternalNotes: async (id: number, internalNotes: string) => {
+    const { data } = await api.patch<AppointmentResponse>(`/appointments/${id}/internal-notes`, {
+      internalNotes,
+    });
     return data;
   },
 

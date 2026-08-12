@@ -217,6 +217,15 @@ export function ClientDrawer({ isOpen, onClose, clientId }: ClientDrawerProps) {
                             </span>
                           </div>
                         )}
+
+                        {appt.internalNotes && (
+                          <div className="mt-2.5 text-3xs border-t border-[#eae1e1]/20 dark:border-gray-800/40 pt-2">
+                            <span className="text-gray-400 block mb-0.5">Observação interna:</span>
+                            <span className="text-[#3b3036] dark:text-gray-200 italic">
+                              {appt.internalNotes}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

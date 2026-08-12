@@ -128,7 +128,7 @@ class AuditAspectTest {
 
         AppointmentResponse response = new AppointmentResponse(
                 99L, 1L, "Client", 2L, "Employee", java.util.List.of(), null, null,
-                null, null, "Notes", "PENDING", null, null, null, false, ""
+                null, null, "Notes", null, "PENDING", null, null, null, false, ""
         );
         ResponseEntity<AppointmentResponse> result = ResponseEntity.ok(response);
 

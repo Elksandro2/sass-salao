@@ -1,7 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, customRender as render } from '../../../../../test/test-utils';
 import { AppointmentDetailModal } from '../AppointmentDetailModal';
 import type { AppointmentResponse } from '../../../../appointments/services/appointments';
+
+vi.mock('../../../../../hooks/useAlert', () => ({
+  useAlert: () => ({
+    error: vi.fn(),
+    success: vi.fn(),
+    alert: vi.fn(),
+    confirm: vi.fn().mockResolvedValue(true),
+  }),
+}));
+
+const adminUser = { email: 'admin@salao.com', role: 'ADMIN', userId: 1, permissions: [] };
 
 const baseAppointment: AppointmentResponse = {
   id: 1,
@@ -30,12 +41,12 @@ const baseAppointment: AppointmentResponse = {
 
 describe('AppointmentDetailModal', () => {
   it('renders nothing when there is no appointment', () => {
-    const { container } = render(<AppointmentDetailModal appointment={null} onClose={vi.fn()} />);
+    const { container } = render(<AppointmentDetailModal appointment={null} onClose={vi.fn()} />, { user: adminUser, isAuthenticated: true });
     expect(container).toBeEmptyDOMElement();
   });
 
   it('shows the effective price/duration without a catalog comparison when there is no customization', () => {
-    render(<AppointmentDetailModal appointment={baseAppointment} onClose={vi.fn()} />);
+    render(<AppointmentDetailModal appointment={baseAppointment} onClose={vi.fn()} />, { user: adminUser, isAuthenticated: true });
 
     expect(screen.getByText('Maria')).toBeInTheDocument();
     expect(screen.getByText('Coloração')).toBeInTheDocument();
@@ -64,7 +75,7 @@ describe('AppointmentDetailModal', () => {
       totalDurationMin: 90,
     };
 
-    render(<AppointmentDetailModal appointment={customized} onClose={vi.fn()} />);
+    render(<AppointmentDetailModal appointment={customized} onClose={vi.fn()} />, { user: adminUser, isAuthenticated: true });
 
     expect(screen.getByText('Catálogo: R$ 150.00')).toBeInTheDocument();
     expect(screen.getByText('Catálogo: 60 min')).toBeInTheDocument();
@@ -94,7 +105,7 @@ describe('AppointmentDetailModal', () => {
       totalDurationMin: 90,
     };
 
-    render(<AppointmentDetailModal appointment={multi} onClose={vi.fn()} />);
+    render(<AppointmentDetailModal appointment={multi} onClose={vi.fn()} />, { user: adminUser, isAuthenticated: true });
 
     expect(screen.getByText('Total')).toBeInTheDocument();
     expect(screen.getByText('R$ 200.00')).toBeInTheDocument();
@@ -104,7 +115,7 @@ describe('AppointmentDetailModal', () => {
   it('mostra a data e hora do agendamento sem deslocar o fuso', () => {
     // O modal não exibia data nenhuma — justamente o dado que se quer conferir ao abrir os
     // detalhes. E é regressão do bug de fuso: 10h agendado tem que aparecer como 10h.
-    render(<AppointmentDetailModal appointment={baseAppointment} onClose={vi.fn()} />);
+    render(<AppointmentDetailModal appointment={baseAppointment} onClose={vi.fn()} />, { user: adminUser, isAuthenticated: true });
 
     expect(screen.getByText('Data e hora')).toBeInTheDocument();
     expect(screen.getByText(/^01\/08\/2026,? 10:00$/)).toBeInTheDocument();
@@ -119,7 +130,7 @@ describe('AppointmentDetailModal', () => {
       status: 'REQUESTED',
     } as AppointmentResponse;
 
-    render(<AppointmentDetailModal appointment={semHorario} onClose={vi.fn()} />);
+    render(<AppointmentDetailModal appointment={semHorario} onClose={vi.fn()} />, { user: adminUser, isAuthenticated: true });
 
     expect(screen.getByText('A combinar')).toBeInTheDocument();
     expect(screen.getByText('Preferência do cliente')).toBeInTheDocument();
@@ -129,7 +140,7 @@ describe('AppointmentDetailModal', () => {
 
   it('calls onClose when the close button is clicked', () => {
     const handleClose = vi.fn();
-    render(<AppointmentDetailModal appointment={baseAppointment} onClose={handleClose} />);
+    render(<AppointmentDetailModal appointment={baseAppointment} onClose={handleClose} />, { user: adminUser, isAuthenticated: true });
 
     fireEvent.click(screen.getByText('Fechar'));
 
