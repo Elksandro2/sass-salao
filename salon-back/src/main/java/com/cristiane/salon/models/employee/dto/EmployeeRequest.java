@@ -15,5 +15,8 @@ public record EmployeeRequest(
 
         BigDecimal remunerationValue,
 
-        BigDecimal commissionValue
+        BigDecimal commissionValue,
+
+        /** Comissão única (%) sobre produtos vendidos — independente da comissão de serviços acima. */
+        BigDecimal productCommissionValue
 ) {}

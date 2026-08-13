@@ -69,6 +69,9 @@ class AppointmentServiceTest {
     private SalonServiceRepository salonServiceRepository;
 
     @Mock
+    private com.cristiane.salon.models.product.repository.ProductRepository productRepository;
+
+    @Mock
     private UserRepository userRepository;
 
     @Mock
@@ -206,7 +209,7 @@ class AppointmentServiceTest {
         SecurityContextHolder.setContext(secCtx);
         when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -219,7 +222,7 @@ class AppointmentServiceTest {
         // Arrange
         mockAuthenticatedUser(clientUser);
         when(featureFlagService.isEnabled("ENABLE_CUSTOMER_PORTAL")).thenReturn(false);
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -233,7 +236,7 @@ class AppointmentServiceTest {
         mockAuthenticatedUser(clientUser);
         when(featureFlagService.isEnabled("ENABLE_CUSTOMER_PORTAL")).thenReturn(true);
         when(featureFlagService.isEnabled("CLIENT_BOOKING")).thenReturn(false);
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -246,7 +249,7 @@ class AppointmentServiceTest {
         // Arrange
         mockAuthenticatedUser(staffUser);
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, 99L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null, 99L);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -262,7 +265,7 @@ class AppointmentServiceTest {
         when(featureFlagService.isEnabled("CLIENT_BOOKING")).thenReturn(true);
         when(employeeRepository.findById(5L)).thenReturn(Optional.empty());
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -279,7 +282,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.empty());
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -297,7 +300,7 @@ class AppointmentServiceTest {
         salonService.setActive(false);
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -315,7 +318,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null, 10L);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -331,7 +334,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), salonClock.now().minusDays(1), null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, salonClock.now().minusDays(1), null, null, 10L);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -347,7 +350,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), salonClock.now().plusDays(1), salonClock.today().minusDays(1), null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, salonClock.now().plusDays(1), salonClock.today().minusDays(1), null, 10L);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -372,7 +375,7 @@ class AppointmentServiceTest {
         when(appointmentRepository.findActiveAppointmentsByEmployeeAndDate(eq(5L), any(), any()))
                 .thenReturn(List.of(conflicting));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), targetTime, null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, targetTime, null, null, 10L);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -402,7 +405,7 @@ class AppointmentServiceTest {
 
         when(appointmentRepository.save(any(Appointment.class))).thenReturn(saved);
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), targetTime, salonClock.today().plusDays(1), "notes", 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, targetTime, salonClock.today().plusDays(1), "notes", 10L);
 
         // Act
         AppointmentResponse result = appointmentService.create(request);
@@ -437,7 +440,7 @@ class AppointmentServiceTest {
         saved.setStatus(AppointmentStatus.CONFIRMED);
         when(appointmentRepository.save(any(Appointment.class))).thenReturn(saved);
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), targetTime, null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, targetTime, null, null, 10L);
 
         AppointmentResponse result = appointmentService.create(request);
 
@@ -457,7 +460,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(6L)).thenReturn(Optional.of(colleagueEmployee));
 
         LocalDateTime targetTime = salonClock.now().plusDays(1);
-        AppointmentRequest request = new AppointmentRequest(6L, List.of(new AppointmentServiceRequest(8L, null, null, null)), targetTime, null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(6L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, targetTime, null, null, 10L);
 
         assertThatThrownBy(() -> appointmentService.create(request))
                 .isInstanceOf(UnauthorizedException.class)
@@ -480,7 +483,7 @@ class AppointmentServiceTest {
                 .thenReturn(List.of());
         when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, new BigDecimal("200.00"), 90, "Cabelo mais longo, precisa de mais tempo")), targetTime, null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, new BigDecimal("200.00"), 90, "Cabelo mais longo, precisa de mais tempo")), null, targetTime, null, null, 10L);
 
         // Act
         AppointmentResponse result = appointmentService.create(request);
@@ -512,7 +515,7 @@ class AppointmentServiceTest {
                 .thenReturn(List.of());
         when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), targetTime, null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, targetTime, null, null, 10L);
 
         // Act
         AppointmentResponse result = appointmentService.create(request);
@@ -555,6 +558,7 @@ class AppointmentServiceTest {
                         new AppointmentServiceRequest(8L, null, null, null),
                         new AppointmentServiceRequest(9L, new BigDecimal("120.00"), null, null)
                 ),
+                null,
                 targetTime, null, null, 10L
         );
 
@@ -592,6 +596,7 @@ class AppointmentServiceTest {
                         new AppointmentServiceRequest(8L, null, null, null),
                         new AppointmentServiceRequest(9L, new BigDecimal("1.00"), null, null)
                 ),
+                null,
                 null, null, null, null
         );
 
@@ -636,6 +641,7 @@ class AppointmentServiceTest {
                         new AppointmentServiceRequest(8L, null, null, null),
                         new AppointmentServiceRequest(9L, null, null, null)
                 ),
+                null,
                 targetTime, null, null, 10L
         );
 
@@ -653,7 +659,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, new BigDecimal("-1.00"), null, null)), salonClock.now().plusDays(1), null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, new BigDecimal("-1.00"), null, null)), null, salonClock.now().plusDays(1), null, null, 10L);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -669,7 +675,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, 0, null)), salonClock.now().plusDays(1), null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, 0, null)), null, salonClock.now().plusDays(1), null, null, 10L);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -695,7 +701,7 @@ class AppointmentServiceTest {
         when(appointmentRepository.findActiveAppointmentsByEmployeeAndDate(eq(5L), any(), any()))
                 .thenReturn(List.of(conflicting));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, 90, null)), targetTime, null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, 90, null)), null, targetTime, null, null, 10L);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -721,7 +727,7 @@ class AppointmentServiceTest {
         when(appointmentRepository.findActiveAppointmentsByEmployeeAndDate(eq(5L), any(), any()))
                 .thenReturn(List.of(conflicting));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), existingStart.plusMinutes(60), null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, existingStart.plusMinutes(60), null, null, 10L);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -740,7 +746,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), salonClock.now().plusDays(1), null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, salonClock.now().plusDays(1), null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -757,7 +763,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, salonClock.today().minusDays(1), null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, salonClock.today().minusDays(1), null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -775,7 +781,7 @@ class AppointmentServiceTest {
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
         when(salonProfileService.isDayOpen(any())).thenReturn(false);
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, salonClock.today().plusDays(3), null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, salonClock.today().plusDays(3), null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -800,7 +806,7 @@ class AppointmentServiceTest {
         saved.setStatus(AppointmentStatus.REQUESTED);
         when(appointmentRepository.save(any(Appointment.class))).thenReturn(saved);
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, null, null);
 
         // Act
         appointmentService.create(request);
@@ -819,7 +825,7 @@ class AppointmentServiceTest {
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
         String longNotes = "a".repeat(4001);
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, longNotes, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, null, longNotes, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -845,7 +851,7 @@ class AppointmentServiceTest {
 
         when(appointmentRepository.save(any(Appointment.class))).thenReturn(saved);
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, salonClock.today().plusDays(2), "my notes", null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null, null)), null, null, salonClock.today().plusDays(2), "my notes", null);
 
         // Act
         AppointmentResponse result = appointmentService.create(request);
@@ -1593,6 +1599,39 @@ class AppointmentServiceTest {
     }
 
     @Test
+    void updateStatus_whenStatusDoneWithProducts_shouldBillGrandTotalAndDeductStock() {
+        // Arrange: agendamento com serviço (R$100) + 2 unidades de um produto (R$50 cada) —
+        // o valor faturado deve ser a soma (R$200), e o estoque do produto deve baixar em 2.
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setScheduledAt(salonClock.now().plusDays(1));
+        apt.setClient(clientUser);
+        apt.setEmployee(employee);
+        withService(apt, salonService);
+
+        com.cristiane.salon.models.product.entity.Product product = shampooProduct();
+        var productItem = new com.cristiane.salon.models.appointment.entity.AppointmentProductItem();
+        productItem.setAppointment(apt);
+        productItem.setProduct(product);
+        productItem.setQuantity(2);
+        apt.setProducts(List.of(productItem));
+
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        appointmentService.updateStatus(1L, "DONE");
+
+        // Assert
+        ArgumentCaptor<CashFlow> cashFlowCaptor = ArgumentCaptor.forClass(CashFlow.class);
+        verify(cashFlowRepository).save(cashFlowCaptor.capture());
+        assertThat(cashFlowCaptor.getValue().getAmount()).isEqualByComparingTo("200.00");
+
+        assertThat(product.getStock()).isEqualTo(8);
+        verify(productRepository).save(product);
+    }
+
+    @Test
     void updateStatus_whenStatusDoneWithCustomPrice_shouldBillCustomPriceInsteadOfCatalogPrice() {
         // Arrange: preço customizado (R$200) para este agendamento específico, sem alterar o
         // preço de catálogo do serviço (R$100 no fixture salonService).
@@ -2044,6 +2083,162 @@ class AppointmentServiceTest {
         // Assert
         assertThat(response).isNotNull();
         assertThat(response.id()).isEqualTo(1L);
+    }
+
+    // --- updateProducts / updateExpenses tests ---
+
+    private com.cristiane.salon.models.product.entity.Product shampooProduct() {
+        com.cristiane.salon.models.product.entity.Product product = new com.cristiane.salon.models.product.entity.Product();
+        product.setId(30L);
+        product.setName("Shampoo");
+        product.setPrice(new BigDecimal("50.00"));
+        product.setStock(10);
+        product.setActive(true);
+        return product;
+    }
+
+    private Appointment appointmentWithStatus(AppointmentStatus status) {
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setClient(clientUser);
+        apt.setEmployee(employee);
+        withService(apt, salonService);
+        apt.setStatus(status);
+        return apt;
+    }
+
+    @Test
+    void updateProducts_whenValid_shouldReplaceProductsAndReturnUpdatedTotals() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(productRepository.findById(30L)).thenReturn(Optional.of(shampooProduct()));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var request = new com.cristiane.salon.models.appointment.dto.AppointmentProductRequest(30L, 2, null);
+
+        AppointmentResponse result = appointmentService.updateProducts(1L, List.of(request));
+
+        assertThat(result.products()).hasSize(1);
+        assertThat(result.totalProductsPrice()).isEqualByComparingTo("100.00");
+        assertThat(result.grandTotal()).isEqualByComparingTo("200.00");
+    }
+
+    @Test
+    void updateProducts_whenProductNotFound_shouldThrowResourceNotFoundException() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(productRepository.findById(30L)).thenReturn(Optional.empty());
+
+        var request = new com.cristiane.salon.models.appointment.dto.AppointmentProductRequest(30L, 1, null);
+
+        assertThatThrownBy(() -> appointmentService.updateProducts(1L, List.of(request)))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Produto não encontrado");
+    }
+
+    @Test
+    void updateProducts_whenProductInactive_shouldThrowBadRequestException() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        com.cristiane.salon.models.product.entity.Product inactive = shampooProduct();
+        inactive.setActive(false);
+        when(productRepository.findById(30L)).thenReturn(Optional.of(inactive));
+
+        var request = new com.cristiane.salon.models.appointment.dto.AppointmentProductRequest(30L, 1, null);
+
+        assertThatThrownBy(() -> appointmentService.updateProducts(1L, List.of(request)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Este produto não está disponível: Shampoo");
+    }
+
+    @Test
+    void updateProducts_whenCustomPriceNegative_shouldThrowBadRequestException() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        var request = new com.cristiane.salon.models.appointment.dto.AppointmentProductRequest(
+                30L, 1, new BigDecimal("-5.00"));
+
+        assertThatThrownBy(() -> appointmentService.updateProducts(1L, List.of(request)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("O preço customizado do produto não pode ser negativo");
+    }
+
+    @Test
+    void updateProducts_whenAppointmentCancelled_shouldThrowBusinessException() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CANCELLED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        var request = new com.cristiane.salon.models.appointment.dto.AppointmentProductRequest(30L, 1, null);
+
+        assertThatThrownBy(() -> appointmentService.updateProducts(1L, List.of(request)))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void updateProducts_whenAppointmentAlreadyDone_shouldThrowBusinessException() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.DONE);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        var request = new com.cristiane.salon.models.appointment.dto.AppointmentProductRequest(30L, 1, null);
+
+        assertThatThrownBy(() -> appointmentService.updateProducts(1L, List.of(request)))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void updateExpenses_whenValid_shouldReplaceExpensesAndReturnUpdatedTotals() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var request = new com.cristiane.salon.models.appointment.dto.AppointmentExpenseRequest(
+                "Material extra", "FIXED", new BigDecimal("20.00"));
+
+        AppointmentResponse result = appointmentService.updateExpenses(1L, List.of(request));
+
+        assertThat(result.expenses()).hasSize(1);
+        assertThat(result.totalExpensesAmount()).isEqualByComparingTo("20.00");
+        assertThat(result.grandTotal()).isEqualByComparingTo("80.00");
+    }
+
+    @Test
+    void updateExpenses_whenValueTypeInvalid_shouldThrowBadRequestException() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        var request = new com.cristiane.salon.models.appointment.dto.AppointmentExpenseRequest(
+                "Material extra", "INVALID_TYPE", new BigDecimal("20.00"));
+
+        assertThatThrownBy(() -> appointmentService.updateExpenses(1L, List.of(request)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Tipo de valor de despesa inválido");
+    }
+
+    @Test
+    void updateExpenses_whenPercentageOver100_shouldThrowBadRequestException() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        var request = new com.cristiane.salon.models.appointment.dto.AppointmentExpenseRequest(
+                "Taxa", "PERCENTAGE", new BigDecimal("150"));
+
+        assertThatThrownBy(() -> appointmentService.updateExpenses(1L, List.of(request)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("A porcentagem da despesa não pode ser maior que 100");
+    }
+
+    @Test
+    void updateExpenses_whenAppointmentPaid_shouldThrowBusinessException() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        apt.setPaymentStatus(com.cristiane.salon.models.appointment.enums.PaymentStatus.PAID);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        var request = new com.cristiane.salon.models.appointment.dto.AppointmentExpenseRequest(
+                "Taxa", "FIXED", new BigDecimal("10"));
+
+        assertThatThrownBy(() -> appointmentService.updateExpenses(1L, List.of(request)))
+                .isInstanceOf(BusinessException.class);
     }
 }
 

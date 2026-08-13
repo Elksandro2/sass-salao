@@ -6,6 +6,8 @@ import com.cristiane.salon.models.appointment.dto.AppointmentRequest;
 import com.cristiane.salon.models.appointment.dto.AppointmentResponse;
 import com.cristiane.salon.models.appointment.dto.ConfirmAppointmentRequest;
 import com.cristiane.salon.models.appointment.dto.GeneratePixRequest;
+import com.cristiane.salon.models.appointment.dto.UpdateAppointmentExpensesRequest;
+import com.cristiane.salon.models.appointment.dto.UpdateAppointmentProductsRequest;
 import com.cristiane.salon.models.appointment.dto.UpdateInternalNotesRequest;
 import com.cristiane.salon.models.appointment.service.AppointmentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -57,6 +59,26 @@ public class AppointmentController {
             @PathVariable Long id,
             @Valid @RequestBody UpdateInternalNotesRequest body) {
         return ResponseEntity.ok(appointmentService.updateInternalNotes(id, body.internalNotes()));
+    }
+
+    @PatchMapping("/{id}/products")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Auditable(action = "APPOINTMENT_PRODUCTS_UPDATED", entityType = "Appointment", captureArgs = true)
+    @Operation(summary = "Define os produtos vendidos num agendamento (Admin/Gerente/Funcionária responsável)")
+    public ResponseEntity<AppointmentResponse> updateProducts(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateAppointmentProductsRequest body) {
+        return ResponseEntity.ok(appointmentService.updateProducts(id, body.products()));
+    }
+
+    @PatchMapping("/{id}/expenses")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Auditable(action = "APPOINTMENT_EXPENSES_UPDATED", entityType = "Appointment", captureArgs = true)
+    @Operation(summary = "Define as despesas itemizadas de um agendamento (Admin/Gerente/Funcionária responsável)")
+    public ResponseEntity<AppointmentResponse> updateExpenses(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateAppointmentExpensesRequest body) {
+        return ResponseEntity.ok(appointmentService.updateExpenses(id, body.expenses()));
     }
 
     @PatchMapping("/{id}/decline")

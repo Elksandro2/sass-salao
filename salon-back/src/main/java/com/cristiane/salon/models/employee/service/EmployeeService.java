@@ -139,11 +139,29 @@ public class EmployeeService {
             } else {
                 employee.setCommissionValue(null);
             }
+
+            if (request.remunerationType() == RemunerationType.COMISSIONADO
+                    || request.remunerationType() == RemunerationType.FIXO_E_COMISSIONADO) {
+                if (request.productCommissionValue() != null) {
+                    if (request.productCommissionValue().compareTo(java.math.BigDecimal.ZERO) < 0) {
+                        throw new BadRequestException("A comissão sobre produtos não pode ser negativa");
+                    }
+                    if (request.productCommissionValue().compareTo(new java.math.BigDecimal("100")) > 0) {
+                        throw new BadRequestException("A comissão sobre produtos não pode exceder 100%");
+                    }
+                    employee.setProductCommissionValue(request.productCommissionValue());
+                } else {
+                    employee.setProductCommissionValue(null);
+                }
+            } else {
+                employee.setProductCommissionValue(null);
+            }
         } else {
             employee.setRemunerationType(null);
             employee.setCommissionScope(null);
             employee.setRemunerationValue(null);
             employee.setCommissionValue(null);
+            employee.setProductCommissionValue(null);
         }
     }
 

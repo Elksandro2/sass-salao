@@ -9,7 +9,9 @@ public record EmployeeFinanceResponse(
         BigDecimal remunerationValue,
         String commissionScope,
         BigDecimal commissionValue,
+        BigDecimal productCommissionValue,
         long doneAppointmentsCount,
         BigDecimal doneAppointmentsValue,
+        BigDecimal doneProductsValue,
         BigDecimal calculatedPayout
 ) {}

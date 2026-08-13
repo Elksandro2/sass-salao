@@ -8,13 +8,18 @@ import com.cristiane.salon.exception.BusinessException;
 import com.cristiane.salon.models.appointment.dto.GeneratePixRequest;
 import com.cristiane.salon.utils.CpfValidator;
 import com.cristiane.salon.integrations.payment.service.MercadoPagoPaymentService;
+import com.cristiane.salon.models.appointment.dto.AppointmentExpenseRequest;
 import com.cristiane.salon.models.appointment.dto.AppointmentFilter;
+import com.cristiane.salon.models.appointment.dto.AppointmentProductRequest;
 import com.cristiane.salon.models.appointment.dto.AppointmentRequest;
 import com.cristiane.salon.models.appointment.dto.AppointmentResponse;
 import com.cristiane.salon.models.appointment.dto.AppointmentServiceRequest;
 import com.cristiane.salon.models.appointment.entity.Appointment;
+import com.cristiane.salon.models.appointment.entity.AppointmentExpenseItem;
+import com.cristiane.salon.models.appointment.entity.AppointmentProductItem;
 import com.cristiane.salon.models.appointment.entity.AppointmentServiceItem;
 import com.cristiane.salon.models.appointment.enums.AppointmentStatus;
+import com.cristiane.salon.models.appointment.enums.ExpenseValueType;
 import com.cristiane.salon.models.appointment.enums.PaymentStatus;
 import com.cristiane.salon.models.appointment.repository.AppointmentRepository;
 import com.cristiane.salon.models.appointment.specification.AppointmentSpecifications;
@@ -25,6 +30,8 @@ import com.cristiane.salon.models.cashflow.enums.CashFlowType;
 import com.cristiane.salon.models.cashflow.repository.CashFlowRepository;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
+import com.cristiane.salon.models.product.entity.Product;
+import com.cristiane.salon.models.product.repository.ProductRepository;
 import com.cristiane.salon.models.service.entity.SalonService;
 import com.cristiane.salon.models.service.repository.SalonServiceRepository;
 import com.cristiane.salon.integrations.email.service.EmailService;
@@ -60,6 +67,7 @@ public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final EmployeeRepository employeeRepository;
     private final SalonServiceRepository salonServiceRepository;
+    private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final CashFlowRepository cashFlowRepository;
     private final FeatureFlagService featureFlagService;
@@ -272,6 +280,9 @@ public class AppointmentService {
             appointment.setClientNotes(request.clientNotes());
             appointment.setStatus(AppointmentStatus.CONFIRMED);
             appointment.setServices(buildServiceItems(appointment, serviceRequests, resolvedServices, true));
+            if (request.products() != null && !request.products().isEmpty()) {
+                appointment.setProducts(buildProductItems(appointment, request.products()));
+            }
 
             Appointment saved = appointmentRepository.save(appointment);
             emailService.sendConfirmationNotificationToClient(saved);
@@ -336,6 +347,93 @@ public class AppointmentService {
             items.add(item);
         }
         return items;
+    }
+
+    private List<AppointmentProductItem> buildProductItems(Appointment appointment,
+                                                             List<AppointmentProductRequest> requests) {
+        List<AppointmentProductItem> items = new java.util.ArrayList<>();
+        for (AppointmentProductRequest pr : requests) {
+            if (pr.customPrice() != null && pr.customPrice().compareTo(BigDecimal.ZERO) < 0) {
+                throw new BadRequestException("O preço customizado do produto não pode ser negativo");
+            }
+            Product product = productRepository.findById(pr.productId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Produto não encontrado"));
+            if (!product.getActive()) {
+                throw new BadRequestException("Este produto não está disponível: " + product.getName());
+            }
+            AppointmentProductItem item = new AppointmentProductItem();
+            item.setAppointment(appointment);
+            item.setProduct(product);
+            item.setQuantity(pr.quantity());
+            item.setCustomPrice(pr.customPrice());
+            items.add(item);
+        }
+        return items;
+    }
+
+    private List<AppointmentExpenseItem> buildExpenseItems(Appointment appointment,
+                                                             List<AppointmentExpenseRequest> requests) {
+        List<AppointmentExpenseItem> items = new java.util.ArrayList<>();
+        for (AppointmentExpenseRequest er : requests) {
+            ExpenseValueType valueType;
+            try {
+                valueType = ExpenseValueType.valueOf(er.valueType().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new BadRequestException("Tipo de valor de despesa inválido");
+            }
+            if (valueType == ExpenseValueType.PERCENTAGE && er.value().compareTo(new BigDecimal("100")) > 0) {
+                throw new BadRequestException("A porcentagem da despesa não pode ser maior que 100");
+            }
+            AppointmentExpenseItem item = new AppointmentExpenseItem();
+            item.setAppointment(appointment);
+            item.setDescription(er.description());
+            item.setValueType(valueType);
+            item.setValue(er.value());
+            items.add(item);
+        }
+        return items;
+    }
+
+    /**
+     * Depois que o atendimento foi faturado (DONE ou pago), produtos/despesas não podem mais
+     * mudar — o valor já foi lançado no Caixa/PIX e recalcular por baixo criaria divergência
+     * silenciosa entre o que foi cobrado e o que o agendamento mostra.
+     */
+    private void assertNotBilled(Appointment appointment, String acao) {
+        if (appointment.getStatus() == AppointmentStatus.CANCELLED) {
+            throw new BusinessException("Não é possível " + acao + " um agendamento cancelado.");
+        }
+        if (appointment.getStatus() == AppointmentStatus.DONE || appointment.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new BusinessException("Não é possível " + acao + " depois que o atendimento foi concluído ou pago.");
+        }
+    }
+
+    @Transactional
+    public AppointmentResponse updateProducts(Long id, List<AppointmentProductRequest> productRequests) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
+        assertCanManage(appointment, "editar os produtos de");
+        assertNotBilled(appointment, "editar os produtos de");
+
+        appointment.getProducts().clear();
+        appointment.getProducts().addAll(buildProductItems(appointment, productRequests));
+
+        Appointment saved = appointmentRepository.save(appointment);
+        return AppointmentResponse.fromEntity(saved);
+    }
+
+    @Transactional
+    public AppointmentResponse updateExpenses(Long id, List<AppointmentExpenseRequest> expenseRequests) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
+        assertCanManage(appointment, "editar as despesas de");
+        assertNotBilled(appointment, "editar as despesas de");
+
+        appointment.getExpenses().clear();
+        appointment.getExpenses().addAll(buildExpenseItems(appointment, expenseRequests));
+
+        Appointment saved = appointmentRepository.save(appointment);
+        return AppointmentResponse.fromEntity(saved);
     }
 
     @Transactional
@@ -461,7 +559,7 @@ public class AppointmentService {
             throw new BadRequestException("Não é possível gerar PIX para um agendamento cancelado.");
         }
 
-        BigDecimal amount = appointment.getTotalEffectivePrice();
+        BigDecimal amount = appointment.getGrandTotal();
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("Este serviço não possui um valor configurado para cobrança.");
         }
@@ -637,7 +735,7 @@ public class AppointmentService {
             appointment.setStatus(status);
 
             if (status == AppointmentStatus.DONE) {
-                billAppointmentOnce(appointment, appointment.getTotalEffectivePrice(),
+                billAppointmentOnce(appointment, appointment.getGrandTotal(),
                         "Pagamento do agendamento #" + appointment.getId() + " - " + appointment.getServiceNames());
             }
 
@@ -691,7 +789,7 @@ public class AppointmentService {
             appointment.setPaymentStatus(paymentStatus);
 
             if (paymentStatus == PaymentStatus.PAID) {
-                billAppointmentOnce(appointment, appointment.getTotalEffectivePrice(),
+                billAppointmentOnce(appointment, appointment.getGrandTotal(),
                         "Pagamento (Confirmado Admin) do agendamento #" + appointment.getId() + " - " + appointment.getServiceNames());
             }
 
@@ -722,9 +820,20 @@ public class AppointmentService {
             cashFlow.setDate(salonClock.today());
             cashFlow.setAppointment(appointment);
             cashFlowRepository.save(cashFlow);
+            deductProductStock(appointment);
         } catch (DataIntegrityViolationException e) {
             log.warn("Agendamento {} já havia sido faturado por outra transação concorrente — ignorando.",
                     appointment.getId());
+        }
+    }
+
+    /** Baixa o estoque dos produtos vendidos neste atendimento, uma única vez (junto do faturamento). */
+    private void deductProductStock(Appointment appointment) {
+        for (AppointmentProductItem item : appointment.getProducts()) {
+            Product product = item.getProduct();
+            int remaining = Math.max(0, product.getStock() - item.getQuantity());
+            product.setStock(remaining);
+            productRepository.save(product);
         }
     }
 }

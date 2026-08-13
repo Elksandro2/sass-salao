@@ -14,7 +14,8 @@ public record EmployeeResponse(
         RemunerationType remunerationType,
         CommissionScope commissionScope,
         BigDecimal remunerationValue,
-        BigDecimal commissionValue
+        BigDecimal commissionValue,
+        BigDecimal productCommissionValue
 ) {
     public static EmployeeResponse fromEntity(Employee employee) {
         return new EmployeeResponse(
@@ -26,7 +27,8 @@ public record EmployeeResponse(
                 employee.getRemunerationType(),
                 employee.getCommissionScope(),
                 employee.getRemunerationValue(),
-                employee.getCommissionValue()
+                employee.getCommissionValue(),
+                employee.getProductCommissionValue()
         );
     }
 }

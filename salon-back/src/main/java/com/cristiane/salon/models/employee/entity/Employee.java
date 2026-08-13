@@ -38,6 +38,14 @@ public class Employee {
     private java.math.BigDecimal commissionValue;
 
     /**
+     * Comissão única (%) sobre produtos vendidos em atendimentos, independente da comissão de
+     * serviços acima — só faz sentido para COMISSIONADO/FIXO_E_COMISSIONADO, usa o mesmo
+     * {@link #commissionScope} (individual/global).
+     */
+    @Column(name = "product_commission_value", precision = 10, scale = 2)
+    private java.math.BigDecimal productCommissionValue;
+
+    /**
      * Separa "recebe remuneração via Employee" de "pode ser escalado num agendamento".
      * FUNCIONARIA é sempre bookable; GERENTE_DE_ATENDIMENTO pode ter Employee (pra registrar
      * salário fixo no relatório financeiro) sem nunca aparecer no seletor de atendimento.

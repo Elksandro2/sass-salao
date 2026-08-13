@@ -15,8 +15,13 @@ public record AppointmentResponse(
         Long employeeId,
         String employeeName,
         List<AppointmentServiceResponse> services,
+        List<AppointmentProductResponse> products,
+        List<AppointmentExpenseResponse> expenses,
         BigDecimal totalPrice,
         Integer totalDurationMin,
+        BigDecimal totalProductsPrice,
+        BigDecimal totalExpensesAmount,
+        BigDecimal grandTotal,
         LocalDateTime scheduledAt,
         LocalDate preferredDate,
         String clientNotes,
@@ -45,6 +50,15 @@ public record AppointmentResponse(
                 .map(AppointmentServiceResponse::fromEntity)
                 .collect(Collectors.toList());
 
+        List<AppointmentProductResponse> products = appointment.getProducts().stream()
+                .map(AppointmentProductResponse::fromEntity)
+                .collect(Collectors.toList());
+
+        BigDecimal expenseBase = appointment.getExpenseBaseAmount();
+        List<AppointmentExpenseResponse> expenses = appointment.getExpenses().stream()
+                .map(item -> AppointmentExpenseResponse.fromEntity(item, expenseBase))
+                .collect(Collectors.toList());
+
         return new AppointmentResponse(
                 appointment.getId(),
                 appointment.getClient().getId(),
@@ -52,8 +66,13 @@ public record AppointmentResponse(
                 appointment.getEmployee().getId(),
                 appointment.getEmployee().getUser().getName(),
                 services,
+                products,
+                expenses,
                 appointment.getTotalEffectivePrice(),
                 appointment.getTotalEffectiveDurationMin(),
+                appointment.getTotalProductsPrice(),
+                appointment.getTotalExpensesAmount(),
+                appointment.getGrandTotal(),
                 appointment.getScheduledAt(),
                 appointment.getPreferredDate(),
                 appointment.getClientNotes(),

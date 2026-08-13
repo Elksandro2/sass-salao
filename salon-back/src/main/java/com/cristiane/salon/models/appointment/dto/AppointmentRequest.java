@@ -15,6 +15,13 @@ public record AppointmentRequest(
         List<AppointmentServiceRequest> services,
 
         /**
+         * Produtos vendidos junto com o atendimento (opcional). Só tem efeito no fluxo
+         * administrativo (equipe cria o agendamento) — ignorado no fluxo de solicitação do
+         * cliente. Também editável depois via {@code PATCH /{id}/products}.
+         */
+        List<AppointmentProductRequest> products,
+
+        /**
          * Obrigatório apenas no fluxo administrativo (agendamento com horário definido).
          * No fluxo do cliente deve ser omitido/null — o salão confirma o horário depois.
          */

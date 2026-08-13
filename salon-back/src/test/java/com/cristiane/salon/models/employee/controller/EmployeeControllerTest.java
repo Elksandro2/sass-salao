@@ -66,7 +66,7 @@ class EmployeeControllerTest extends BaseControllerTest {
         EmployeeResponse response = new EmployeeResponse(
                 1L, 1L, "Alice", "alice@example.com", "FUNCIONARIA",
                 RemunerationType.COMISSIONADO, CommissionScope.INDIVIDUAL,
-                BigDecimal.ZERO, BigDecimal.TEN
+                BigDecimal.ZERO, BigDecimal.TEN, null
         );
         org.springframework.data.domain.Page<EmployeeResponse> page =
                 new org.springframework.data.domain.PageImpl<>(List.of(response));
@@ -96,7 +96,7 @@ class EmployeeControllerTest extends BaseControllerTest {
         EmployeeResponse response = new EmployeeResponse(
                 2L, 1L, "Alice", "alice@example.com", "FUNCIONARIA",
                 RemunerationType.SALARIO_FIXO, null,
-                BigDecimal.TEN, BigDecimal.ZERO
+                BigDecimal.TEN, BigDecimal.ZERO, null
         );
         when(employeeService.update(eq(2L), any())).thenReturn(response);
 

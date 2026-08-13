@@ -43,6 +43,12 @@ public class Appointment {
     @OneToMany(mappedBy = "appointment", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<AppointmentServiceItem> services = new ArrayList<>();
 
+    @OneToMany(mappedBy = "appointment", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<AppointmentProductItem> products = new ArrayList<>();
+
+    @OneToMany(mappedBy = "appointment", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<AppointmentExpenseItem> expenses = new ArrayList<>();
+
     /**
      * Definido pela equipe ao confirmar o pedido do cliente.
      *
@@ -111,5 +117,35 @@ public class Appointment {
         return services.stream()
                 .map(item -> item.getSalonService().getName())
                 .collect(Collectors.joining(", "));
+    }
+
+    public BigDecimal getTotalProductsPrice() {
+        return products.stream()
+                .map(AppointmentProductItem::getEffectiveTotalPrice)
+                .filter(price -> price != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /** Base sobre a qual despesas em porcentagem são calculadas: serviços + produtos. */
+    public BigDecimal getExpenseBaseAmount() {
+        return getTotalEffectivePrice().add(getTotalProductsPrice());
+    }
+
+    public BigDecimal getTotalExpensesAmount() {
+        BigDecimal base = getExpenseBaseAmount();
+        return expenses.stream()
+                .map(item -> item.getEffectiveAmount(base))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * Valor final cobrado/recebido pelo agendamento: serviços + produtos - despesas. Quando não
+     * há produtos nem despesas cadastrados (caso mais comum hoje), equivale exatamente a
+     * {@link #getTotalEffectivePrice()} — mantém compatível o valor cobrado no PIX e faturado
+     * no Caixa para todo agendamento que só usa serviços.
+     */
+    public BigDecimal getGrandTotal() {
+        BigDecimal total = getExpenseBaseAmount().subtract(getTotalExpensesAmount());
+        return total.max(BigDecimal.ZERO);
     }
 }

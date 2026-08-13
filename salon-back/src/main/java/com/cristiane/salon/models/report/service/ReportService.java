@@ -95,6 +95,10 @@ public class ReportService {
                 .map(a -> a.getTotalEffectivePrice() != null ? a.getTotalEffectivePrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        BigDecimal globalDoneProductsValue = doneAppointments.stream()
+                .map(Appointment::getTotalProductsPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         List<Employee> employees = employeeRepository.findAll();
         List<EmployeeFinanceResponse> employeeFinanceDetails = new ArrayList<>();
 
@@ -110,8 +114,12 @@ public class ReportService {
             BigDecimal empDoneValue = empDoneAppointments.stream()
                     .map(a -> a.getTotalEffectivePrice() != null ? a.getTotalEffectivePrice() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal empDoneProductsValue = empDoneAppointments.stream()
+                    .map(Appointment::getTotalProductsPrice)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneValue, globalDoneAppointmentsValue);
+            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneValue, globalDoneAppointmentsValue,
+                    empDoneProductsValue, globalDoneProductsValue);
             totalSalaryPaid = totalSalaryPaid.add(breakdown.salaryPart());
             totalCommissionPaid = totalCommissionPaid.add(breakdown.commissionPart());
 
@@ -122,8 +130,10 @@ public class ReportService {
                     employee.getRemunerationValue(),
                     employee.getCommissionScope() != null ? employee.getCommissionScope().name() : null,
                     employee.getCommissionValue(),
+                    employee.getProductCommissionValue(),
                     doneCount,
                     empDoneValue,
+                    empDoneProductsValue,
                     breakdown.totalPayout()
             ));
         }
@@ -156,7 +166,8 @@ public class ReportService {
      */
     @WithSpan("calcular-pagamento-funcionaria")
     private PayoutBreakdown calcularPagamentoFuncionaria(
-            Employee employee, BigDecimal empDoneValue, BigDecimal globalDoneAppointmentsValue) {
+            Employee employee, BigDecimal empDoneValue, BigDecimal globalDoneAppointmentsValue,
+            BigDecimal empDoneProductsValue, BigDecimal globalDoneProductsValue) {
 
         Span span = Span.current();
         span.setAttribute("funcionaria.id", employee.getId());
@@ -177,6 +188,8 @@ public class ReportService {
             } else if (employee.getCommissionScope() == CommissionScope.GLOBAL) {
                 payout = globalDoneAppointmentsValue.multiply(pct).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
             }
+            BigDecimal productCommission = calcularComissaoProdutos(employee, empDoneProductsValue, globalDoneProductsValue);
+            payout = payout.add(productCommission);
             commissionPart = payout;
         } else if (employee.getRemunerationType() == RemunerationType.FIXO_E_COMISSIONADO) {
             BigDecimal salary = employee.getRemunerationValue() != null ? employee.getRemunerationValue() : BigDecimal.ZERO;
@@ -187,6 +200,7 @@ public class ReportService {
             } else if (employee.getCommissionScope() == CommissionScope.GLOBAL) {
                 commission = globalDoneAppointmentsValue.multiply(pct).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
             }
+            commission = commission.add(calcularComissaoProdutos(employee, empDoneProductsValue, globalDoneProductsValue));
             salaryPart = salary;
             commissionPart = commission;
             payout = salary.add(commission);
@@ -194,6 +208,23 @@ public class ReportService {
 
         span.setAttribute("funcionaria.pagamento_calculado", payout.doubleValue());
         return new PayoutBreakdown(salaryPart, commissionPart, payout);
+    }
+
+    /**
+     * Comissão única (%) sobre produtos vendidos, independente da comissão de serviços — usa o
+     * mesmo {@link CommissionScope} da funcionária. Só se aplica a quem é comissionada
+     * (SALARIO_FIXO não chega a chamar este método) e tem o percentual configurado.
+     */
+    private BigDecimal calcularComissaoProdutos(
+            Employee employee, BigDecimal empDoneProductsValue, BigDecimal globalDoneProductsValue) {
+        if (employee.getProductCommissionValue() == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal pct = employee.getProductCommissionValue();
+        BigDecimal base = employee.getCommissionScope() == CommissionScope.GLOBAL
+                ? globalDoneProductsValue
+                : empDoneProductsValue;
+        return base.multiply(pct).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
     }
 
     private record PayoutBreakdown(BigDecimal salaryPart, BigDecimal commissionPart, BigDecimal totalPayout) {}
@@ -248,6 +279,10 @@ public class ReportService {
                 .map(a -> a.getTotalEffectivePrice() != null ? a.getTotalEffectivePrice() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        BigDecimal globalDoneProductsValue = doneAppointments.stream()
+                .map(Appointment::getTotalProductsPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         List<Employee> employees = employeeRepository.findAll();
         List<PayrollReportResponse.PayrollItem> items = new ArrayList<>();
 
@@ -258,6 +293,9 @@ public class ReportService {
 
             BigDecimal empDoneValue = empDoneAppointments.stream()
                     .map(a -> a.getTotalEffectivePrice() != null ? a.getTotalEffectivePrice() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal empDoneProductsValue = empDoneAppointments.stream()
+                    .map(Appointment::getTotalProductsPrice)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             BigDecimal payout = BigDecimal.ZERO;
@@ -274,6 +312,7 @@ public class ReportService {
                     baseAmount = globalDoneAppointmentsValue;
                 }
                 payout = baseAmount.multiply(pct).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+                payout = payout.add(calcularComissaoProdutos(employee, empDoneProductsValue, globalDoneProductsValue));
             } else if (employee.getRemunerationType() == RemunerationType.FIXO_E_COMISSIONADO) {
                 BigDecimal salary = employee.getRemunerationValue() != null ? employee.getRemunerationValue() : BigDecimal.ZERO;
                 BigDecimal pct = employee.getCommissionValue() != null ? employee.getCommissionValue() : BigDecimal.ZERO;
@@ -284,6 +323,7 @@ public class ReportService {
                     baseAmount = globalDoneAppointmentsValue;
                 }
                 commissionPart = baseAmount.multiply(pct).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+                commissionPart = commissionPart.add(calcularComissaoProdutos(employee, empDoneProductsValue, globalDoneProductsValue));
                 payout = salary.add(commissionPart);
             }
 
