@@ -64,7 +64,13 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/v1/feature-flags").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/salon/profile").permitAll()
                 .requestMatchers(HttpMethod.POST, "/v1/webhooks/mercadopago").permitAll()
-                
+                // O Mercado Pago redireciona o NAVEGADOR da funcionária pra cá depois que ela
+                // autoriza (fluxo OAuth de split) — não é uma chamada de API do frontend, então
+                // não carrega o JWT da sessão (não é um axios com interceptor, é navegação de
+                // topo). Quem autentica essa operação é o "state" de uso único, validado dentro
+                // do EmployeeMercadoPagoConnectionService — não o Spring Security aqui.
+                .requestMatchers(HttpMethod.GET, "/v1/employees/mercadopago/callback").permitAll()
+
                 // Swagger & API Docs
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
                 

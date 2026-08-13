@@ -66,6 +66,16 @@ logging:
 mercadopago:
   access-token: ${MERCADO_PAGO_ACCESS_TOKEN}
   webhook-secret: ${MERCADO_PAGO_WEBHOOK_SECRET}
+  # Split de pagamento (Fase B/C) — opcionais de propósito: sem eles configurados, o recurso
+  # de split simplesmente fica indisponível (cai no fluxo manual já existente), não quebra
+  # o resto da aplicação. Só ficam obrigatórios quando alguém tentar conectar uma funcionária.
+  client-id: ${MERCADO_PAGO_CLIENT_ID:}
+  client-secret: ${MERCADO_PAGO_CLIENT_SECRET:}
+  oauth-redirect-uri: ${MERCADO_PAGO_OAUTH_REDIRECT_URI:}
+  # Taxa de PIX cobrada pelo MP na conta do salão — confirmar o valor exato no painel dela
+  # (Configurações > Taxas) antes de ligar o split de verdade. Usada só pra calcular a
+  # comissão fixa do salão sem deixar a funcionária absorver a variação da taxa.
+  pix-fee-rate: ${MERCADO_PAGO_PIX_FEE_RATE:0.0099}
 
 # Resilience4j: infraestrutura genérica de resiliência a falha de integração externa.
 # "default" é o template — qualquer integração nova só cria uma instance nova referenciando
@@ -99,6 +109,12 @@ resilience4j:
           - java.lang.IllegalStateException
       email-provider:
         base-config: default
+      mercadopago-oauth:
+        base-config: default
+        # 4xx do MP (code inválido/expirado, client_secret errado) é erro de configuração ou
+        # de fluxo do usuário, não indisponibilidade do gateway — não deve abrir o circuito.
+        ignore-exceptions:
+          - org.springframework.web.client.HttpClientErrorException
   retry:
     configs:
       default:
@@ -111,6 +127,10 @@ resilience4j:
         base-config: default
         ignore-exceptions:
           - com.mercadopago.exceptions.MPApiException
+      mercadopago-oauth:
+        base-config: default
+        ignore-exceptions:
+          - org.springframework.web.client.HttpClientErrorException
       ai-provider:
         base-config: default
         ignore-exceptions:
