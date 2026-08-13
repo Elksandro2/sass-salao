@@ -19,10 +19,23 @@ export const usePermission = (method: string, endpoint: string) => {
 
     if (authMethod !== '*' && authMethod !== method.toUpperCase()) return false;
 
-    // Very basic wildcard match (can be improved to regex if needed)
+    // Trailing /* é um prefixo aberto (ex.: /v1/users/* casa /v1/users/5/qualquer-coisa).
     if (authEndpoint.endsWith('/*')) {
       const baseEndpoint = authEndpoint.replace('/*', '');
       return endpoint.startsWith(baseEndpoint);
+    }
+
+    // Curinga no meio do caminho (ex.: /v1/clients/*/anamnesis) — cada "*" casa exatamente um
+    // segmento, igual ao AntPathMatcher usado no backend (CustomPermissionEvaluator).
+    if (authEndpoint.includes('*')) {
+      const pattern =
+        '^' +
+        authEndpoint
+          .split('/')
+          .map((segment) => (segment === '*' ? '[^/]+' : segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+          .join('/') +
+        '$';
+      return new RegExp(pattern).test(endpoint);
     }
 
     return authEndpoint === endpoint;

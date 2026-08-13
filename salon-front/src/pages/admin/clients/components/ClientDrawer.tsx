@@ -5,6 +5,9 @@ import type { ClientDetailsResponse } from '../services/clients';
 import { getApiErrorMessage } from '../../../../utils/apiError';
 import { useAlert } from '../../../../hooks/useAlert';
 import { maskCPF } from '../../../../utils/formatters';
+import { ClientAnamnesisSection } from './ClientAnamnesisSection';
+
+type DrawerTab = 'history' | 'anamnesis';
 
 interface ClientDrawerProps {
   isOpen: boolean;
@@ -15,9 +18,11 @@ interface ClientDrawerProps {
 export function ClientDrawer({ isOpen, onClose, clientId }: ClientDrawerProps) {
   const [client, setClient] = useState<ClientDetailsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [tab, setTab] = useState<DrawerTab>('history');
   const { error: showError } = useAlert();
 
   useEffect(() => {
+    setTab('history');
     if (isOpen && clientId) {
       const loadDetails = async () => {
         setIsLoading(true);
@@ -73,6 +78,27 @@ export function ClientDrawer({ isOpen, onClose, clientId }: ClientDrawerProps) {
             </div>
           ) : (
             <div className="space-y-6">
+              <div className="flex gap-1 p-1 bg-[#eae1e1]/50 dark:bg-[#0f172a]/60 rounded-xl">
+                {(['history', 'anamnesis'] as DrawerTab[]).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTab(t)}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      tab === t
+                        ? 'bg-white dark:bg-[#161c2a] text-[#be8a83] shadow-sm'
+                        : 'text-[#7a7074] dark:text-gray-400 hover:text-[#3b3036] dark:hover:text-white'
+                    }`}
+                  >
+                    {t === 'history' ? 'Histórico' : 'Anamnese'}
+                  </button>
+                ))}
+              </div>
+
+              {tab === 'anamnesis' ? (
+                <ClientAnamnesisSection clientId={client.id} />
+              ) : (
+                <>
               {/* Profile card */}
               <div className="glass-card p-5 space-y-3 dark:bg-[#161c2a]/80">
                 <div className="flex items-center gap-3">
@@ -231,6 +257,8 @@ export function ClientDrawer({ isOpen, onClose, clientId }: ClientDrawerProps) {
                   </div>
                 )}
               </div>
+                </>
+              )}
             </div>
           )}
         </div>
