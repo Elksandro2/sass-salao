@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -118,5 +119,45 @@ public class EmployeeMercadoPagoConnectionService {
         return mpAccountRepository.findByEmployeeId(employeeId)
                 .map(acc -> new MercadoPagoStatusResponse(true, acc.getConnectedAt()))
                 .orElseGet(MercadoPagoStatusResponse::notConnected);
+    }
+
+    /** Alguma folga antes do vencimento real, pra não arriscar o token expirar no meio da chamada. */
+    private static final java.time.Duration TOKEN_EXPIRY_MARGIN = java.time.Duration.ofMinutes(5);
+
+    /**
+     * Devolve um access token válido da funcionária pra usar no split, renovando com o
+     * refresh token se o atual já expirou (ou está perto disso) — o access token do MP dura
+     * só algumas horas, e o pagamento pode acontecer bem depois da conexão ter sido feita.
+     *
+     * <p>Se a renovação falhar (token revogado, funcionária desconectou do lado do MP, etc.),
+     * devolve vazio em vez de propagar erro — quem chama cai de volta no fluxo sem split em
+     * vez de travar a geração do PIX por causa disso.
+     */
+    @Transactional
+    public Optional<String> resolveValidAccessToken(Long employeeId) {
+        Optional<EmployeeMercadoPagoAccount> maybeAccount = mpAccountRepository.findByEmployeeId(employeeId);
+        if (maybeAccount.isEmpty()) {
+            return Optional.empty();
+        }
+
+        EmployeeMercadoPagoAccount account = maybeAccount.get();
+        Instant expiresAt = account.getTokenExpiresAt();
+        boolean needsRefresh = expiresAt == null || Instant.now().plus(TOKEN_EXPIRY_MARGIN).isAfter(expiresAt);
+
+        if (!needsRefresh) {
+            return Optional.of(account.getAccessToken());
+        }
+
+        try {
+            MercadoPagoOAuthGateway.MercadoPagoTokenResponse token = oAuthGateway.refreshToken(account.getRefreshToken());
+            account.setAccessToken(token.access_token());
+            account.setRefreshToken(token.refresh_token());
+            account.setTokenExpiresAt(
+                    token.expires_in() != null ? Instant.now().plusSeconds(token.expires_in()) : null);
+            mpAccountRepository.save(account);
+            return Optional.of(token.access_token());
+        } catch (Exception e) {
+            return Optional.empty();
+        }
     }
 }

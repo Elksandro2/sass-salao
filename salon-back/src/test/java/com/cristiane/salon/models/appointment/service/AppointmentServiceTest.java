@@ -90,6 +90,9 @@ class AppointmentServiceTest {
     private MercadoPagoPaymentService mercadoPagoPaymentService;
 
     @Mock
+    private com.cristiane.salon.integrations.payment.marketplace.SplitPaymentResolver splitPaymentResolver;
+
+    @Mock
     private AuditLogService auditLogService;
 
     // SalonClock real, não mock: os testes dependem do "hoje"/"agora" de verdade no fuso
@@ -150,6 +153,10 @@ class AppointmentServiceTest {
         // Padrão permissivo: testes que não são sobre horário de funcionamento não precisam
         // se preocupar com isso. Os testes dedicados ao bloqueio sobrescrevem para false.
         lenient().when(salonProfileService.isDayOpen(any())).thenReturn(true);
+
+        // Padrão: sem split (comportamento igual ao que já existia antes da feature). Os
+        // testes dedicados ao split sobrescrevem isso.
+        lenient().when(splitPaymentResolver.resolve(any(), any())).thenReturn(java.util.Optional.empty());
 
         // Padrão: agindo como ADMIN. Agora que confirm/decline/updateStatus checam de quem é o
         // agendamento, todos eles precisam de um usuário autenticado no contexto.
@@ -1717,7 +1724,7 @@ class AppointmentServiceTest {
         when(poi.getTransactionData()).thenReturn(td);
         when(td.getQrCode()).thenReturn("mocked_qr_done");
         when(payment.getId()).thenReturn(77L);
-        when(mercadoPagoPaymentService.createPixPayment(any(), any(), any(), any(), any(), any()))
+        when(mercadoPagoPaymentService.createPixPayment(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(payment);
         when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -1790,7 +1797,7 @@ class AppointmentServiceTest {
         when(poi.getTransactionData()).thenReturn(td);
         when(td.getQrCode()).thenReturn("mocked_qr_custom_price");
         when(payment.getId()).thenReturn(88L);
-        when(mercadoPagoPaymentService.createPixPayment(any(), any(), any(), any(), any(), any()))
+        when(mercadoPagoPaymentService.createPixPayment(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(payment);
         when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -1799,7 +1806,7 @@ class AppointmentServiceTest {
 
         // Assert: cobra os R$200 customizados, não os R$100 do catálogo
         ArgumentCaptor<BigDecimal> amountCaptor = ArgumentCaptor.forClass(BigDecimal.class);
-        verify(mercadoPagoPaymentService).createPixPayment(amountCaptor.capture(), any(), any(), any(), any(), any());
+        verify(mercadoPagoPaymentService).createPixPayment(amountCaptor.capture(), any(), any(), any(), any(), any(), any());
         assertThat(amountCaptor.getValue()).isEqualByComparingTo("200.00");
     }
 
@@ -1908,7 +1915,7 @@ class AppointmentServiceTest {
         when(td.getQrCode()).thenReturn("mocked_qr_code");
         when(payment.getId()).thenReturn(12345L);
 
-        when(mercadoPagoPaymentService.createPixPayment(any(), any(), any(), any(), any(), any()))
+        when(mercadoPagoPaymentService.createPixPayment(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(payment);
         when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -1951,7 +1958,8 @@ class AppointmentServiceTest {
                 eq(clientUser.getEmail()), // Payer email should be client's
                 eq(clientUser.getName()),  // Payer name should be client's
                 eq("09123456752"),
-                eq(1L)
+                eq(1L),
+                any()
         )).thenReturn(payment);
         when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 

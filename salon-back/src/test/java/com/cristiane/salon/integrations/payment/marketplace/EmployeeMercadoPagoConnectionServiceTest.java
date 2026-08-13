@@ -181,6 +181,71 @@ class EmployeeMercadoPagoConnectionServiceTest {
         assertThat(result.connectedAt()).isNull();
     }
 
+    @Test
+    void resolveValidAccessToken_whenNotConnected_shouldReturnEmpty() {
+        when(mpAccountRepository.findByEmployeeId(5L)).thenReturn(Optional.empty());
+
+        assertThat(service.resolveValidAccessToken(5L)).isEmpty();
+        verifyNoInteractions(oAuthGateway);
+    }
+
+    @Test
+    void resolveValidAccessToken_whenTokenStillValid_shouldReturnItWithoutRefreshing() {
+        EmployeeMercadoPagoAccount account = new EmployeeMercadoPagoAccount();
+        account.setAccessToken("valid-token");
+        account.setTokenExpiresAt(java.time.Instant.now().plus(java.time.Duration.ofHours(2)));
+        when(mpAccountRepository.findByEmployeeId(5L)).thenReturn(Optional.of(account));
+
+        assertThat(service.resolveValidAccessToken(5L)).contains("valid-token");
+        verifyNoInteractions(oAuthGateway);
+        verify(mpAccountRepository, never()).save(any());
+    }
+
+    @Test
+    void resolveValidAccessToken_whenTokenExpiringSoon_shouldRefreshAndPersist() {
+        EmployeeMercadoPagoAccount account = new EmployeeMercadoPagoAccount();
+        account.setAccessToken("old-token");
+        account.setRefreshToken("refresh-token");
+        // dentro da margem de 5 minutos — precisa renovar mesmo "ainda não vencido"
+        account.setTokenExpiresAt(java.time.Instant.now().plus(java.time.Duration.ofMinutes(1)));
+        when(mpAccountRepository.findByEmployeeId(5L)).thenReturn(Optional.of(account));
+        when(oAuthGateway.refreshToken("refresh-token")).thenReturn(
+                new MercadoPagoOAuthGateway.MercadoPagoTokenResponse(
+                        "new-token", "bearer", 21600, "read write", 999L, "new-refresh-token", "PUB-KEY"));
+
+        assertThat(service.resolveValidAccessToken(5L)).contains("new-token");
+        assertThat(account.getAccessToken()).isEqualTo("new-token");
+        assertThat(account.getRefreshToken()).isEqualTo("new-refresh-token");
+        verify(mpAccountRepository).save(account);
+    }
+
+    @Test
+    void resolveValidAccessToken_whenTokenExpiredAndRefreshFails_shouldReturnEmpty() {
+        EmployeeMercadoPagoAccount account = new EmployeeMercadoPagoAccount();
+        account.setAccessToken("old-token");
+        account.setRefreshToken("revoked-refresh-token");
+        account.setTokenExpiresAt(java.time.Instant.now().minus(java.time.Duration.ofHours(1)));
+        when(mpAccountRepository.findByEmployeeId(5L)).thenReturn(Optional.of(account));
+        when(oAuthGateway.refreshToken("revoked-refresh-token")).thenThrow(new RuntimeException("token revogado"));
+
+        assertThat(service.resolveValidAccessToken(5L)).isEmpty();
+        verify(mpAccountRepository, never()).save(any());
+    }
+
+    @Test
+    void resolveValidAccessToken_whenExpiresAtIsNull_shouldRefresh() {
+        EmployeeMercadoPagoAccount account = new EmployeeMercadoPagoAccount();
+        account.setAccessToken("old-token");
+        account.setRefreshToken("refresh-token");
+        account.setTokenExpiresAt(null);
+        when(mpAccountRepository.findByEmployeeId(5L)).thenReturn(Optional.of(account));
+        when(oAuthGateway.refreshToken("refresh-token")).thenReturn(
+                new MercadoPagoOAuthGateway.MercadoPagoTokenResponse(
+                        "new-token", "bearer", 21600, "read write", 999L, "new-refresh-token", "PUB-KEY"));
+
+        assertThat(service.resolveValidAccessToken(5L)).contains("new-token");
+    }
+
     private String extractState(MercadoPagoConnectResponse response) {
         String url = response.authorizationUrl();
         int idx = url.indexOf("state=");

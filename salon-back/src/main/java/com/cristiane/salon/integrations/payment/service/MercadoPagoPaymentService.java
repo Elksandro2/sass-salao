@@ -11,10 +11,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.cristiane.salon.exception.BadRequestException;
+import com.cristiane.salon.integrations.payment.marketplace.SplitPaymentResolver;
 import com.mercadopago.client.common.IdentificationRequest;
 import com.mercadopago.client.payment.PaymentCreateRequest;
 import com.mercadopago.client.payment.PaymentPayerRequest;
 import com.mercadopago.resources.payment.Payment;
+import com.mercadopago.resources.payment.PaymentFeeDetail;
+
+import java.util.Optional;
 
 import org.springframework.context.annotation.Profile;
 import com.cristiane.salon.utils.LogMasker;
@@ -36,13 +40,24 @@ public class MercadoPagoPaymentService {
 
     public Payment createPixPayment(BigDecimal amount, String description, String payerEmail, String payerName,
             String payerCpf, Long appointmentId) {
+        return createPixPayment(amount, description, payerEmail, payerName, payerCpf, appointmentId, Optional.empty());
+    }
+
+    /**
+     * Split de pagamento: quando {@code splitInfo} vem preenchido, o pagamento é criado com
+     * {@code application_fee} (comissão do salão) e autenticado com o access token da própria
+     * funcionária — o restante cai direto na conta dela, sem passar pela do salão. Quando vazio,
+     * comportamento idêntico ao de sempre (100% pro salão).
+     */
+    public Payment createPixPayment(BigDecimal amount, String description, String payerEmail, String payerName,
+            String payerCpf, Long appointmentId, Optional<SplitPaymentResolver.SplitPaymentInfo> splitInfo) {
         try {
             // Divide o nome completo em primeiro e último nome para a API do Mercado Pago
             String[] nameParts = (payerName != null ? payerName.trim() : "Cliente").split("\\s+", 2);
             String firstName = nameParts[0];
             String lastName = nameParts.length > 1 ? nameParts[1] : firstName;
 
-            PaymentCreateRequest request = PaymentCreateRequest.builder()
+            PaymentCreateRequest.PaymentCreateRequestBuilder requestBuilder = PaymentCreateRequest.builder()
                     .transactionAmount(amount)
                     .description(description)
                     .paymentMethodId("pix")
@@ -56,17 +71,25 @@ public class MercadoPagoPaymentService {
                                     .type("CPF")
                                     .number(payerCpf)
                                     .build())
-                            .build())
-                    .build();
+                            .build());
+            splitInfo.ifPresent(info -> requestBuilder.applicationFee(info.applicationFee()));
+            PaymentCreateRequest request = requestBuilder.build();
 
             // Uma chave nova por chamada: tentativas automáticas do Resilience4j (retry) desta
             // MESMA chamada reusam a mesma chave (evitando duplicar a cobrança), mas uma
             // chamada manual nova (ex.: usuário clicando "gerar PIX" de novo depois que o
             // anterior expirou) gera uma chave diferente, permitindo um PIX novo de verdade.
             String idempotencyKey = "appointment-" + appointmentId + "-" + java.util.UUID.randomUUID();
-            Payment payment = gateway.createPayment(request, idempotencyKey);
+            String sellerAccessToken = splitInfo.map(SplitPaymentResolver.SplitPaymentInfo::sellerAccessToken).orElse(null);
+            Payment payment = gateway.createPayment(request, idempotencyKey, sellerAccessToken);
 
-            log.info("PIX gerado no Mercado Pago com sucesso para o Agendamento ID: {}", appointmentId);
+            if (splitInfo.isPresent()) {
+                log.info("PIX com split gerado para o Agendamento ID: {} — comissão do salão: R$ {}, funcionária: R$ {}. Taxas reais cobradas: {}",
+                        appointmentId, splitInfo.get().applicationFee(), splitInfo.get().employeeShare(),
+                        describeFeeDetails(payment.getFeeDetails()));
+            } else {
+                log.info("PIX gerado no Mercado Pago com sucesso para o Agendamento ID: {}", appointmentId);
+            }
             return payment;
         } catch (com.mercadopago.exceptions.MPApiException e) {
             // Essa é a linha de mestre: ela pega o JSON exato que o Mercado Pago devolveu
@@ -80,6 +103,16 @@ public class MercadoPagoPaymentService {
             log.error("Erro ao comunicar com a API do Mercado Pago: ", e);
             throw new BadRequestException("Falha ao gerar o PIX no Mercado Pago. Tente novamente mais tarde.");
         }
+    }
+
+    /** Log de auditoria: a taxa real cobrada pelo MP pode diferir centavos da estimativa usada no cálculo. */
+    private static String describeFeeDetails(java.util.List<PaymentFeeDetail> feeDetails) {
+        if (feeDetails == null || feeDetails.isEmpty()) {
+            return "indisponível ainda";
+        }
+        return feeDetails.stream()
+                .map(f -> f.getType() + "=" + f.getAmount())
+                .collect(java.util.stream.Collectors.joining(", "));
     }
 
     public Payment getPayment(Long paymentId) {

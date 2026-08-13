@@ -30,6 +30,18 @@ public class MercadoPagoGateway {
     @CircuitBreaker(name = "mercadopago")
     @Retry(name = "mercadopago")
     public Payment createPayment(PaymentCreateRequest request, String idempotencyKey) throws Exception {
+        return createPayment(request, idempotencyKey, null);
+    }
+
+    /**
+     * Split de pagamento: quando {@code sellerAccessToken} vem preenchido, a chamada à API é
+     * autenticada com o token da PRÓPRIA funcionária (obtido via OAuth), não com o token global
+     * do salão — é assim que o Mercado Pago sabe creditar a conta dela. O {@code application_fee}
+     * (comissão do salão) já vem calculado dentro do {@code request}.
+     */
+    @CircuitBreaker(name = "mercadopago")
+    @Retry(name = "mercadopago")
+    public Payment createPayment(PaymentCreateRequest request, String idempotencyKey, String sellerAccessToken) throws Exception {
         // Sem isso, um timeout que dispara DEPOIS do Mercado Pago já ter processado o pagamento
         // (mas antes da resposta chegar) faria o @Retry criar um SEGUNDO PIX para o mesmo
         // agendamento — cobrança duplicada de verdade, não hipotética. A chave é gerada uma
@@ -37,11 +49,13 @@ public class MercadoPagoGateway {
         // todas as tentativas automáticas do Resilience4j dessa MESMA chamada, então o Mercado
         // Pago reconhece as tentativas repetidas como "a mesma operação" e devolve o pagamento
         // já criado em vez de processar de novo.
-        MPRequestOptions options = MPRequestOptions.builder()
-                .customHeaders(Map.of("X-Idempotency-Key", idempotencyKey))
-                .build();
+        MPRequestOptions.MPRequestOptionsBuilder optionsBuilder = MPRequestOptions.builder()
+                .customHeaders(Map.of("X-Idempotency-Key", idempotencyKey));
+        if (sellerAccessToken != null) {
+            optionsBuilder.accessToken(sellerAccessToken);
+        }
         PaymentClient client = new PaymentClient();
-        return client.create(request, options);
+        return client.create(request, optionsBuilder.build());
     }
 
     @CircuitBreaker(name = "mercadopago", fallbackMethod = "getPaymentFallback")

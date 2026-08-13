@@ -67,6 +67,7 @@ public class AppointmentService {
     private final PushService pushService;
     private final SalonProfileService salonProfileService;
     private final MercadoPagoPaymentService mercadoPagoPaymentService;
+    private final com.cristiane.salon.integrations.payment.marketplace.SplitPaymentResolver splitPaymentResolver;
     private final AuditLogService auditLogService;
     private final SalonClock salonClock;
 
@@ -499,7 +500,9 @@ public class AppointmentService {
         String payerEmail = appointment.getClient().getEmail();
         String payerName = appointment.getClient().getName();
 
-        Payment payment = mercadoPagoPaymentService.createPixPayment(amount, description, payerEmail, payerName, clientCpf, appointment.getId());
+        var splitInfo = splitPaymentResolver.resolve(amount, appointment.getEmployee());
+        Payment payment = mercadoPagoPaymentService.createPixPayment(
+                amount, description, payerEmail, payerName, clientCpf, appointment.getId(), splitInfo);
 
         // Extrai o "Copia e Cola" de dentro da resposta complexa da API
         String qrCodeCopiaECola = payment.getPointOfInteraction().getTransactionData().getQrCode();

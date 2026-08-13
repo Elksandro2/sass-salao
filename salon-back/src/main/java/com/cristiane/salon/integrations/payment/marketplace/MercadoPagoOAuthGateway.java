@@ -57,6 +57,30 @@ public class MercadoPagoOAuthGateway {
                 .body(MercadoPagoTokenResponse.class);
     }
 
+    /**
+     * Renova o access token de uma funcionária usando o refresh token guardado — necessário
+     * porque o access token do MP expira em poucas horas (ver {@code expires_in} na resposta),
+     * e um pagamento pode acontecer dias depois da conexão ter sido feita.
+     */
+    @CircuitBreaker(name = "mercadopago-oauth")
+    @Retry(name = "mercadopago-oauth")
+    public MercadoPagoTokenResponse refreshToken(String refreshToken) {
+        RestClient restClient = restClientBuilder.clone().baseUrl(API_BASE_URL).build();
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("client_id", properties.getClientId());
+        payload.put("client_secret", properties.getClientSecret());
+        payload.put("grant_type", "refresh_token");
+        payload.put("refresh_token", refreshToken);
+
+        return restClient.post()
+                .uri("/oauth/token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(payload)
+                .retrieve()
+                .body(MercadoPagoTokenResponse.class);
+    }
+
     /** Resposta do MP na troca de código por token — nomes de campo batem com o payload deles. */
     public record MercadoPagoTokenResponse(
             String access_token,
