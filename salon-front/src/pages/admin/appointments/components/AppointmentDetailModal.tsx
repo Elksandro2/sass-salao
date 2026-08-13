@@ -6,6 +6,7 @@ import { formatApiDate, formatApiDateTime } from '../../../../utils/datetime';
 import { PermissionGate } from '../../../../components/permissions/PermissionGate';
 import { useAlert } from '../../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../../utils/apiError';
+import { AppointmentProductsExpensesEditor } from './AppointmentProductsExpensesEditor';
 
 const labelCls = 'label-premium';
 const inputCls = 'input-premium';
@@ -21,7 +22,7 @@ function formatDuration(value: number | null | undefined): string {
 interface AppointmentDetailModalProps {
   appointment: AppointmentResponse | null;
   onClose: () => void;
-  /** Avisa o pai que a observação interna mudou, pra refletir na listagem/histórico. */
+  /** Avisa o pai que o agendamento mudou (notas, produtos, despesas...), pra refletir na listagem/histórico. */
   onNotesSaved?: (updated: AppointmentResponse) => void;
 }
 
@@ -164,6 +165,13 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
               </div>
             </div>
           )}
+
+          <div className="border-t border-[#eae1e1] pt-4">
+            <AppointmentProductsExpensesEditor
+              appointment={appointment}
+              onSaved={(updated) => onNotesSaved?.(updated)}
+            />
+          </div>
 
           {appointment.clientNotes && (
             <div>

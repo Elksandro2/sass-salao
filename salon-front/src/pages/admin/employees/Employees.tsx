@@ -129,6 +129,10 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
         'commissionValue',
         employee.commissionValue != null ? String(employee.commissionValue) : undefined
       );
+      setValue(
+        'productCommissionValue',
+        employee.productCommissionValue != null ? String(employee.productCommissionValue) : undefined
+      );
     } else {
       setEditingEmployee(null);
       setSelectedUserLabel('');
@@ -147,18 +151,26 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
       payload.remunerationValue = Number(data.remunerationValue);
       payload.commissionScope = undefined;
       payload.commissionValue = undefined;
+      payload.productCommissionValue = undefined;
     } else if (data.remunerationType === 'COMISSIONADO') {
       payload.remunerationValue = Number(data.remunerationValue);
       payload.commissionScope = data.commissionScope || undefined;
       payload.commissionValue = undefined;
+      payload.productCommissionValue = data.productCommissionValue
+        ? Number(data.productCommissionValue)
+        : undefined;
     } else if (data.remunerationType === 'FIXO_E_COMISSIONADO') {
       payload.remunerationValue = Number(data.remunerationValue);
       payload.commissionScope = data.commissionScope || undefined;
       payload.commissionValue = Number(data.commissionValue);
+      payload.productCommissionValue = data.productCommissionValue
+        ? Number(data.productCommissionValue)
+        : undefined;
     } else {
       payload.remunerationValue = undefined;
       payload.commissionScope = undefined;
       payload.commissionValue = undefined;
+      payload.productCommissionValue = undefined;
     }
 
     try {
@@ -457,6 +469,28 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
                   )}
                 </div>
               )}
+
+              {!isManager && (remunerationType === 'COMISSIONADO' ||
+                remunerationType === 'FIXO_E_COMISSIONADO') && (
+                <div>
+                  <label className={labelCls}>Comissão sobre Produtos (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className={`${inputCls} ${errors.productCommissionValue ? 'border-rose-300' : ''}`}
+                    {...register('productCommissionValue')}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Opcional. Comissão única sobre produtos vendidos em atendimentos, separada da
+                    comissão de serviços acima. Deixe em branco se ela não vende produtos.
+                  </p>
+                  {errors.productCommissionValue && (
+                    <span className="text-xs text-rose-500 font-semibold">
+                      {errors.productCommissionValue.message}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -560,6 +594,16 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
                               : 'Individual'}
                           </span>
                         </div>
+                        {selectedEmployee.productCommissionValue != null && (
+                          <div>
+                            <span className="font-semibold text-xs text-[#3b3036]/70">
+                              Comissão sobre Produtos:
+                            </span>{' '}
+                            <span className="text-sm font-semibold text-[#8b6d68]">
+                              {selectedEmployee.productCommissionValue}%
+                            </span>
+                          </div>
+                        )}
                       </>
                     )}
 
@@ -587,6 +631,16 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
                               : 'Individual'}
                           </span>
                         </div>
+                        {selectedEmployee.productCommissionValue != null && (
+                          <div>
+                            <span className="font-semibold text-xs text-[#3b3036]/70">
+                              Comissão sobre Produtos:
+                            </span>{' '}
+                            <span className="text-sm font-semibold text-[#8b6d68]">
+                              {selectedEmployee.productCommissionValue}%
+                            </span>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>

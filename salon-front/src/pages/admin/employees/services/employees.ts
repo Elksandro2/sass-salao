@@ -12,6 +12,8 @@ export interface EmployeeData {
   commissionScope?: 'INDIVIDUAL' | 'GLOBAL';
   remunerationValue?: number;
   commissionValue?: number;
+  /** Comissão única (%) sobre produtos vendidos — independente da comissão de serviços acima. */
+  productCommissionValue?: number;
 }
 
 export interface EmployeeFilter {

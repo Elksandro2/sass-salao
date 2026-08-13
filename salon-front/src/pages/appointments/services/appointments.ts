@@ -10,9 +10,25 @@ export interface AppointmentServiceRequestItem {
   customServiceNotes?: string | null;
 }
 
+export interface AppointmentProductRequestItem {
+  productId: number;
+  quantity: number;
+  /** Sobrescreve o preço unitário do produto só para este item. */
+  customPrice?: number | null;
+}
+
+export interface AppointmentExpenseRequestItem {
+  description: string;
+  /** 'FIXED' (valor em R$) ou 'PERCENTAGE' (% sobre serviços+produtos do agendamento). */
+  valueType: 'FIXED' | 'PERCENTAGE';
+  value: number;
+}
+
 export interface AppointmentRequestBody {
   employeeId: number;
   services: AppointmentServiceRequestItem[];
+  /** Produtos vendidos junto do atendimento (só tem efeito no fluxo admin). */
+  products?: AppointmentProductRequestItem[];
   /** Fluxo admin: horário já definido */
   scheduledAt?: string | null;
   /** Fluxo cliente: dia preferido */
@@ -33,6 +49,24 @@ export interface AppointmentServiceResponse {
   effectiveDurationMin: number | null;
 }
 
+export interface AppointmentProductResponse {
+  productId: number;
+  productName: string;
+  catalogPrice: number | null;
+  quantity: number;
+  customPrice: number | null;
+  effectiveUnitPrice: number | null;
+  effectiveTotalPrice: number | null;
+}
+
+export interface AppointmentExpenseResponse {
+  id: number;
+  description: string;
+  valueType: 'FIXED' | 'PERCENTAGE';
+  value: number;
+  effectiveAmount: number;
+}
+
 export interface AppointmentResponse {
   id: number;
   clientId: number;
@@ -40,8 +74,13 @@ export interface AppointmentResponse {
   employeeId: number;
   employeeName: string;
   services: AppointmentServiceResponse[];
+  products?: AppointmentProductResponse[];
+  expenses?: AppointmentExpenseResponse[];
   totalPrice: number | null;
   totalDurationMin: number | null;
+  totalProductsPrice?: number | null;
+  totalExpensesAmount?: number | null;
+  grandTotal?: number | null;
   scheduledAt: string | null;
   preferredDate?: string | null;
   clientNotes?: string | null;
@@ -57,6 +96,7 @@ export interface AppointmentResponse {
 interface AppointmentCreatePayload {
   employeeId: number;
   services: AppointmentServiceRequestItem[];
+  products?: AppointmentProductRequestItem[];
   scheduledAt?: string | null;
   clientId?: number | null;
   preferredDate?: string | null;
@@ -80,6 +120,15 @@ function buildCreatePayload(request: AppointmentRequestBody): AppointmentCreateP
       return item;
     }),
   };
+  if (request.products != null && request.products.length > 0) {
+    body.products = request.products.map((p) => {
+      const item: AppointmentProductRequestItem = { productId: p.productId, quantity: p.quantity };
+      if (p.customPrice != null) {
+        item.customPrice = p.customPrice;
+      }
+      return item;
+    });
+  }
   if (request.scheduledAt != null && String(request.scheduledAt).trim() !== '') {
     body.scheduledAt = request.scheduledAt;
   }
@@ -176,6 +225,20 @@ export const appointmentsApi = {
 
   findById: async (id: number) => {
     const { data } = await api.get<AppointmentResponse>(`/appointments/${id}`);
+    return data;
+  },
+
+  updateProducts: async (id: number, products: AppointmentProductRequestItem[]) => {
+    const { data } = await api.patch<AppointmentResponse>(`/appointments/${id}/products`, {
+      products,
+    });
+    return data;
+  },
+
+  updateExpenses: async (id: number, expenses: AppointmentExpenseRequestItem[]) => {
+    const { data } = await api.patch<AppointmentResponse>(`/appointments/${id}/expenses`, {
+      expenses,
+    });
     return data;
   },
 };

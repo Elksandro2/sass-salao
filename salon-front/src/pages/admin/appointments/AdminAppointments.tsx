@@ -9,6 +9,8 @@ import { appointmentsApi } from '../../appointments/services/appointments';
 import type { AppointmentResponse } from '../../appointments/services/appointments';
 import { salonServicesApi } from '../../services/services/services';
 import type { SalonServiceData } from '../../services/services/services';
+import { productsApi } from '../products/services/products';
+import type { ProductData } from '../products/services/products';
 import { employeesApi } from '../employees/services/employees';
 import type { EmployeeData } from '../employees/services/employees';
 import type { UserData } from '../users/services/users';
@@ -65,9 +67,12 @@ export const AdminAppointments = () => {
   const [allServices, setAllServices] = useState<SalonServiceData[]>([]);
   const [employees, setEmployees] = useState<EmployeeData[]>([]);
 
+  const [products, setProducts] = useState<ProductData[]>([]);
   const [selectedClient, setSelectedClient] = useState('');
   const [selectedServiceIds, setSelectedServiceIds] = useState<number[]>([]);
   const [serviceSearch, setServiceSearch] = useState('');
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
+  const [productQuantities, setProductQuantities] = useState<Record<number, string>>({});
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [selectedDateTime, setSelectedDateTime] = useState('');
   const [customizations, setCustomizations] = useState<Record<number, ServiceCustomizationValues>>({});
@@ -151,14 +156,16 @@ export const AdminAppointments = () => {
 
   const loadFormData = async () => {
     try {
-      const [clientsResponse, servicesResponse] = await Promise.all([
+      const [clientsResponse, servicesResponse, productsResponse] = await Promise.all([
         clientsApi.findAll({ active: true }, 0, 1000),
         salonServicesApi.findAll({}, 0, 1000),
+        productsApi.findAll({ active: true }, 0, 1000),
       ]);
       const servicesData = servicesResponse.content;
       setClients(clientsResponse.content);
       setServices(servicesData.filter((s) => s.active));
       setAllServices(servicesData);
+      setProducts(productsResponse.content);
     } catch (err) {
       await showError('Erro ao carregar dados do formulário');
     }
@@ -196,6 +203,16 @@ export const AdminAppointments = () => {
         },
       };
     });
+  };
+
+  const toggleProduct = (productId: number) => {
+    setSelectedProductIds((prev) => {
+      if (prev.includes(productId)) {
+        return prev.filter((id) => id !== productId);
+      }
+      return [...prev, productId];
+    });
+    setProductQuantities((prev) => (prev[productId] ? prev : { ...prev, [productId]: '1' }));
   };
 
   useEffect(() => {
@@ -251,9 +268,15 @@ export const AdminAppointments = () => {
         };
       });
 
+      const productsPayload = selectedProductIds.map((productId) => ({
+        productId,
+        quantity: Number(productQuantities[productId] ?? '1') || 1,
+      }));
+
       await appointmentsApi.create({
         clientId: Number(selectedClient),
         services,
+        products: productsPayload,
         employeeId: Number(selectedEmployee),
         scheduledAt: toLocalDateTimeIso(selectedDateTime),
       });
@@ -263,6 +286,8 @@ export const AdminAppointments = () => {
       setSelectedServiceIds([]);
       setCustomizations({});
       setServiceSearch('');
+      setSelectedProductIds([]);
+      setProductQuantities({});
       setSelectedEmployee('');
       setSelectedDateTime('');
     } catch (error) {
@@ -782,6 +807,41 @@ export const AdminAppointments = () => {
                     />
                   );
                 })}
+
+                {products.length > 0 && (
+                  <div>
+                    <label className={labelCls}>Produtos vendidos (opcional)</label>
+                    <div className="border border-[#eae1e1] rounded-xl max-h-40 overflow-y-auto divide-y divide-[#eae1e1]/70">
+                      {products.map((p) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-[#3b3036] hover:bg-[#fdf6f5] transition-all"
+                        >
+                          <label className="flex items-center gap-2.5 flex-1 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedProductIds.includes(p.id!)}
+                              onChange={() => toggleProduct(p.id!)}
+                              className="accent-[#be8a83]"
+                            />
+                            {p.name} — R$ {p.price.toFixed(2)}
+                          </label>
+                          {selectedProductIds.includes(p.id!) && (
+                            <input
+                              type="number"
+                              min={1}
+                              className={`${selectCls} w-16 py-1`}
+                              value={productQuantities[p.id!] ?? '1'}
+                              onChange={(e) =>
+                                setProductQuantities((prev) => ({ ...prev, [p.id!]: e.target.value }))
+                              }
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="p-3.5 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
                   O agendamento nasce já <strong>confirmado</strong>. Clientes pelo site enviam uma{' '}

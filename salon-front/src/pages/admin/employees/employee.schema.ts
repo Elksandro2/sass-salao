@@ -10,9 +10,10 @@ export const employeeFormSchema = z
     commissionScope: commissionScopeSchema.optional(),
     remunerationValue: z.string().optional(),
     commissionValue: z.string().optional(),
+    productCommissionValue: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    const { remunerationType, commissionScope, remunerationValue, commissionValue } = data;
+    const { remunerationType, commissionScope, remunerationValue, commissionValue, productCommissionValue } = data;
 
     const isCommissionBased =
       remunerationType === 'COMISSIONADO' || remunerationType === 'FIXO_E_COMISSIONADO';
@@ -79,6 +80,25 @@ export const employeeFormSchema = z
             path: ['commissionValue'],
           });
         }
+      }
+    }
+
+    // Comissão sobre produtos é opcional (nem toda comissionada vende produto), mas quando
+    // preenchida segue as mesmas regras de faixa 0-100%.
+    if (isCommissionBased && productCommissionValue) {
+      const num = Number(productCommissionValue);
+      if (num < 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'O valor não pode ser negativo',
+          path: ['productCommissionValue'],
+        });
+      } else if (num > 100) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'A comissão não pode passar de 100%',
+          path: ['productCommissionValue'],
+        });
       }
     }
   });

@@ -30,6 +30,12 @@ vi.mock('../../../services/services/services', () => ({
   },
 }));
 
+vi.mock('../../products/services/products', () => ({
+  productsApi: {
+    findAll: vi.fn().mockResolvedValue({ content: [], totalPages: 1, totalElements: 0 }),
+  },
+}));
+
 vi.mock('../../employees/services/employees', () => ({
   employeesApi: {
     findAllForBooking: vi.fn(),
