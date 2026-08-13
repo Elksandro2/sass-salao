@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../../../components/modal/ConfirmDialog';
 import { PermissionGate } from '../../../components/permissions/PermissionGate';
 import { employeesApi } from './services/employees';
 import type { EmployeeData, EmployeeFilter } from './services/employees';
+import { MercadoPagoConnectionCell } from './components/MercadoPagoConnectionCell';
 import { usersApi } from '../users/services/users';
 import type { UserData } from '../users/services/users';
 import { employeeFormSchema } from './employee.schema';
@@ -230,6 +231,19 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
         }
         return '-';
       },
+    },
+    {
+      key: 'mercadoPago',
+      label: 'Mercado Pago',
+      render: (item: EmployeeData) => (
+        <MercadoPagoConnectionCell
+          employeeId={item.id!}
+          splitApplicable={
+            (item.remunerationType === 'COMISSIONADO' || item.remunerationType === 'FIXO_E_COMISSIONADO') &&
+            item.commissionScope === 'INDIVIDUAL'
+          }
+        />
+      ),
     },
     {
       key: 'actions',

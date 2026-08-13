@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Users as TeamIcon, ShieldCheck } from 'lucide-react';
 import { StaffRegistration } from '../staff/StaffRegistration';
 import { Employees } from '../employees/Employees';
 import { Users } from '../users/Users';
+import { useAlert } from '../../../hooks/useAlert';
 
 type TeamTab = 'staff' | 'accounts';
 
@@ -23,6 +25,22 @@ const TABS: { key: TeamTab; label: string; icon: typeof TeamIcon }[] = [
  */
 export const Team = () => {
   const [tab, setTab] = useState<TeamTab>('staff');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { success: showSuccess, error: showError } = useAlert();
+
+  // O Mercado Pago redireciona de volta pra cá depois do fluxo de OAuth (ver
+  // MercadoPagoConnectionCell) — mostra o resultado e limpa a URL pra não repetir o toast
+  // se a página for recarregada.
+  useEffect(() => {
+    if (searchParams.has('mp_connected')) {
+      showSuccess('Conta Mercado Pago conectada com sucesso.');
+      setSearchParams({}, { replace: true });
+    } else if (searchParams.has('mp_error')) {
+      showError('Não foi possível conectar a conta Mercado Pago. Tente novamente.');
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-6">
