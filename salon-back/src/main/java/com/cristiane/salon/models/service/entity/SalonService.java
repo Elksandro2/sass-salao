@@ -30,14 +30,6 @@ public class SalonService {
     @Column(precision = 10, scale = 2)
     private BigDecimal price;
 
-    /** Opcional: usado para checar sobreposição na agenda; se nulo, usa valor padrão no serviço */
-    @Column(name = "duration_min")
-    private Integer durationMin;
-
-    /** Ex.: "Em média 50 min", "Em média 1h30" */
-    @Column(name = "duration_estimate", length = 160)
-    private String durationEstimate;
-
     @Column(nullable = false)
     private Boolean active = true;
 }

@@ -8,15 +8,23 @@ import com.cristiane.salon.models.appointment.repository.AppointmentRepository;
 import com.cristiane.salon.models.cashflow.entity.CashFlow;
 import com.cristiane.salon.models.cashflow.enums.CashFlowType;
 import com.cristiane.salon.models.cashflow.repository.CashFlowRepository;
+import com.cristiane.salon.models.appointment.entity.AppointmentServiceItem;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.entity.RemunerationType;
 import com.cristiane.salon.models.employee.entity.CommissionScope;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
+import com.cristiane.salon.models.fixedexpense.repository.FixedExpenseRepository;
 import com.cristiane.salon.models.report.dto.AppointmentFinancialResponse;
+import com.cristiane.salon.models.report.dto.AppointmentProfitResponse;
 import com.cristiane.salon.models.report.dto.AppointmentReportResponse;
 import com.cristiane.salon.models.report.dto.FinancialReportResponse;
 import com.cristiane.salon.models.report.dto.EmployeeFinanceResponse;
 import com.cristiane.salon.models.report.dto.PayrollReportResponse;
+import com.cristiane.salon.models.report.dto.ServicePricingAnalysisResponse;
+import com.cristiane.salon.models.report.dto.ServicePricingItemResponse;
+import com.cristiane.salon.models.service.entity.SalonService;
+import com.cristiane.salon.models.service.entity.SalonServiceProductUsage;
+import com.cristiane.salon.models.service.repository.SalonServiceProductUsageRepository;
 import com.cristiane.salon.utils.DateRangeValidator;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.instrumentation.annotations.SpanAttribute;
@@ -48,6 +56,8 @@ public class ReportService {
     private final CashFlowRepository cashFlowRepository;
     private final AppointmentRepository appointmentRepository;
     private final EmployeeRepository employeeRepository;
+    private final SalonServiceProductUsageRepository serviceProductUsageRepository;
+    private final FixedExpenseRepository fixedExpenseRepository;
     private final SalonClock salonClock;
 
     @Transactional(readOnly = true)
@@ -64,6 +74,167 @@ public class ReportService {
         return appointmentRepository
                 .findByEmployeeIdForFinancialHistory(employeeId, fromDateTime, toDateTime, pageable)
                 .map(AppointmentFinancialResponse::fromEntity);
+    }
+
+    /**
+     * Lucro/prejuízo deste atendimento específico: quanto foi cobrado menos o custo dos
+     * produtos (consumidos na receita do serviço + vendidos) e a comissão da profissional.
+     * Não considera rateio de gastos fixos — isso só entra na análise agregada por serviço.
+     */
+    @Transactional(readOnly = true)
+    public AppointmentProfitResponse getAppointmentProfit(Long appointmentId) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
+
+        BigDecimal grossRevenue = appointment.getGrandTotal();
+
+        BigDecimal recipeCost = appointment.getServices().stream()
+                .flatMap(item -> serviceProductUsageRepository
+                        .findBySalonServiceId(item.getSalonService().getId()).stream())
+                .map(SalonServiceProductUsage::getEstimatedCost)
+                .filter(cost -> cost != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal productsSoldCost = appointment.getProducts().stream()
+                .map(item -> {
+                    BigDecimal costPrice = item.getProduct().getCostPrice();
+                    if (costPrice == null) return BigDecimal.ZERO;
+                    return costPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal commissionCost = calculateAppointmentCommission(appointment);
+
+        return AppointmentProfitResponse.of(
+                appointment.getId(), grossRevenue, recipeCost, productsSoldCost, commissionCost);
+    }
+
+    /**
+     * Comissão estimada da profissional sobre ESTE atendimento — trata a comissão como se fosse
+     * sempre individual (não dá pra atribuir comissão GLOBAL a um único atendimento de forma
+     * exata); é uma estimativa pra dar noção de margem, não o valor exato da folha.
+     */
+    private BigDecimal calculateAppointmentCommission(Appointment appointment) {
+        Employee employee = appointment.getEmployee();
+        if (employee == null || employee.getRemunerationType() == null
+                || employee.getRemunerationType() == RemunerationType.SALARIO_FIXO) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal servicePct = employee.getRemunerationType() == RemunerationType.COMISSIONADO
+                ? employee.getRemunerationValue()
+                : employee.getCommissionValue();
+        BigDecimal serviceCommission = servicePct != null
+                ? appointment.getTotalEffectivePrice().multiply(servicePct)
+                        .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        BigDecimal productPct = employee.getProductCommissionValue();
+        BigDecimal productCommission = productPct != null
+                ? appointment.getTotalProductsPrice().multiply(productPct)
+                        .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        return serviceCommission.add(productCommission);
+    }
+
+    /**
+     * Análise agregada de preço por TIPO de serviço do catálogo, com rateio dos gastos fixos do
+     * período — diferente de {@link #getAppointmentProfit(Long)}, que é o lucro de um atendimento
+     * isolado sem rateio. Responde "tô cobrando certo por esse serviço ou preciso reajustar?":
+     * soma receita, custo de produtos (receita do serviço) e comissão de cada execução DONE do
+     * serviço no período, e distribui os gastos fixos proporcionalmente à receita de cada
+     * serviço (quem fatura mais absorve mais gasto fixo). Só entram serviços de fato realizados
+     * no período — não lista o catálogo inteiro com zeros.
+     */
+    @Transactional(readOnly = true)
+    public ServicePricingAnalysisResponse generateServicePricingAnalysis(LocalDate from, LocalDate to) {
+        DateRangeValidator.validate(from, to);
+        if (from == null) from = salonClock.today().withDayOfMonth(1);
+        if (to == null) to = salonClock.today().plusDays(30);
+
+        List<Appointment> doneAppointments = findAppointmentsInPeriod(from, to).stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.DONE)
+                .collect(Collectors.toList());
+
+        BigDecimal totalFixedExpenses = fixedExpenseRepository.sumAmountByDateBetween(from, to);
+
+        Map<Long, ServiceAccumulator> accumulators = new java.util.LinkedHashMap<>();
+
+        for (Appointment appointment : doneAppointments) {
+            Employee employee = appointment.getEmployee();
+            for (AppointmentServiceItem item : appointment.getServices()) {
+                SalonService service = item.getSalonService();
+                BigDecimal effectivePrice = item.getEffectivePrice() != null ? item.getEffectivePrice() : BigDecimal.ZERO;
+
+                ServiceAccumulator acc = accumulators.computeIfAbsent(service.getId(),
+                        id -> new ServiceAccumulator(service));
+                acc.count++;
+                acc.revenue = acc.revenue.add(effectivePrice);
+
+                BigDecimal recipeCost = serviceProductUsageRepository.findBySalonServiceId(service.getId()).stream()
+                        .map(SalonServiceProductUsage::getEstimatedCost)
+                        .filter(cost -> cost != null)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                acc.recipeCost = acc.recipeCost.add(recipeCost);
+
+                acc.commission = acc.commission.add(calculateServiceItemCommission(employee, effectivePrice));
+            }
+        }
+
+        BigDecimal totalRevenueAllServices = accumulators.values().stream()
+                .map(acc -> acc.revenue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<ServicePricingItemResponse> items = new ArrayList<>();
+        for (ServiceAccumulator acc : accumulators.values()) {
+            BigDecimal fixedExpenseShare = totalRevenueAllServices.signum() > 0
+                    ? totalFixedExpenses.multiply(acc.revenue)
+                            .divide(totalRevenueAllServices, 2, java.math.RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+            items.add(ServicePricingItemResponse.of(
+                    acc.service.getId(), acc.service.getName(), acc.service.getPrice(), acc.count,
+                    acc.revenue, acc.recipeCost, acc.commission, fixedExpenseShare));
+        }
+
+        // Pior margem primeiro — é o que a Cristiane mais precisa ver de cara.
+        items.sort(java.util.Comparator.comparing(ServicePricingItemResponse::netProfit));
+
+        String period = from + " a " + to;
+        return new ServicePricingAnalysisResponse(items, totalFixedExpenses, period);
+    }
+
+    /** Acumulador mutável de uma linha da análise por serviço enquanto os agendamentos são percorridos. */
+    private static final class ServiceAccumulator {
+        final SalonService service;
+        long count = 0;
+        BigDecimal revenue = BigDecimal.ZERO;
+        BigDecimal recipeCost = BigDecimal.ZERO;
+        BigDecimal commission = BigDecimal.ZERO;
+
+        ServiceAccumulator(SalonService service) {
+            this.service = service;
+        }
+    }
+
+    /**
+     * Comissão estimada de UM item de serviço dentro da análise agregada — mesma limitação do
+     * {@link #calculateAppointmentCommission(Appointment)}: trata a comissão como individual por
+     * item, sem considerar o escopo GLOBAL de forma exata. É estimativa de tendência, não folha.
+     */
+    private BigDecimal calculateServiceItemCommission(Employee employee, BigDecimal effectivePrice) {
+        if (employee == null || employee.getRemunerationType() == null
+                || employee.getRemunerationType() == RemunerationType.SALARIO_FIXO) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal pct = employee.getRemunerationType() == RemunerationType.COMISSIONADO
+                ? employee.getRemunerationValue()
+                : employee.getCommissionValue();
+        if (pct == null) {
+            return BigDecimal.ZERO;
+        }
+        return effectivePrice.multiply(pct).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
     }
 
     @WithSpan("gerar-relatorio-financeiro")

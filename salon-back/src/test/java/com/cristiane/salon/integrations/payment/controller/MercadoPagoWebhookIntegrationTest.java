@@ -149,7 +149,6 @@ class MercadoPagoWebhookIntegrationTest {
         salonService.setName("Corte de Cabelo");
         salonService.setDescription("Corte feminino premium");
         salonService.setPrice(BigDecimal.valueOf(80.00));
-        salonService.setDurationMin(45);
         salonService.setActive(true);
         salonService = salonServiceRepository.save(salonService);
 
@@ -202,6 +201,7 @@ class MercadoPagoWebhookIntegrationTest {
         // Assert 1: Appointment payment status is updated to PAID
         Appointment updatedAppointment = appointmentRepository.findById(appointment.getId()).orElseThrow();
         assertThat(updatedAppointment.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(updatedAppointment.getPaymentMethod()).isEqualTo(com.cristiane.salon.models.appointment.enums.PaymentMethod.PIX);
 
         // Assert 2: Cash flow income has been created
         List<CashFlow> cashFlows = cashFlowRepository.findAll();

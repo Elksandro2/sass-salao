@@ -1,6 +1,7 @@
 package com.cristiane.salon.models.product.dto;
 
 import com.cristiane.salon.models.product.entity.Product;
+import com.cristiane.salon.models.product.entity.ProductUnit;
 
 import java.math.BigDecimal;
 
@@ -9,7 +10,12 @@ public record ProductResponse(
         String name,
         Integer stock,
         BigDecimal price,
-        Boolean active
+        Boolean active,
+        String brand,
+        BigDecimal costPrice,
+        BigDecimal capacity,
+        ProductUnit unit,
+        BigDecimal unitCost
 ) {
     public static ProductResponse fromEntity(Product product) {
         return new ProductResponse(
@@ -17,7 +23,12 @@ public record ProductResponse(
                 product.getName(),
                 product.getStock(),
                 product.getPrice(),
-                product.getActive()
+                product.getActive(),
+                product.getBrand(),
+                product.getCostPrice(),
+                product.getCapacity(),
+                product.getUnit(),
+                product.getUnitCost()
         );
     }
 }

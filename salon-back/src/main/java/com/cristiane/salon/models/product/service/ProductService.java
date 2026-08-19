@@ -39,6 +39,10 @@ public class ProductService {
         product.setStock(request.stock() != null ? request.stock() : 0);
         product.setPrice(request.price());
         product.setActive(request.active() != null ? request.active() : true);
+        product.setBrand(blankToNull(request.brand()));
+        product.setCostPrice(request.costPrice());
+        product.setCapacity(request.capacity());
+        product.setUnit(request.unit());
 
         return ProductResponse.fromEntity(productRepository.save(product));
     }
@@ -52,8 +56,16 @@ public class ProductService {
         if (request.stock() != null) product.setStock(request.stock());
         if (request.price() != null) product.setPrice(request.price());
         if (request.active() != null) product.setActive(request.active());
+        product.setBrand(blankToNull(request.brand()));
+        product.setCostPrice(request.costPrice());
+        product.setCapacity(request.capacity());
+        product.setUnit(request.unit());
 
         return ProductResponse.fromEntity(productRepository.save(product));
+    }
+
+    private static String blankToNull(String value) {
+        return value != null && !value.isBlank() ? value.trim() : null;
     }
 
     @Transactional

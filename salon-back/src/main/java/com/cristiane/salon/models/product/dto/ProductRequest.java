@@ -1,5 +1,6 @@
 package com.cristiane.salon.models.product.dto;
 
+import com.cristiane.salon.models.product.entity.ProductUnit;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -20,5 +21,18 @@ public record ProductRequest(
         @DecimalMin(value = "0.00", message = "O preço não pode ser negativo")
         BigDecimal price,
 
-        Boolean active
+        Boolean active,
+
+        @Size(max = 100, message = "A marca deve ter no máximo 100 caracteres")
+        String brand,
+
+        /** Quanto o salão pagou pela embalagem/produto (opcional, usado só pra custeio interno). */
+        @DecimalMin(value = "0.00", message = "O custo não pode ser negativo")
+        BigDecimal costPrice,
+
+        /** Capacidade da embalagem, na unidade de {@code unit} (ex.: 1000 para 1000ml). */
+        @DecimalMin(value = "0.01", message = "A capacidade deve ser maior que zero")
+        BigDecimal capacity,
+
+        ProductUnit unit
 ) {}

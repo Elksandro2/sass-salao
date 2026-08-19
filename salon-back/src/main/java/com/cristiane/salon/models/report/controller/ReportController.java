@@ -1,9 +1,11 @@
 package com.cristiane.salon.models.report.controller;
 
 import com.cristiane.salon.models.report.dto.AppointmentFinancialResponse;
+import com.cristiane.salon.models.report.dto.AppointmentProfitResponse;
 import com.cristiane.salon.models.report.dto.AppointmentReportResponse;
 import com.cristiane.salon.models.report.dto.FinancialReportResponse;
 import com.cristiane.salon.models.report.dto.PayrollReportResponse;
+import com.cristiane.salon.models.report.dto.ServicePricingAnalysisResponse;
 import com.cristiane.salon.models.report.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -56,6 +58,22 @@ public class ReportController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ResponseEntity.ok(reportService.generatePayrollReport(from, to));
+    }
+
+    @GetMapping("/appointments/{id}/profit")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Operation(summary = "Lucro/prejuízo estimado de um atendimento específico (Admin/Gerente)")
+    public ResponseEntity<AppointmentProfitResponse> getAppointmentProfit(@PathVariable Long id) {
+        return ResponseEntity.ok(reportService.getAppointmentProfit(id));
+    }
+
+    @GetMapping("/service-pricing")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Operation(summary = "Análise de preço por tipo de serviço, com rateio dos gastos fixos (Admin/Gerente)")
+    public ResponseEntity<ServicePricingAnalysisResponse> getServicePricingAnalysis(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(reportService.generateServicePricingAnalysis(from, to));
     }
 
     @GetMapping("/financial/employees/{employeeId}")

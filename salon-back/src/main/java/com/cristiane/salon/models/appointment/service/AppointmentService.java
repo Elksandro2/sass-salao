@@ -20,6 +20,7 @@ import com.cristiane.salon.models.appointment.entity.AppointmentProductItem;
 import com.cristiane.salon.models.appointment.entity.AppointmentServiceItem;
 import com.cristiane.salon.models.appointment.enums.AppointmentStatus;
 import com.cristiane.salon.models.appointment.enums.ExpenseValueType;
+import com.cristiane.salon.models.appointment.enums.PaymentMethod;
 import com.cristiane.salon.models.appointment.enums.PaymentStatus;
 import com.cristiane.salon.models.appointment.repository.AppointmentRepository;
 import com.cristiane.salon.models.appointment.specification.AppointmentSpecifications;
@@ -85,22 +86,6 @@ public class AppointmentService {
                     appointment.getClient().getName() + " solicitou " + appointment.getServiceNames(),
                     "/admin/appointments");
         }
-    }
-
-    private static int blockingMinutes(Integer overrideDurationMin, SalonService service) {
-        if (overrideDurationMin != null && overrideDurationMin > 0) {
-            return overrideDurationMin;
-        }
-        if (service.getDurationMin() != null && service.getDurationMin() > 0) {
-            return service.getDurationMin();
-        }
-        return 60;
-    }
-
-    private static int totalBlockingMinutes(List<AppointmentServiceItem> items) {
-        return items.stream()
-                .mapToInt(item -> blockingMinutes(item.getCustomDurationMin(), item.getSalonService()))
-                .sum();
     }
 
     private User getAuthenticatedUser() {
@@ -178,30 +163,6 @@ public class AppointmentService {
                 filter.clientName(), filter.startDate(), filter.endDate());
     }
 
-    private void assertNoScheduleConflict(Long employeeId, LocalDateTime scheduledAt, int durationMinutes,
-                                         Long ignoreAppointmentId) {
-        List<Appointment> existing = appointmentRepository.findActiveAppointmentsByEmployeeAndDate(
-                employeeId,
-                scheduledAt.toLocalDate().atStartOfDay(),
-                scheduledAt.toLocalDate().atTime(LocalTime.MAX)
-        );
-
-        LocalDateTime requestEnd = scheduledAt.plusMinutes(durationMinutes);
-
-        for (Appointment apt : existing) {
-            if (ignoreAppointmentId != null && apt.getId().equals(ignoreAppointmentId)) {
-                continue;
-            }
-            LocalDateTime aptStart = apt.getScheduledAt();
-            LocalDateTime aptEnd = aptStart.plusMinutes(totalBlockingMinutes(apt.getServices()));
-
-            boolean overlaps = scheduledAt.isBefore(aptEnd) && aptStart.isBefore(requestEnd);
-            if (overlaps) {
-                throw new BadRequestException("Este horário já está ocupado para esta profissional");
-            }
-        }
-    }
-
     @Transactional
     public AppointmentResponse create(AppointmentRequest request) {
         User currentUser = getAuthenticatedUser();
@@ -256,17 +217,7 @@ public class AppointmentService {
                 if (sr.customPrice() != null && sr.customPrice().compareTo(BigDecimal.ZERO) < 0) {
                     throw new BadRequestException("O preço customizado não pode ser negativo");
                 }
-                if (sr.customDurationMin() != null && sr.customDurationMin() <= 0) {
-                    throw new BadRequestException("A duração customizada deve ser maior que zero");
-                }
             }
-
-            int totalDuration = 0;
-            for (int i = 0; i < serviceRequests.size(); i++) {
-                totalDuration += blockingMinutes(serviceRequests.get(i).customDurationMin(), resolvedServices.get(i));
-            }
-
-            assertNoScheduleConflict(employee.getId(), request.scheduledAt(), totalDuration, null);
 
             if (request.preferredDate() != null && request.preferredDate().isBefore(salonClock.today())) {
                 throw new BadRequestException("A data preferida deve ser hoje ou uma data futura");
@@ -325,9 +276,9 @@ public class AppointmentService {
     }
 
     /**
-     * No fluxo do cliente (auto-agendamento) customPrice/customDurationMin/customServiceNotes do
-     * request são ignorados — essas sobrescritas só têm efeito quando a equipe cria o agendamento,
-     * evitando que o cliente manipule o próprio preço/duração cobrados.
+     * No fluxo do cliente (auto-agendamento) customPrice/customServiceNotes do request são
+     * ignorados — essas sobrescritas só têm efeito quando a equipe cria o agendamento, evitando
+     * que o cliente manipule o próprio preço cobrado.
      */
     private List<AppointmentServiceItem> buildServiceItems(Appointment appointment,
                                                             List<AppointmentServiceRequest> serviceRequests,
@@ -341,7 +292,6 @@ public class AppointmentService {
             item.setSalonService(resolvedServices.get(i));
             if (allowCustomization) {
                 item.setCustomPrice(sr.customPrice());
-                item.setCustomDurationMin(sr.customDurationMin());
                 item.setCustomServiceNotes(sr.customServiceNotes());
             }
             items.add(item);
@@ -408,6 +358,46 @@ public class AppointmentService {
         }
     }
 
+    /**
+     * A cliente às vezes decide fazer mais alguma coisa depois de já ter sido atendida ou de o
+     * agendamento já estar confirmado — sem grade de horário fixa, isso não tem nenhum impacto
+     * de agenda, só precisa ficar registrado.
+     */
+    @Transactional
+    public AppointmentResponse updateServices(Long id, List<AppointmentServiceRequest> serviceRequests) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
+        assertCanManage(appointment, "editar os serviços de");
+        assertNotBilled(appointment, "editar os serviços de");
+
+        if (serviceRequests == null || serviceRequests.isEmpty()) {
+            throw new BadRequestException("Ao menos um serviço é obrigatório");
+        }
+
+        List<SalonService> resolvedServices = serviceRequests.stream()
+                .map(sr -> salonServiceRepository.findById(sr.serviceId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Serviço não encontrado")))
+                .collect(Collectors.toList());
+
+        for (SalonService svc : resolvedServices) {
+            if (!svc.getActive()) {
+                throw new BadRequestException("Este serviço não está disponível: " + svc.getName());
+            }
+        }
+
+        for (AppointmentServiceRequest sr : serviceRequests) {
+            if (sr.customPrice() != null && sr.customPrice().compareTo(BigDecimal.ZERO) < 0) {
+                throw new BadRequestException("O preço customizado não pode ser negativo");
+            }
+        }
+
+        appointment.getServices().clear();
+        appointment.getServices().addAll(buildServiceItems(appointment, serviceRequests, resolvedServices, true));
+
+        Appointment saved = appointmentRepository.save(appointment);
+        return AppointmentResponse.fromEntity(saved);
+    }
+
     @Transactional
     public AppointmentResponse updateProducts(Long id, List<AppointmentProductRequest> productRequests) {
         Appointment appointment = appointmentRepository.findById(id)
@@ -449,9 +439,6 @@ public class AppointmentService {
         if (scheduledAt.isBefore(salonClock.now())) {
             throw new BadRequestException("Não é possível confirmar um horário no passado");
         }
-
-        assertNoScheduleConflict(appointment.getEmployee().getId(), scheduledAt,
-                totalBlockingMinutes(appointment.getServices()), null);
 
         appointment.setScheduledAt(scheduledAt);
         appointment.setStatus(AppointmentStatus.CONFIRMED);
@@ -636,6 +623,7 @@ public class AppointmentService {
 
         // 5. MARCA COMO PAGO!
         appointment.setPaymentStatus(PaymentStatus.PAID);
+        appointment.setPaymentMethod(PaymentMethod.PIX);
         appointmentRepository.save(appointment);
 
         // 6. Lança a receita no Fluxo de Caixa financeiro do salão
@@ -759,7 +747,7 @@ public class AppointmentService {
     }
 
     @Transactional
-    public AppointmentResponse updatePaymentStatus(Long id, String paymentStatusStr) {
+    public AppointmentResponse updatePaymentStatus(Long id, String paymentStatusStr, String paymentMethodStr) {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
         assertCanManage(appointment, "alterar o pagamento de");
@@ -787,6 +775,16 @@ public class AppointmentService {
             }
 
             appointment.setPaymentStatus(paymentStatus);
+
+            // Forma de pagamento é escolhida manualmente quando o admin confirma pagamento
+            // recebido fora da plataforma (crédito, débito, PIX presencial, dinheiro).
+            if (paymentStatus == PaymentStatus.MANUAL && paymentMethodStr != null && !paymentMethodStr.isBlank()) {
+                try {
+                    appointment.setPaymentMethod(PaymentMethod.valueOf(paymentMethodStr.toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    throw new BadRequestException("Forma de pagamento inválida");
+                }
+            }
 
             if (paymentStatus == PaymentStatus.PAID) {
                 billAppointmentOnce(appointment, appointment.getGrandTotal(),

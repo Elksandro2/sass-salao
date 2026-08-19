@@ -24,12 +24,10 @@ class AppointmentTest {
         haircut = new SalonService();
         haircut.setName("Corte");
         haircut.setPrice(new BigDecimal("100.00"));
-        haircut.setDurationMin(45);
 
         coloring = new SalonService();
         coloring.setName("Coloração");
         coloring.setPrice(new BigDecimal("150.00"));
-        coloring.setDurationMin(60);
 
         appointment = new Appointment();
 
@@ -56,32 +54,11 @@ class AppointmentTest {
     }
 
     @Test
-    void getEffectiveDurationMin_whenNoCustomDuration_shouldReturnCatalogDuration() {
-        assertThat(haircutItem.getEffectiveDurationMin()).isEqualTo(45);
-    }
-
-    @Test
-    void getEffectiveDurationMin_whenCustomDurationSet_shouldReturnCustomDurationAndLeaveCatalogUntouched() {
-        haircutItem.setCustomDurationMin(90);
-
-        assertThat(haircutItem.getEffectiveDurationMin()).isEqualTo(90);
-        assertThat(haircut.getDurationMin()).isEqualTo(45);
-    }
-
-    @Test
     void getTotalEffectivePrice_withMultipleServices_shouldSumEffectivePrices() {
         haircutItem.setCustomPrice(new BigDecimal("120.00"));
         appointment.setServices(List.of(haircutItem, coloringItem));
 
         assertThat(appointment.getTotalEffectivePrice()).isEqualByComparingTo("270.00");
-    }
-
-    @Test
-    void getTotalEffectiveDurationMin_withMultipleServices_shouldSumEffectiveDurations() {
-        coloringItem.setCustomDurationMin(90);
-        appointment.setServices(List.of(haircutItem, coloringItem));
-
-        assertThat(appointment.getTotalEffectiveDurationMin()).isEqualTo(135);
     }
 
     @Test

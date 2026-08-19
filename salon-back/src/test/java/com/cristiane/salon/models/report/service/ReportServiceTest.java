@@ -10,6 +10,7 @@ import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.entity.RemunerationType;
 import com.cristiane.salon.models.employee.entity.CommissionScope;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
+import com.cristiane.salon.models.report.dto.AppointmentProfitResponse;
 import com.cristiane.salon.models.report.dto.AppointmentReportResponse;
 import com.cristiane.salon.models.report.dto.FinancialReportResponse;
 import com.cristiane.salon.models.report.dto.EmployeeFinanceResponse;
@@ -28,6 +29,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -49,6 +51,12 @@ class ReportServiceTest {
 
     @Mock
     private EmployeeRepository employeeRepository;
+
+    @Mock
+    private com.cristiane.salon.models.service.repository.SalonServiceProductUsageRepository serviceProductUsageRepository;
+
+    @Mock
+    private com.cristiane.salon.models.fixedexpense.repository.FixedExpenseRepository fixedExpenseRepository;
 
     // SalonClock real, não mock: os testes dependem do "hoje"/"agora" de verdade no fuso
     // do salão, e um mock devolveria null silenciosamente.
@@ -654,6 +662,209 @@ class ReportServiceTest {
                 com.cristiane.salon.exception.ResourceNotFoundException.class,
                 () -> reportService.getEmployeeFinancialHistory(99L, null, null, pageable)
         );
+    }
+
+    @Test
+    void getAppointmentProfit_whenNoRecipeOrRetailProducts_shouldEqualRevenueMinusCommission() {
+        Employee emp = new Employee();
+        emp.setId(1L);
+        User user = new User();
+        user.setName("Alice");
+        emp.setUser(user);
+        emp.setRemunerationType(RemunerationType.COMISSIONADO);
+        emp.setCommissionScope(CommissionScope.INDIVIDUAL);
+        emp.setRemunerationValue(new BigDecimal("10.00"));
+
+        SalonService service = new SalonService();
+        service.setId(1L);
+        service.setPrice(new BigDecimal("100.00"));
+
+        Appointment apt = new Appointment();
+        apt.setId(5L);
+        apt.setEmployee(emp);
+        withService(apt, service);
+
+        when(appointmentRepository.findById(5L)).thenReturn(java.util.Optional.of(apt));
+
+        AppointmentProfitResponse result = reportService.getAppointmentProfit(5L);
+
+        assertEquals(new BigDecimal("100.00"), result.grossRevenue());
+        assertEquals(BigDecimal.ZERO, result.serviceRecipeCost());
+        assertEquals(BigDecimal.ZERO, result.productsSoldCost());
+        assertEquals(new BigDecimal("10.00"), result.commissionCost());
+        assertEquals(new BigDecimal("90.00"), result.netProfit());
+        assertThat(result.positive()).isTrue();
+    }
+
+    @Test
+    void getAppointmentProfit_withRecipeCost_shouldDeductFromRevenue() {
+        Employee emp = new Employee();
+        emp.setId(1L);
+        User user = new User();
+        user.setName("Alice");
+        emp.setUser(user);
+        emp.setRemunerationType(RemunerationType.SALARIO_FIXO);
+        emp.setRemunerationValue(new BigDecimal("2000.00"));
+
+        SalonService service = new SalonService();
+        service.setId(1L);
+        service.setPrice(new BigDecimal("100.00"));
+
+        com.cristiane.salon.models.product.entity.Product coloring =
+                new com.cristiane.salon.models.product.entity.Product();
+        coloring.setId(10L);
+        coloring.setName("Tintura");
+        coloring.setCostPrice(new BigDecimal("40.00"));
+        coloring.setCapacity(new BigDecimal("1000"));
+
+        com.cristiane.salon.models.service.entity.SalonServiceProductUsage usage =
+                new com.cristiane.salon.models.service.entity.SalonServiceProductUsage();
+        usage.setSalonService(service);
+        usage.setProduct(coloring);
+        usage.setQuantityUsed(new BigDecimal("30"));
+
+        when(serviceProductUsageRepository.findBySalonServiceId(1L)).thenReturn(List.of(usage));
+
+        Appointment apt = new Appointment();
+        apt.setId(5L);
+        apt.setEmployee(emp);
+        withService(apt, service);
+
+        when(appointmentRepository.findById(5L)).thenReturn(java.util.Optional.of(apt));
+
+        AppointmentProfitResponse result = reportService.getAppointmentProfit(5L);
+
+        // custo = 40/1000 * 30 = 1.20; salário fixo não gera comissão por atendimento
+        assertThat(result.serviceRecipeCost()).isEqualByComparingTo("1.20");
+        assertEquals(BigDecimal.ZERO, result.commissionCost());
+        assertThat(result.netProfit()).isEqualByComparingTo("98.80");
+    }
+
+    @Test
+    void getAppointmentProfit_whenAppointmentNotFound_shouldThrowResourceNotFoundException() {
+        when(appointmentRepository.findById(99L)).thenReturn(java.util.Optional.empty());
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.cristiane.salon.exception.ResourceNotFoundException.class,
+                () -> reportService.getAppointmentProfit(99L)
+        );
+    }
+
+    @Test
+    void generateServicePricingAnalysis_shouldAllocateFixedExpensesProportionallyToRevenueAndSortByWorstMargin() {
+        // Given: Corte (R$100, comissionada 10%) feito 2x = R$200 de receita
+        Employee commissionedEmployee = new Employee();
+        commissionedEmployee.setId(1L);
+        commissionedEmployee.setUser(new User());
+        commissionedEmployee.setRemunerationType(RemunerationType.COMISSIONADO);
+        commissionedEmployee.setRemunerationValue(new BigDecimal("10"));
+        commissionedEmployee.setCommissionScope(CommissionScope.INDIVIDUAL);
+
+        SalonService corte = new SalonService();
+        corte.setId(1L);
+        corte.setName("Corte");
+        corte.setPrice(new BigDecimal("100.00"));
+
+        Appointment aptCorte1 = new Appointment();
+        aptCorte1.setStatus(AppointmentStatus.DONE);
+        aptCorte1.setEmployee(commissionedEmployee);
+        withService(aptCorte1, corte);
+        aptCorte1.setScheduledAt(salonClock.now());
+
+        Appointment aptCorte2 = new Appointment();
+        aptCorte2.setStatus(AppointmentStatus.DONE);
+        aptCorte2.setEmployee(commissionedEmployee);
+        withService(aptCorte2, corte);
+        aptCorte2.setScheduledAt(salonClock.now());
+
+        // Escova (R$50, funcionária SALARIO_FIXO, sem comissão) feito 1x = R$50 de receita
+        Employee fixedEmployee = new Employee();
+        fixedEmployee.setId(2L);
+        fixedEmployee.setUser(new User());
+        fixedEmployee.setRemunerationType(RemunerationType.SALARIO_FIXO);
+        fixedEmployee.setRemunerationValue(new BigDecimal("2000"));
+
+        SalonService escova = new SalonService();
+        escova.setId(2L);
+        escova.setName("Escova");
+        escova.setPrice(new BigDecimal("50.00"));
+
+        Appointment aptEscova = new Appointment();
+        aptEscova.setStatus(AppointmentStatus.DONE);
+        aptEscova.setEmployee(fixedEmployee);
+        withService(aptEscova, escova);
+        aptEscova.setScheduledAt(salonClock.now());
+
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(aptCorte1, aptCorte2, aptEscova));
+        // R$100 de gasto fixo no período, rateado proporcionalmente à receita: Corte (200/250) = 80, Escova (50/250) = 20
+        when(fixedExpenseRepository.sumAmountByDateBetween(any(), any())).thenReturn(new BigDecimal("100.00"));
+
+        // When
+        var response = reportService.generateServicePricingAnalysis(salonClock.today(), salonClock.today());
+
+        // Then
+        assertThat(response.totalFixedExpenses()).isEqualByComparingTo("100.00");
+        assertThat(response.items()).hasSize(2);
+
+        var corteItem = response.items().stream().filter(i -> i.serviceId().equals(1L)).findFirst().orElseThrow();
+        assertThat(corteItem.timesPerformed()).isEqualTo(2);
+        assertThat(corteItem.totalRevenue()).isEqualByComparingTo("200.00");
+        assertThat(corteItem.commissionCostTotal()).isEqualByComparingTo("20.00"); // 10% de 100, 2x
+        assertThat(corteItem.fixedExpenseShare()).isEqualByComparingTo("80.00");
+        // 200 - 0 (sem receita de produto) - 20 (comissão) - 80 (rateio) = 100
+        assertThat(corteItem.netProfit()).isEqualByComparingTo("100.00");
+
+        var escovaItem = response.items().stream().filter(i -> i.serviceId().equals(2L)).findFirst().orElseThrow();
+        assertThat(escovaItem.timesPerformed()).isEqualTo(1);
+        assertThat(escovaItem.totalRevenue()).isEqualByComparingTo("50.00");
+        assertThat(escovaItem.commissionCostTotal()).isEqualByComparingTo(BigDecimal.ZERO); // salário fixo não comissiona
+        assertThat(escovaItem.fixedExpenseShare()).isEqualByComparingTo("20.00");
+        // 50 - 0 - 0 - 20 = 30
+        assertThat(escovaItem.netProfit()).isEqualByComparingTo("30.00");
+
+        // Ordenado por pior margem primeiro: Escova (30) rende menos lucro absoluto que Corte (100)
+        assertThat(response.items().get(0).serviceId()).isEqualTo(2L);
+        assertThat(response.items().get(1).serviceId()).isEqualTo(1L);
+    }
+
+    @Test
+    void generateServicePricingAnalysis_whenNoAppointmentsDone_shouldReturnEmptyItems() {
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(fixedExpenseRepository.sumAmountByDateBetween(any(), any())).thenReturn(BigDecimal.ZERO);
+
+        var response = reportService.generateServicePricingAnalysis(salonClock.today(), salonClock.today());
+
+        assertThat(response.items()).isEmpty();
+    }
+
+    @Test
+    void generateServicePricingAnalysis_whenNetProfitNegative_shouldBeMarkedUnhealthy() {
+        Employee employee = new Employee();
+        employee.setId(1L);
+        employee.setUser(new User());
+        employee.setRemunerationType(RemunerationType.SALARIO_FIXO);
+
+        SalonService service = new SalonService();
+        service.setId(1L);
+        service.setName("Hidratação");
+        service.setPrice(new BigDecimal("30.00"));
+
+        Appointment apt = new Appointment();
+        apt.setStatus(AppointmentStatus.DONE);
+        apt.setEmployee(employee);
+        withService(apt, service);
+        apt.setScheduledAt(salonClock.now());
+
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of(apt));
+        // Gasto fixo maior que a receita do único serviço do período
+        when(fixedExpenseRepository.sumAmountByDateBetween(any(), any())).thenReturn(new BigDecimal("500.00"));
+
+        var response = reportService.generateServicePricingAnalysis(salonClock.today(), salonClock.today());
+
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.items().get(0).healthy()).isFalse();
+        assertThat(response.items().get(0).netProfit()).isEqualByComparingTo("-470.00");
     }
 }
 

@@ -5,6 +5,7 @@ import com.cristiane.salon.exception.ResourceNotFoundException;
 import com.cristiane.salon.models.service.dto.SalonServiceFilter;
 import com.cristiane.salon.models.service.dto.SalonServiceRequest;
 import com.cristiane.salon.models.service.dto.SalonServiceResponse;
+import com.cristiane.salon.models.service.dto.ServiceProductUsageRequest;
 import com.cristiane.salon.models.service.entity.SalonService;
 import com.cristiane.salon.models.service.repository.SalonServiceRepository;
 import org.junit.jupiter.api.Test;
@@ -38,11 +39,22 @@ class SalonServiceManagerTest {
     @Mock
     private SalonServiceRepository salonServiceRepository;
 
+    @Mock
+    private com.cristiane.salon.models.service.repository.SalonServiceProductUsageRepository serviceProductUsageRepository;
+
+    @Mock
+    private com.cristiane.salon.models.product.repository.ProductRepository productRepository;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        lenient().when(serviceProductUsageRepository.findBySalonServiceId(any())).thenReturn(java.util.List.of());
+    }
+
     @Test
     void findAll_shouldReturnPageFromRepository() {
         // Arrange
-        SalonService s1 = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), 30, "30 min", true);
-        SalonService s2 = new SalonService(2L, "Barba", "Desc", new BigDecimal("30.0"), 20, "20 min", false);
+        SalonService s1 = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true);
+        SalonService s2 = new SalonService(2L, "Barba", "Desc", new BigDecimal("30.0"), false);
         Pageable pageable = PageRequest.of(0, 10);
         Page<SalonService> page = new PageImpl<>(Arrays.asList(s1, s2));
         when(salonServiceRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
@@ -61,7 +73,7 @@ class SalonServiceManagerTest {
     void findById_shouldReturnService_whenServiceExists() {
         // Arrange
         Long id = 1L;
-        SalonService s = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), 30, "30 min", true);
+        SalonService s = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true);
         when(salonServiceRepository.findById(id)).thenReturn(Optional.of(s));
 
         // Act
@@ -87,7 +99,7 @@ class SalonServiceManagerTest {
     @Test
     void create_shouldThrowBadRequestException_whenPriceIsNegative() {
         // Arrange
-        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("-10.0"), "30 min", 30, true);
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("-10.0"), true, null);
 
         // Act & Assert
         assertThatThrownBy(() -> salonServiceManager.create(request))
@@ -96,26 +108,10 @@ class SalonServiceManagerTest {
     }
 
     @Test
-    void create_shouldThrowBadRequestException_whenBothDurationMinAndDurationEstimateAreInvalid() {
+    void create_shouldSaveService_whenValid() {
         // Arrange
-        SalonServiceRequest requestNulls = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), null, null, true);
-        SalonServiceRequest requestInvalids = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), "   ", 0, true);
-
-        // Act & Assert
-        assertThatThrownBy(() -> salonServiceManager.create(requestNulls))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Informe o tempo estimado");
-
-        assertThatThrownBy(() -> salonServiceManager.create(requestInvalids))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Informe o tempo estimado");
-    }
-
-    @Test
-    void create_shouldSaveService_whenDurationMinIsProvided() {
-        // Arrange
-        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), "  ", 30, null);
-        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), 30, null, true);
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), null, null);
+        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true);
         when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
 
         // Act
@@ -124,39 +120,88 @@ class SalonServiceManagerTest {
         // Assert
         assertThat(result).isNotNull();
         assertThat(result.id()).isEqualTo(1L);
-        assertThat(result.durationEstimate()).isNull(); // blankToNull test
         assertThat(result.active()).isTrue(); // default active is true
 
-        verify(salonServiceRepository).save(argThat(service -> 
-                service.getName().equals("Corte") &&
-                service.getDurationMin() == 30 &&
-                service.getDurationEstimate() == null &&
-                service.getActive()
+        verify(salonServiceRepository).save(argThat(service ->
+                service.getName().equals("Corte") && service.getActive()
         ));
     }
 
     @Test
-    void create_shouldSaveService_whenDurationEstimateIsProvided() {
+    void create_shouldRespectActiveFlag_whenFalse() {
         // Arrange
-        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), "cerca de 40 min", null, false);
-        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), null, "cerca de 40 min", false);
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), false, null);
+        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), false);
         when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
 
         // Act
         SalonServiceResponse result = salonServiceManager.create(request);
 
         // Assert
-        assertThat(result).isNotNull();
-        assertThat(result.durationMin()).isNull();
-        assertThat(result.durationEstimate()).isEqualTo("cerca de 40 min");
         assertThat(result.active()).isFalse();
+    }
+
+    @Test
+    void create_withProductUsages_shouldSaveRecipeAndReturnEstimatedCost() {
+        com.cristiane.salon.models.product.entity.Product shampoo = new com.cristiane.salon.models.product.entity.Product();
+        shampoo.setId(30L);
+        shampoo.setName("Shampoo");
+        shampoo.setPrice(new BigDecimal("50.00"));
+        shampoo.setCostPrice(new BigDecimal("40.00"));
+        shampoo.setCapacity(new BigDecimal("1000"));
+        shampoo.setUnit(com.cristiane.salon.models.product.entity.ProductUnit.ML);
+
+        when(productRepository.findById(30L)).thenReturn(Optional.of(shampoo));
+        when(serviceProductUsageRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true);
+        when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
+
+        var usageRequest = new ServiceProductUsageRequest(30L, new BigDecimal("30"));
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, List.of(usageRequest));
+
+        SalonServiceResponse result = salonServiceManager.create(request);
+
+        assertThat(result.productUsages()).hasSize(1);
+        assertThat(result.productUsages().get(0).productName()).isEqualTo("Shampoo");
+        // custo unitário = 40/1000 = 0.04/ml; 30ml = 1.20
+        assertThat(result.estimatedProductCost()).isEqualByComparingTo("1.20");
+    }
+
+    @Test
+    void create_withProductUsageForUnknownProduct_shouldThrowResourceNotFoundException() {
+        when(productRepository.findById(99L)).thenReturn(Optional.empty());
+        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true);
+        when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
+
+        var usageRequest = new ServiceProductUsageRequest(99L, new BigDecimal("10"));
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, List.of(usageRequest));
+
+        assertThatThrownBy(() -> salonServiceManager.create(request))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Produto não encontrado");
+    }
+
+    @Test
+    void update_whenProductUsagesIsNull_shouldNotTouchExistingRecipe() {
+        Long id = 1L;
+        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true);
+        SalonService saved = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true);
+        when(salonServiceRepository.findById(id)).thenReturn(Optional.of(service));
+        when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
+
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, null);
+
+        salonServiceManager.update(id, request);
+
+        verify(serviceProductUsageRepository, never()).deleteBySalonServiceId(any());
     }
 
     @Test
     void update_shouldThrowResourceNotFoundException_whenServiceDoesNotExist() {
         // Arrange
         Long id = 1L;
-        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), "30 min", 30, true);
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, null);
         when(salonServiceRepository.findById(id)).thenReturn(Optional.empty());
 
         // Act & Assert
@@ -168,8 +213,8 @@ class SalonServiceManagerTest {
     void update_shouldThrowBadRequestException_whenNewPriceIsNegative() {
         // Arrange
         Long id = 1L;
-        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), 30, "30 min", true);
-        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("-5.0"), "30 min", 30, true);
+        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true);
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("-5.0"), true, null);
 
         when(salonServiceRepository.findById(id)).thenReturn(Optional.of(service));
 
@@ -183,10 +228,10 @@ class SalonServiceManagerTest {
     void update_shouldUpdateFieldsAndSave_whenValid() {
         // Arrange
         Long id = 1L;
-        SalonService service = new SalonService(id, "Old Corte", "Old Desc", new BigDecimal("40.0"), 20, "20 min", true);
-        SalonServiceRequest request = new SalonServiceRequest("New Corte", "New Desc", new BigDecimal("50.0"), "30 min", 30, false);
+        SalonService service = new SalonService(id, "Old Corte", "Old Desc", new BigDecimal("40.0"), true);
+        SalonServiceRequest request = new SalonServiceRequest("New Corte", "New Desc", new BigDecimal("50.0"), false, null);
 
-        SalonService saved = new SalonService(id, "New Corte", "New Desc", new BigDecimal("50.0"), 30, "30 min", false);
+        SalonService saved = new SalonService(id, "New Corte", "New Desc", new BigDecimal("50.0"), false);
         when(salonServiceRepository.findById(id)).thenReturn(Optional.of(service));
         when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
 
@@ -200,12 +245,10 @@ class SalonServiceManagerTest {
         assertThat(result.price()).isEqualTo(new BigDecimal("50.0"));
         assertThat(result.active()).isFalse();
 
-        verify(salonServiceRepository).save(argThat(s -> 
+        verify(salonServiceRepository).save(argThat(s ->
                 s.getName().equals("New Corte") &&
                 s.getDescription().equals("New Desc") &&
                 s.getPrice().equals(new BigDecimal("50.0")) &&
-                s.getDurationMin() == 30 &&
-                s.getDurationEstimate().equals("30 min") &&
                 !s.getActive()
         ));
     }
@@ -214,7 +257,7 @@ class SalonServiceManagerTest {
     void delete_shouldMarkServiceAsInactive() {
         // Arrange
         Long id = 1L;
-        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), 30, "30 min", true);
+        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true);
         when(salonServiceRepository.findById(id)).thenReturn(Optional.of(service));
 
         // Act
@@ -240,8 +283,8 @@ class SalonServiceManagerTest {
     void reactivate_shouldMarkServiceAsActive() {
         // Arrange
         Long id = 1L;
-        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), 30, "30 min", false);
-        SalonService saved = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), 30, "30 min", true);
+        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), false);
+        SalonService saved = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true);
 
         when(salonServiceRepository.findById(id)).thenReturn(Optional.of(service));
         when(salonServiceRepository.save(service)).thenReturn(saved);

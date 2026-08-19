@@ -8,6 +8,7 @@ import com.cristiane.salon.models.appointment.dto.ConfirmAppointmentRequest;
 import com.cristiane.salon.models.appointment.dto.GeneratePixRequest;
 import com.cristiane.salon.models.appointment.dto.UpdateAppointmentExpensesRequest;
 import com.cristiane.salon.models.appointment.dto.UpdateAppointmentProductsRequest;
+import com.cristiane.salon.models.appointment.dto.UpdateAppointmentServicesRequest;
 import com.cristiane.salon.models.appointment.dto.UpdateInternalNotesRequest;
 import com.cristiane.salon.models.appointment.service.AppointmentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,6 +60,16 @@ public class AppointmentController {
             @PathVariable Long id,
             @Valid @RequestBody UpdateInternalNotesRequest body) {
         return ResponseEntity.ok(appointmentService.updateInternalNotes(id, body.internalNotes()));
+    }
+
+    @PatchMapping("/{id}/services")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Auditable(action = "APPOINTMENT_SERVICES_UPDATED", entityType = "Appointment", captureArgs = true)
+    @Operation(summary = "Define os serviços de um agendamento (Admin/Gerente/Funcionária responsável)")
+    public ResponseEntity<AppointmentResponse> updateServices(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateAppointmentServicesRequest body) {
+        return ResponseEntity.ok(appointmentService.updateServices(id, body.services()));
     }
 
     @PatchMapping("/{id}/products")
@@ -132,8 +143,11 @@ public class AppointmentController {
     @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
     @Auditable(action = "APPOINTMENT_PAYMENT_STATUS_CHANGED", entityType = "Appointment", captureArgs = true)
     @Operation(summary = "Atualiza o status de pagamento de um agendamento (Admin/Gerente/Funcionária)")
-    public ResponseEntity<AppointmentResponse> updatePaymentStatus(@PathVariable Long id, @RequestParam String paymentStatus) {
-        return ResponseEntity.ok(appointmentService.updatePaymentStatus(id, paymentStatus));
+    public ResponseEntity<AppointmentResponse> updatePaymentStatus(
+            @PathVariable Long id,
+            @RequestParam String paymentStatus,
+            @RequestParam(required = false) String paymentMethod) {
+        return ResponseEntity.ok(appointmentService.updatePaymentStatus(id, paymentStatus, paymentMethod));
     }
 
     @PostMapping("/{id}/pix")

@@ -13,9 +13,6 @@ public record AppointmentServiceRequest(
          */
         BigDecimal customPrice,
 
-        /** Sobrescreve a duração do serviço só para este agendamento (nulo = usa o valor do catálogo). */
-        Integer customDurationMin,
-
         /** Observações específicas do serviço customizado para este agendamento (opcional). */
         String customServiceNotes
 ) {

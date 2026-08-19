@@ -65,10 +65,10 @@ class AppointmentControllerTest extends BaseControllerTest {
     void confirmReturns200() throws Exception {
         AppointmentResponse response = new AppointmentResponse(
                 1L, 1L, "Client", 2L, "Employee",
-                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null, null, null, null)),
+                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
-                null, null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", null, null, null, false, ""
+                null, null, null, null,
+                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", null, null, null, null, false, ""
         );
         when(appointmentService.confirm(eq(1L), any())).thenReturn(response);
 
@@ -86,10 +86,10 @@ class AppointmentControllerTest extends BaseControllerTest {
     void declineReturns200() throws Exception {
         AppointmentResponse response = new AppointmentResponse(
                 1L, 1L, "Client", 2L, "Employee",
-                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null, null, null, null)),
+                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
-                null, null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "DECLINED", null, null, null, false, ""
+                null, null, null, null,
+                LocalDateTime.now(), LocalDate.now(), "Notes", null, "DECLINED", null, null, null, null, false, ""
         );
         when(appointmentService.decline(eq(1L))).thenReturn(response);
 
@@ -104,10 +104,10 @@ class AppointmentControllerTest extends BaseControllerTest {
     void getMyAppointmentsReturnsList() throws Exception {
         AppointmentResponse response = new AppointmentResponse(
                 1L, 1L, "Client", 2L, "Employee",
-                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null, null, null, null)),
+                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
-                null, null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "REQUESTED", null, null, null, false, ""
+                null, null, null, null,
+                LocalDateTime.now(), LocalDate.now(), "Notes", null, "REQUESTED", null, null, null, null, false, ""
         );
         when(appointmentService.getMyAppointments()).thenReturn(List.of(response));
 
@@ -122,10 +122,10 @@ class AppointmentControllerTest extends BaseControllerTest {
     void findAllReturnsPageOfAppointments() throws Exception {
         AppointmentResponse response = new AppointmentResponse(
                 1L, 1L, "Client", 2L, "Employee",
-                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null, null, null, null)),
+                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
-                null, null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", null, null, null, false, ""
+                null, null, null, null,
+                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", null, null, null, null, false, ""
         );
         org.springframework.data.domain.Page<AppointmentResponse> page =
                 new org.springframework.data.domain.PageImpl<>(List.of(response));
@@ -142,10 +142,10 @@ class AppointmentControllerTest extends BaseControllerTest {
     void cancelReturns200() throws Exception {
         AppointmentResponse response = new AppointmentResponse(
                 1L, 1L, "Client", 2L, "Employee",
-                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null, null, null, null)),
+                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
-                null, null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CANCELLED", null, null, null, false, ""
+                null, null, null, null,
+                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CANCELLED", null, null, null, null, false, ""
         );
         when(appointmentService.cancel(eq(1L))).thenReturn(response);
 
@@ -160,10 +160,10 @@ class AppointmentControllerTest extends BaseControllerTest {
     void updateStatusReturns200() throws Exception {
         AppointmentResponse response = new AppointmentResponse(
                 1L, 1L, "Client", 2L, "Employee",
-                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null, null, null, null)),
+                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
-                null, null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "DONE", null, null, null, false, ""
+                null, null, null, null,
+                LocalDateTime.now(), LocalDate.now(), "Notes", null, "DONE", null, null, null, null, false, ""
         );
         when(appointmentService.updateStatus(eq(1L), eq("DONE"))).thenReturn(response);
 
@@ -179,12 +179,12 @@ class AppointmentControllerTest extends BaseControllerTest {
     void updatePaymentStatusReturns200() throws Exception {
         AppointmentResponse response = new AppointmentResponse(
                 1L, 1L, "Client", 2L, "Employee",
-                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null, null, null, null)),
+                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
-                null, null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", "PAID", null, null, false, ""
+                null, null, null, null,
+                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", "PAID", null, null, null, false, ""
         );
-        when(appointmentService.updatePaymentStatus(eq(1L), eq("PAID"))).thenReturn(response);
+        when(appointmentService.updatePaymentStatus(eq(1L), eq("PAID"), eq(null))).thenReturn(response);
 
         mvc.perform(patch("/v1/appointments/1/payment-status")
                 .param("paymentStatus", "PAID")
@@ -198,10 +198,10 @@ class AppointmentControllerTest extends BaseControllerTest {
     void findByIdReturns200() throws Exception {
         AppointmentResponse response = new AppointmentResponse(
                 1L, 1L, "Client", 2L, "Employee",
-                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null, null, null, null)),
+                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
-                null, null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", null, null, null, false, ""
+                null, null, null, null,
+                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", null, null, null, null, false, ""
         );
         when(appointmentService.findById(1L)).thenReturn(response);
 

@@ -1,6 +1,7 @@
 package com.cristiane.salon.models.appointment.entity;
 
 import com.cristiane.salon.models.appointment.enums.AppointmentStatus;
+import com.cristiane.salon.models.appointment.enums.PaymentMethod;
 import com.cristiane.salon.models.appointment.enums.PaymentStatus;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.user.entity.User;
@@ -90,6 +91,15 @@ public class Appointment {
     @Column(name = "payment_id")
     private Long paymentId;
 
+    /**
+     * Como o pagamento foi feito. Setado automaticamente como PIX quando confirmado via
+     * webhook da plataforma; escolhido manualmente (crédito/débito/pix/dinheiro) quando o
+     * admin marca como pago fora da plataforma.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", length = 20)
+    private PaymentMethod paymentMethod;
+
     /** A string "Copia e Cola" do PIX gerada pela API */
     @Column(name = "pix_qr_code", columnDefinition = "TEXT")
     private String pixQrCode;
@@ -104,13 +114,6 @@ public class Appointment {
                 .map(AppointmentServiceItem::getEffectivePrice)
                 .filter(price -> price != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    public Integer getTotalEffectiveDurationMin() {
-        return services.stream()
-                .map(AppointmentServiceItem::getEffectiveDurationMin)
-                .filter(duration -> duration != null)
-                .reduce(0, Integer::sum);
     }
 
     public String getServiceNames() {

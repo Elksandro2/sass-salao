@@ -25,13 +25,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long>,
     @Query("SELECT MAX(a.scheduledAt) FROM Appointment a WHERE a.client.id = :clientId")
     LocalDateTime findLastAppointmentDateByClientId(@Param("clientId") Long clientId);
 
-    @Query("SELECT a FROM Appointment a WHERE a.employee.id = :employeeId AND a.scheduledAt >= :startOfDay AND a.scheduledAt < :endOfDay AND a.scheduledAt IS NOT NULL AND a.status NOT IN ('CANCELLED', 'DECLINED')")
-    List<Appointment> findActiveAppointmentsByEmployeeAndDate(
-            @Param("employeeId") Long employeeId,
-            @Param("startOfDay") LocalDateTime startOfDay,
-            @Param("endOfDay") LocalDateTime endOfDay
-    );
-
     // CAST(:from/:to AS timestamp) na checagem IS NULL não é frescura — sem ele, o Postgres
     // não consegue inferir o tipo do parâmetro (ele aparece "nu", só num "? is null", sem
     // nenhum outro contexto de tipo) e a query quebra com "could not determine data type

@@ -18,7 +18,6 @@ public record AppointmentResponse(
         List<AppointmentProductResponse> products,
         List<AppointmentExpenseResponse> expenses,
         BigDecimal totalPrice,
-        Integer totalDurationMin,
         BigDecimal totalProductsPrice,
         BigDecimal totalExpensesAmount,
         BigDecimal grandTotal,
@@ -29,6 +28,7 @@ public record AppointmentResponse(
         String status,
         String paymentStatus,
         Long paymentId,
+        String paymentMethod,
         String pixQrCode,
         Boolean clientHasSavedCpf,
         String clientCpfMasked
@@ -69,7 +69,6 @@ public record AppointmentResponse(
                 products,
                 expenses,
                 appointment.getTotalEffectivePrice(),
-                appointment.getTotalEffectiveDurationMin(),
                 appointment.getTotalProductsPrice(),
                 appointment.getTotalExpensesAmount(),
                 appointment.getGrandTotal(),
@@ -80,6 +79,7 @@ public record AppointmentResponse(
                 appointment.getStatus().name(),
                 appointment.getPaymentStatus() != null ? appointment.getPaymentStatus().name() : null,
                 appointment.getPaymentId(),
+                appointment.getPaymentMethod() != null ? appointment.getPaymentMethod().name() : null,
                 appointment.getPixQrCode(),
                 hasSavedCpf,
                 maskedCpf

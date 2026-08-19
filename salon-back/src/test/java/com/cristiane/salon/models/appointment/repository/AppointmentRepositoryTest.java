@@ -108,7 +108,6 @@ class AppointmentRepositoryTest {
         salonService.setName("Corte de Cabelo");
         salonService.setDescription("Corte feminino");
         salonService.setPrice(BigDecimal.valueOf(80.00));
-        salonService.setDurationMin(45);
         salonService.setActive(true);
         salonService = salonServiceRepository.save(salonService);
     }

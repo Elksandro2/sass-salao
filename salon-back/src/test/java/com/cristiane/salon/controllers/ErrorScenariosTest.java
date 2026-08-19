@@ -113,6 +113,9 @@ class ErrorScenariosTest extends BaseControllerTest {
     @MockitoBean
     private com.cristiane.salon.models.clientanamnesis.service.ClientAnamnesisService clientAnamnesisService;
 
+    @MockitoBean
+    private com.cristiane.salon.models.fixedexpense.service.FixedExpenseService fixedExpenseService;
+
     @Test
     void whenInvalidAppointment_thenReturns400() throws Exception {
         String invalidJson = "{}";

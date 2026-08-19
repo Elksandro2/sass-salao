@@ -38,7 +38,7 @@ class SalonServiceControllerTest extends BaseControllerTest {
     void createReturns201_whenValid() throws Exception {
         when(salonServiceManager.create(any())).thenReturn(null);
 
-        String body = "{\"name\":\"cut\",\"durationMin\":30}";
+        String body = "{\"name\":\"cut\"}";
 
         mvc.perform(post("/v1/services")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -61,7 +61,7 @@ class SalonServiceControllerTest extends BaseControllerTest {
     @WithMockUser
     void reactivateReturns200() throws Exception {
         SalonServiceResponse dummyResponse = new SalonServiceResponse(
-                1L, "cut", "description", new BigDecimal("50.0"), 30, "30 min", true
+                1L, "cut", "description", new BigDecimal("50.0"), true, java.util.List.of(), null
         );
         when(salonServiceManager.reactivate(any())).thenReturn(dummyResponse);
 
@@ -73,7 +73,7 @@ class SalonServiceControllerTest extends BaseControllerTest {
     @WithMockUser
     void findAllReturnsPageOfServices() throws Exception {
         SalonServiceResponse response = new SalonServiceResponse(
-                1L, "Haircut", "Classic trim", new BigDecimal("45.00"), 30, "30m", true
+                1L, "Haircut", "Classic trim", new BigDecimal("45.00"), true, java.util.List.of(), null
         );
         org.springframework.data.domain.Page<SalonServiceResponse> page =
                 new org.springframework.data.domain.PageImpl<>(List.of(response));
@@ -90,7 +90,7 @@ class SalonServiceControllerTest extends BaseControllerTest {
     @WithMockUser
     void findByIdReturnsService() throws Exception {
         SalonServiceResponse response = new SalonServiceResponse(
-                2L, "Manicure", "Nail care", new BigDecimal("30.00"), 45, "45m", true
+                2L, "Manicure", "Nail care", new BigDecimal("30.00"), true, java.util.List.of(), null
         );
         when(salonServiceManager.findById(eq(2L))).thenReturn(response);
 
@@ -104,11 +104,11 @@ class SalonServiceControllerTest extends BaseControllerTest {
     @WithMockUser
     void updateReturnsUpdatedService() throws Exception {
         SalonServiceResponse response = new SalonServiceResponse(
-                2L, "Pedicure", "Nail care", new BigDecimal("35.00"), 45, "45m", true
+                2L, "Pedicure", "Nail care", new BigDecimal("35.00"), true, java.util.List.of(), null
         );
         when(salonServiceManager.update(eq(2L), any())).thenReturn(response);
 
-        String body = "{\"name\":\"Pedicure\",\"durationMin\":45}";
+        String body = "{\"name\":\"Pedicure\"}";
 
         mvc.perform(put("/v1/services/2")
                 .contentType(MediaType.APPLICATION_JSON)
