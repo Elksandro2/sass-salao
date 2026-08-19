@@ -42,7 +42,8 @@ security:
   jwt:
     secret: ${JWT_SECRET}
     access-token-expiration-ms: 900000
-    refresh-token-expiration-ms: 604800000
+    # 180 dias — equipe fica logada por muito tempo sem precisar refazer login com frequência.
+    refresh-token-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:15552000000}
 
 ai:
   config-encryption-key: ${AI_CONFIG_ENCRYPTION_KEY}

@@ -27,7 +27,8 @@ security:
   jwt:
     secret: dev-secret-key-change-in-prod-must-be-at-least-256-bits-long!!
     access-token-expiration-ms: 900000 # 15 minutos
-    refresh-token-expiration-ms: 604800000 # 7 dias
+    # 180 dias — mesmo valor de prod, pra dev não expirar sessão o tempo todo durante testes.
+    refresh-token-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:15552000000}
 
 ai:
   # Chave AES-256 (base64) que cifra a API key de IA armazenada em tb_ai_config — nunca em texto puro no banco.

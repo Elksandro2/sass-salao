@@ -69,20 +69,41 @@ public class UserService {
 
     @Transactional
     public UserResponse create(UserCreateRequest request) {
-        if (userRepository.findByEmail(request.email()).isPresent()) {
-            throw new ConflictException("Email já está em uso");
-        }
-
         Role role = roleRepository.findById(request.roleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Role não encontrada"));
 
+        // Só quem efetivamente faz login (equipe/admin) precisa de email+senha. Cliente
+        // cadastrado pelo salão pode ter só o nome — email é funcionalidade desligada por
+        // feature flag nesta versão, não removida.
+        boolean logsIn = !"CLIENTE".equals(role.getName());
+        if (logsIn) {
+            if (request.email() == null || request.email().isBlank()) {
+                throw new BadRequestException("O email é obrigatório para este papel");
+            }
+            if (request.password() == null || request.password().isBlank()) {
+                throw new BadRequestException("A senha é obrigatória para este papel");
+            }
+        }
+
+        String email = request.email() != null && !request.email().isBlank() ? request.email() : null;
+        if (email != null && userRepository.findByEmail(email).isPresent()) {
+            throw new ConflictException("Email já está em uso");
+        }
+
+        String rawPassword = request.password() != null && !request.password().isBlank()
+                ? request.password()
+                // Cliente sem senha ainda não faz login nesta versão — precisa de algo no
+                // campo NOT NULL, mas não precisa ser algo que alguém vá digitar.
+                : java.util.UUID.randomUUID().toString();
+
         User user = new User();
         user.setName(request.name());
-        user.setEmail(request.email());
-        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(rawPassword));
         user.setPhone(request.phone());
+        user.setCpf(request.cpf());
         user.setRole(role);
-        
+
         if (request.active() != null) {
             user.setActive(request.active());
         } else {

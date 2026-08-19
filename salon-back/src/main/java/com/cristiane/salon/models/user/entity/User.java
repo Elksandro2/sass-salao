@@ -29,7 +29,11 @@ public class User implements UserDetails {
     @Column(nullable = false, length = 150)
     private String name;
 
-    @Column(nullable = false, unique = true, length = 150)
+    /**
+     * Nula pra clientes cadastrados só com nome (a funcionalidade de e-mail está desligada por
+     * feature flag nesta versão, não removida — cliente sempre pode ganhar e-mail depois).
+     */
+    @Column(unique = true, length = 150)
     private String email;
 
     @Column(nullable = false)

@@ -205,7 +205,8 @@ class UserServiceTest {
     @Test
     void create_whenEmailAlreadyInUse_shouldThrowConflictException() {
         // Arrange
-        UserCreateRequest request = new UserCreateRequest("New User", "maria@example.com", "password", "123", true, 1L);
+        UserCreateRequest request = new UserCreateRequest("New User", "maria@example.com", "password", "123", null, true, 1L);
+        when(roleRepository.findById(1L)).thenReturn(Optional.of(clientRole));
         when(userRepository.findByEmail("maria@example.com")).thenReturn(Optional.of(activeUser));
 
         // Act & Assert
@@ -217,8 +218,7 @@ class UserServiceTest {
     @Test
     void create_whenRoleNotFound_shouldThrowResourceNotFoundException() {
         // Arrange
-        UserCreateRequest request = new UserCreateRequest("New User", "new@example.com", "password", "123", true, 9L);
-        when(userRepository.findByEmail("new@example.com")).thenReturn(Optional.empty());
+        UserCreateRequest request = new UserCreateRequest("New User", "new@example.com", "password", "123", null, true, 9L);
         when(roleRepository.findById(9L)).thenReturn(Optional.empty());
 
         // Act & Assert
@@ -230,7 +230,7 @@ class UserServiceTest {
     @Test
     void create_whenClientRoleAndActiveTrue_shouldCreateUserWithoutEmployee() {
         // Arrange
-        UserCreateRequest request = new UserCreateRequest("New Client", "client@example.com", "password", "123", true, 1L);
+        UserCreateRequest request = new UserCreateRequest("New Client", "client@example.com", "password", "123", null, true, 1L);
         when(userRepository.findByEmail("client@example.com")).thenReturn(Optional.empty());
         when(roleRepository.findById(1L)).thenReturn(Optional.of(clientRole));
         when(passwordEncoder.encode("password")).thenReturn("encoded_pass");
@@ -263,7 +263,7 @@ class UserServiceTest {
     @Test
     void create_whenActiveFieldIsNull_shouldDefaultToTrue() {
         // Arrange
-        UserCreateRequest request = new UserCreateRequest("New Client", "client@example.com", "password", "123", null, 1L);
+        UserCreateRequest request = new UserCreateRequest("New Client", "client@example.com", "password", "123", null, null, 1L);
         when(userRepository.findByEmail("client@example.com")).thenReturn(Optional.empty());
         when(roleRepository.findById(1L)).thenReturn(Optional.of(clientRole));
         when(passwordEncoder.encode("password")).thenReturn("encoded_pass");
@@ -293,7 +293,7 @@ class UserServiceTest {
     @Test
     void create_whenStaffRole_shouldCreateUserAndAutoCreateEmployee() {
         // Arrange
-        UserCreateRequest request = new UserCreateRequest("New Staff", "staff@example.com", "password", "123", true, 2L);
+        UserCreateRequest request = new UserCreateRequest("New Staff", "staff@example.com", "password", "123", null, true, 2L);
         when(userRepository.findByEmail("staff@example.com")).thenReturn(Optional.empty());
         when(roleRepository.findById(2L)).thenReturn(Optional.of(staffRole));
         when(passwordEncoder.encode("password")).thenReturn("encoded_pass");
