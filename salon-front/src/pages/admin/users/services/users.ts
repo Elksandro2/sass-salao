@@ -5,7 +5,8 @@ export type { PageResponse } from '../../../../utils/pagination';
 export interface UserData {
   id: number;
   name: string;
-  email: string;
+  /** Nula pra cliente cadastrado só com nome — email é funcionalidade desligada por feature flag. */
+  email: string | null;
   phone: string;
   cpf?: string | null;
   role: string;
@@ -33,9 +34,10 @@ export interface UserUpdateRequest {
 
 export interface UserCreateRequest {
   name: string;
-  email: string;
+  email?: string | null;
   password?: string;
   phone?: string;
+  cpf?: string;
   active?: boolean;
   roleId: number;
 }

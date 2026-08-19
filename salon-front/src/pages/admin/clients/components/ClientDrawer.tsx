@@ -109,7 +109,7 @@ export function ClientDrawer({ isOpen, onClose, clientId }: ClientDrawerProps) {
                     <h4 className="text-base font-bold text-[#3b3036] dark:text-white m-0">
                       {client.name}
                     </h4>
-                    <span className="text-xs text-[#7a7074] dark:text-gray-400">{client.email}</span>
+                    <span className="text-xs text-[#7a7074] dark:text-gray-400">{client.email || 'Sem e-mail cadastrado'}</span>
                   </div>
                 </div>
 

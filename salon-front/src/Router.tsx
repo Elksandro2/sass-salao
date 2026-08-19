@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Lock } from 'lucide-react';
 
 import { DefaultLayout } from './layouts/DefaultLayout';
 import { AdminLayout } from './layouts/AdminLayout';
@@ -19,11 +18,11 @@ import { Products } from './pages/admin/products/Products';
 import { Team } from './pages/admin/team/Team';
 import { Clients } from './pages/admin/clients/Clients';
 import { PublicServices } from './pages/services/PublicServices';
-import { PublicHome } from './pages/home/PublicHome';
 import { PublicAppointment } from './pages/appointments/PublicAppointment';
 import { MyAppointments } from './pages/appointments/MyAppointments';
 import { AdminAppointments } from './pages/admin/appointments/AdminAppointments';
 import { CashFlow } from './pages/admin/cashflow/CashFlow';
+import { FixedExpenses } from './pages/admin/fixed-expenses/FixedExpenses';
 import { GeneralNotes } from './pages/admin/general-notes/GeneralNotes';
 import { Recommendations } from './pages/admin/recommendations/Recommendations';
 import { EmailOutbox } from './pages/admin/email-outbox/EmailOutbox';
@@ -42,34 +41,6 @@ import { getDefaultAdminPath } from './config/adminNav';
 const AdminIndexRedirect = () => {
   const { user } = useAuth();
   return <Navigate to={getDefaultAdminPath(user?.role)} replace />;
-};
-
-// Componente simples e moderno de Manutenção / Em Breve (suporta tema escuro)
-const MaintenancePage = () => {
-  return (
-    <div className="min-h-screen bg-[#fcf9f9] dark:bg-[#0b0f17] flex flex-col justify-center items-center px-6 py-12 transition-colors duration-300">
-      <div className="max-w-md w-full text-center space-y-8 bg-white dark:bg-[#161c2a] border border-[#eae1e1] dark:border-[#1e293b] rounded-3xl p-8 shadow-sm">
-        <div className="flex justify-center">
-          <div className="w-16 h-16 bg-[#be8a83]/10 dark:bg-[#e5a49c]/10 rounded-full flex items-center justify-center text-[#be8a83] dark:text-[#e5a49c]">
-            <Lock size={32} />
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <h1 className="font-heading text-3xl font-bold text-[#3b3036] dark:text-white">
-            Portal em Configuração
-          </h1>
-          <p className="text-sm text-[#7a7074] dark:text-[#9ca3af] leading-relaxed">
-            Estamos preparando novidades incríveis para você. No momento, a área pública de clientes
-            está temporariamente desativada para ajustes no salão.
-          </p>
-        </div>
-      </div>
-      <p className="text-xs text-[#7a7074]/60 dark:text-[#9ca3af]/50 mt-6">
-        © {new Date().getFullYear()} Espaço Cristiane Moura. Todos os direitos reservados.
-      </p>
-    </div>
-  );
 };
 
 export const Router = () => {
@@ -107,19 +78,22 @@ export const Router = () => {
       <Route path="/admin" element={<AdminIndexRedirect />} />
       <Route path="/sysadmin" element={<Navigate to="/sysadmin/feature-flags" replace />} />
 
-      {/* Portal do Cliente e Home - Condicional à Feature Flag */}
+      {/* Nesta versão o portal do cliente é pouco usado — a raiz vai direto pro login.
+          As rotas do portal continuam existindo (link direto, feature flag) pra não perder
+          a funcionalidade, só não são mais a porta de entrada padrão. */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+
+      {/* Portal do Cliente - Condicional à Feature Flag */}
       {!isPortalEnabled ? (
         <>
-          <Route path="/" element={<MaintenancePage />} />
-          <Route path="/services" element={<Navigate to="/" replace />} />
-          <Route path="/appointment" element={<Navigate to="/" replace />} />
-          <Route path="/my-appointments" element={<Navigate to="/" replace />} />
-          <Route path="/profile" element={<Navigate to="/" replace />} />
+          <Route path="/services" element={<Navigate to="/login" replace />} />
+          <Route path="/appointment" element={<Navigate to="/login" replace />} />
+          <Route path="/my-appointments" element={<Navigate to="/login" replace />} />
+          <Route path="/profile" element={<Navigate to="/login" replace />} />
         </>
       ) : (
         <>
           <Route element={<DefaultLayout />}>
-            <Route path="/" element={<PublicHome />} />
             <Route path="/services" element={<PublicServices />} />
             <Route path="/appointment" element={<PublicAppointment />} />
           </Route>
@@ -201,6 +175,14 @@ export const Router = () => {
           element={
             <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE_DE_ATENDIMENTO']}>
               <CashFlow />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/fixed-expenses"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE_DE_ATENDIMENTO']}>
+              <FixedExpenses />
             </ProtectedRoute>
           }
         />

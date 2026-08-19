@@ -44,7 +44,7 @@ export const Profile = () => {
       try {
         const data = await profileApi.getProfileById(user.userId);
         setValue('name', data.name);
-        setValue('email', data.email);
+        setValue('email', data.email ?? '');
         setValue('phone', data.phone || '');
         if (data.cpf) {
           setValue('cpf', formatCpf(data.cpf));

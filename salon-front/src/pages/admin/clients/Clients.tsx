@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Edit, Trash2, Plus, RotateCcw, Eye, EyeOff } from 'lucide-react';
+import { Edit, Trash2, Plus, RotateCcw } from 'lucide-react';
 import { DataTable } from '../../../components/table/DataTable';
 import type { FilterField } from '../../../components/table/DataTable';
 import { ModalForm } from '../../../components/modal/ModalForm';
@@ -34,9 +34,6 @@ export const Clients = () => {
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
   const {
     register,
     handleSubmit,
@@ -53,7 +50,7 @@ export const Clients = () => {
       setEditingClient(client);
       setValue('_isEdit', true);
       setValue('name', client.name);
-      setValue('email', client.email);
+      setValue('email', client.email ?? '');
       setValue('phone', client.phone);
       setValue('cpf', client.cpf || '');
       setValue('active', client.active);
@@ -71,15 +68,11 @@ export const Clients = () => {
     try {
       const payload: any = {
         ...data,
+        email: data.email?.trim() || undefined,
         roleId: 4,
       };
 
       delete payload._isEdit;
-      delete payload.confirmPassword;
-
-      if (editingClient?.id && !payload.password) {
-        delete payload.password;
-      }
 
       if (editingClient?.id) {
         await usersApi.update(editingClient.id, payload);
@@ -146,7 +139,7 @@ export const Clients = () => {
 
   const columns = [
     { key: 'name', label: 'Nome' },
-    { key: 'email', label: 'Email' },
+    { key: 'email', label: 'Email', render: (item: UserData) => item.email || 'Não informado' },
     { key: 'phone', label: 'Telefone', render: (item: UserData) => item.phone || 'Não informado' },
     { key: 'cpf', label: 'CPF', render: (item: UserData) => maskCPF(item.cpf) || 'Não informado' },
     {
@@ -273,13 +266,16 @@ export const Clients = () => {
             )}
           </div>
           <div>
-            <label className={labelCls}>Email *</label>
+            <label className={labelCls}>Email (opcional)</label>
             <input
               type="email"
               maxLength={150}
               className={`input-premium ${errors.email ? 'border-rose-300 focus:border-rose-500' : ''}`}
               {...register('email')}
             />
+            <p className="text-xs text-gray-400 mt-1">
+              O envio de e-mails está desligado nesta versão — pode deixar em branco.
+            </p>
             {errors.email && (
               <span className="text-xs text-rose-500 font-semibold">{errors.email.message}</span>
             )}
@@ -305,56 +301,6 @@ export const Clients = () => {
             />
             {errors.cpf && (
               <span className="text-xs text-rose-500 font-semibold">{errors.cpf.message}</span>
-            )}
-          </div>
-          <div>
-            <label className={labelCls}>
-              {editingClient?.id ? 'Nova Senha (opcional)' : 'Senha *'}
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                className={`input-premium pr-10 ${errors.password ? 'border-rose-300 focus:border-rose-500' : ''}`}
-                placeholder={editingClient?.id ? 'Deixe em branco para manter' : 'Mínimo 8 caracteres com 1 número'}
-                {...register('password')}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none cursor-pointer flex items-center"
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-            {errors.password && (
-              <span className="text-xs text-rose-500 font-semibold">
-                {errors.password.message}
-              </span>
-            )}
-          </div>
-          <div>
-            <label className={labelCls}>
-              {editingClient?.id ? 'Confirmar Nova Senha (opcional)' : 'Confirmar Senha *'}
-            </label>
-            <div className="relative">
-              <input
-                type={showConfirmPassword ? 'text' : 'password'}
-                className={`input-premium pr-10 ${errors.confirmPassword ? 'border-rose-300 focus:border-rose-500' : ''}`}
-                placeholder="Confirme a senha"
-                {...register('confirmPassword')}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none cursor-pointer flex items-center"
-              >
-                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-            {errors.confirmPassword && (
-              <span className="text-xs text-rose-500 font-semibold">
-                {errors.confirmPassword.message}
-              </span>
             )}
           </div>
           <div className="flex items-center gap-3">

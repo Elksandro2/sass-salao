@@ -15,6 +15,7 @@ export const AdminLayout = () => {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const { enabled: aiRecommendationsEnabled } = useFeatureFlag('ENABLE_AI_RECOMMENDATIONS');
+  const { enabled: emailNotificationsEnabled } = useFeatureFlag('EMAIL_NOTIFICATIONS');
 
   if (isLoading)
     return (
@@ -43,11 +44,14 @@ export const AdminLayout = () => {
     });
   };
 
-  // "Recomendações de IA" só aparece com a feature flag ligada — o motor por trás
-  // (RecommendationService) recusa qualquer chamada enquanto ela estiver desligada.
-  const menuItems = getVisibleAdminNavItems(user?.role).filter(
-    (item) => item.to !== '/admin/recommendations' || aiRecommendationsEnabled
-  );
+  // "Recomendações de IA" e "Central de E-mails" só aparecem com a feature flag ligada — o
+  // envio de e-mail (continuidade de negócio) está desligado nesta versão, sem sumir da
+  // Central de Feature Flags do Sysadmin caso precise ser reativado depois.
+  const menuItems = getVisibleAdminNavItems(user?.role).filter((item) => {
+    if (item.to === '/admin/recommendations') return aiRecommendationsEnabled;
+    if (item.to === '/admin/email-outbox') return emailNotificationsEnabled;
+    return true;
+  });
 
   const userName = user?.email ? user.email.split('@')[0] : 'Admin';
 

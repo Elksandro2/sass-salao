@@ -254,7 +254,8 @@ export const ClientAnamnesisSection = ({ clientId }: ClientAnamnesisSectionProps
             <button
               type="button"
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || !form.consentGiven}
+              title={!form.consentGiven ? 'Marque o consentimento da cliente para salvar' : undefined}
               className="btn-premium text-xs px-4 py-2 disabled:opacity-50"
             >
               {isSaving ? 'Salvando...' : 'Salvar ficha'}

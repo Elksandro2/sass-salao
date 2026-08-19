@@ -45,7 +45,7 @@ export const Users = () => {
       setEditingUser(user);
       setValue('_isEdit', true);
       setValue('name', user.name);
-      setValue('email', user.email);
+      setValue('email', user.email ?? '');
       setValue('phone', user.phone);
       setValue('active', user.active);
       setValue('roleId', getRoleIdByName(user.role));
