@@ -4,6 +4,7 @@ import type {
   FinancialReportResponse,
   AppointmentReportResponse,
   PayrollReportResponse,
+  ServicePricingAnalysisResponse,
 } from './services/reports';
 import { EmployeeFinancialHistorySection } from './EmployeeFinancialHistorySection';
 import { cashFlowApi } from '../cashflow/services/cashflow';
@@ -22,7 +23,7 @@ import {
 } from 'recharts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 import { useAlert } from '../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import { useAuth } from '../../../hooks/useAuth';
@@ -36,9 +37,12 @@ export const Reports = () => {
   const [appointments, setAppointments] = useState<AppointmentReportResponse | null>(null);
   const [cashFlows, setCashFlows] = useState<CashFlowData[]>([]);
   const [payroll, setPayroll] = useState<PayrollReportResponse | null>(null);
+  const [servicePricing, setServicePricing] = useState<ServicePricingAnalysisResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  const [activeTab, setActiveTab] = useState<'financial' | 'payroll' | 'appointments'>('financial');
+  const [activeTab, setActiveTab] = useState<'financial' | 'payroll' | 'appointments' | 'pricing'>(
+    'financial'
+  );
 
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -48,16 +52,18 @@ export const Reports = () => {
   const loadReports = async () => {
     setIsLoading(true);
     try {
-      const [finData, aptData, cfData, payData] = await Promise.all([
+      const [finData, aptData, cfData, payData, pricingData] = await Promise.all([
         reportsApi.getFinancialReport(dateFrom || undefined, dateTo || undefined),
         reportsApi.getAppointmentReport(dateFrom || undefined, dateTo || undefined),
         cashFlowApi.findByPeriod(dateFrom || undefined, dateTo || undefined, 0, 1000),
         reportsApi.getPayrollReport(dateFrom || undefined, dateTo || undefined),
+        reportsApi.getServicePricingAnalysis(dateFrom || undefined, dateTo || undefined),
       ]);
       setFinancial(finData);
       setAppointments(aptData);
       setCashFlows(cfData.content);
       setPayroll(payData);
+      setServicePricing(pricingData);
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Erro ao carregar relatórios');
       await showError(msg);
@@ -400,6 +406,7 @@ export const Reports = () => {
           { id: 'financial', label: 'Finanças & Receitas' },
           { id: 'payroll', label: 'Folha de Pagamento' },
           { id: 'appointments', label: 'Agendamentos' },
+          { id: 'pricing', label: 'Preço por Serviço' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -821,6 +828,125 @@ export const Reports = () => {
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: Pricing analysis per service type, with fixed expense allocation */}
+          {activeTab === 'pricing' && (
+            <div className="space-y-6 animate-fade-in-up">
+              <div className="flex flex-col gap-2">
+                <h4 className="font-heading font-bold text-lg text-[#3b3036]">
+                  Estou cobrando certo por cada serviço?
+                </h4>
+                <p className="text-xs text-[#7a7074]">
+                  Pra cada serviço realmente executado no período, mostra quanto ele rendeu menos
+                  custo de produtos usados, comissão da profissional e a fatia proporcional dos
+                  gastos fixos (aluguel, água, luz...) — os serviços com margem mais apertada
+                  aparecem primeiro.
+                </p>
+                {servicePricing && (
+                  <p className="text-xs text-[#7a7074]">
+                    Gastos fixos rateados no período:{' '}
+                    <span className="font-semibold text-[#3b3036]">
+                      {formatBRL(servicePricing.totalFixedExpenses)}
+                    </span>
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-white rounded-2xl border border-[#eae1e1]/80 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[900px]">
+                    <thead>
+                      <tr className="bg-[#fcf9f9]/50 border-b border-[#eae1e1]">
+                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider">
+                          Serviço
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-center">
+                          Vezes
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-right">
+                          Receita
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-right">
+                          Custo Produtos
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-right">
+                          Comissão
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-right">
+                          Rateio Gastos Fixos
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-right">
+                          Lucro Líquido
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-right">
+                          Margem
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#eae1e1]/40">
+                      {servicePricing && servicePricing.items.length > 0 ? (
+                        servicePricing.items.map((item) => (
+                          <tr
+                            key={item.serviceId}
+                            className={`transition-colors ${!item.healthy ? 'bg-rose-50/40 hover:bg-rose-50/70' : 'hover:bg-[#fcf9f9]/20'}`}
+                          >
+                            <td className="px-6 py-4 text-sm font-semibold text-[#3b3036]">
+                              <div className="flex items-center gap-2">
+                                {!item.healthy && (
+                                  <span title="Margem negativa — considere reajustar o preço">
+                                    <AlertTriangle size={14} className="text-rose-500 shrink-0" />
+                                  </span>
+                                )}
+                                {item.serviceName}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-[#7a7074] text-center">
+                              {item.timesPerformed}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-[#7a7074] text-right">
+                              {formatBRL(item.totalRevenue)}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-[#7a7074] text-right">
+                              {formatBRL(item.recipeCostTotal)}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-[#7a7074] text-right">
+                              {formatBRL(item.commissionCostTotal)}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-[#7a7074] text-right">
+                              {formatBRL(item.fixedExpenseShare)}
+                            </td>
+                            <td
+                              className={`px-6 py-4 text-sm font-bold text-right ${item.healthy ? 'text-emerald-600' : 'text-rose-600'}`}
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                {item.healthy ? (
+                                  <TrendingUp size={14} />
+                                ) : (
+                                  <TrendingDown size={14} />
+                                )}
+                                {formatBRL(item.netProfit)}
+                              </div>
+                            </td>
+                            <td
+                              className={`px-6 py-4 text-sm font-bold text-right ${item.healthy ? 'text-emerald-600' : 'text-rose-600'}`}
+                            >
+                              {item.marginPercent.toFixed(1)}%
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={8} className="px-6 py-10 text-center text-sm text-[#7a7074]">
+                            Nenhum serviço concluído no período selecionado.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

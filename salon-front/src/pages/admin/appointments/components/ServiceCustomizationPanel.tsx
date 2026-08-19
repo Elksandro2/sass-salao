@@ -6,14 +6,12 @@ const labelCls = 'label-premium';
 
 export interface ServiceCustomizationValues {
   price: string;
-  durationMin: string;
   notes: string;
 }
 
 interface ServiceCustomizationPanelProps {
   serviceName?: string;
   defaultPrice: number | null;
-  defaultDurationMin: number | null;
   values: ServiceCustomizationValues;
   onChange: (values: ServiceCustomizationValues) => void;
 }
@@ -21,7 +19,6 @@ interface ServiceCustomizationPanelProps {
 export const ServiceCustomizationPanel = ({
   serviceName,
   defaultPrice,
-  defaultDurationMin,
   values,
   onChange,
 }: ServiceCustomizationPanelProps) => {
@@ -43,36 +40,20 @@ export const ServiceCustomizationPanel = ({
 
       {expanded && (
         <div className="p-4 space-y-4 bg-white">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Preço (R$)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder={defaultPrice != null ? defaultPrice.toFixed(2) : '—'}
-                value={values.price}
-                onChange={(e) => onChange({ ...values, price: e.target.value })}
-                className={inputCls}
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Padrão: {defaultPrice != null ? `R$ ${defaultPrice.toFixed(2)}` : 'não definido'}
-              </p>
-            </div>
-            <div>
-              <label className={labelCls}>Duração (minutos)</label>
-              <input
-                type="number"
-                min="1"
-                placeholder={defaultDurationMin != null ? String(defaultDurationMin) : '—'}
-                value={values.durationMin}
-                onChange={(e) => onChange({ ...values, durationMin: e.target.value })}
-                className={inputCls}
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Padrão: {defaultDurationMin != null ? `${defaultDurationMin} min` : 'não definida'}
-              </p>
-            </div>
+          <div>
+            <label className={labelCls}>Preço (R$)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder={defaultPrice != null ? defaultPrice.toFixed(2) : '—'}
+              value={values.price}
+              onChange={(e) => onChange({ ...values, price: e.target.value })}
+              className={inputCls}
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Padrão: {defaultPrice != null ? `R$ ${defaultPrice.toFixed(2)}` : 'não definido'}
+            </p>
           </div>
           <div>
             <label className={labelCls}>Observações do serviço (opcional)</label>

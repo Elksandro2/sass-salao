@@ -4,9 +4,8 @@ export type { PageResponse } from '../../../utils/pagination';
 
 export interface AppointmentServiceRequestItem {
   serviceId: number;
-  /** Serviço como template: sobrescreve preço/duração/observações só para este item. */
+  /** Serviço como template: sobrescreve preço/observações só para este item. */
   customPrice?: number | null;
-  customDurationMin?: number | null;
   customServiceNotes?: string | null;
 }
 
@@ -41,12 +40,9 @@ export interface AppointmentServiceResponse {
   serviceId: number;
   serviceName: string;
   catalogPrice: number | null;
-  catalogDurationMin: number | null;
   customPrice: number | null;
-  customDurationMin: number | null;
   customServiceNotes: string | null;
   effectivePrice: number | null;
-  effectiveDurationMin: number | null;
 }
 
 export interface AppointmentProductResponse {
@@ -77,7 +73,6 @@ export interface AppointmentResponse {
   products?: AppointmentProductResponse[];
   expenses?: AppointmentExpenseResponse[];
   totalPrice: number | null;
-  totalDurationMin: number | null;
   totalProductsPrice?: number | null;
   totalExpensesAmount?: number | null;
   grandTotal?: number | null;
@@ -88,6 +83,7 @@ export interface AppointmentResponse {
   status: string;
   paymentStatus?: string | null;
   paymentId?: number | null;
+  paymentMethod?: string | null;
   pixQrCode?: string | null;
   clientHasSavedCpf?: boolean;
   clientCpfMasked?: string;
@@ -110,9 +106,6 @@ function buildCreatePayload(request: AppointmentRequestBody): AppointmentCreateP
       const item: AppointmentServiceRequestItem = { serviceId: s.serviceId };
       if (s.customPrice != null) {
         item.customPrice = s.customPrice;
-      }
-      if (s.customDurationMin != null) {
-        item.customDurationMin = s.customDurationMin;
       }
       if (s.customServiceNotes != null && s.customServiceNotes.trim() !== '') {
         item.customServiceNotes = s.customServiceNotes.trim();
@@ -211,9 +204,9 @@ export const appointmentsApi = {
     return data;
   },
 
-  updatePaymentStatus: async (id: number, paymentStatus: string) => {
+  updatePaymentStatus: async (id: number, paymentStatus: string, paymentMethod?: string) => {
     const { data } = await api.patch<AppointmentResponse>(`/appointments/${id}/payment-status`, null, {
-      params: { paymentStatus },
+      params: { paymentStatus, paymentMethod },
     });
     return data;
   },
@@ -225,6 +218,13 @@ export const appointmentsApi = {
 
   findById: async (id: number) => {
     const { data } = await api.get<AppointmentResponse>(`/appointments/${id}`);
+    return data;
+  },
+
+  updateServices: async (id: number, services: AppointmentServiceRequestItem[]) => {
+    const { data } = await api.patch<AppointmentResponse>(`/appointments/${id}/services`, {
+      services,
+    });
     return data;
   },
 

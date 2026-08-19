@@ -11,7 +11,6 @@ vi.mock('../../../services/services/services', () => ({
     create: vi.fn(),
     update: vi.fn(),
   },
-  displayServiceDuration: (s: any) => s.durationEstimate || `${s.durationMin} min`,
 }));
 
 vi.mock('../../../../hooks/usePermission', () => ({
@@ -28,8 +27,8 @@ vi.mock('../../../../hooks/useAlert', () => ({
 }));
 
 const mockServices = [
-  { id: 1, name: 'Corte de Cabelo', description: 'Corte tesoura', price: 50.0, durationMin: 30, durationEstimate: '30 min', active: true },
-  { id: 2, name: 'Pintura', description: 'Tintura premium', price: 100.0, durationMin: 60, durationEstimate: '1h', active: false },
+  { id: 1, name: 'Corte de Cabelo', description: 'Corte tesoura', price: 50.0, active: true },
+  { id: 2, name: 'Pintura', description: 'Tintura premium', price: 100.0, active: false },
 ];
 
 const mockPage = (content: typeof mockServices) => ({
@@ -81,8 +80,6 @@ describe('AdminServices Page', () => {
       name: 'Pintura',
       description: 'Tintura premium',
       price: 100.0,
-      durationMin: 60,
-      durationEstimate: '1h',
       active: true,
     });
 

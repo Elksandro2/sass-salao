@@ -221,7 +221,7 @@ describe('AdminAppointments Component', () => {
     expect(appointmentsApi.updateStatus).toHaveBeenCalledWith(1, 'DONE');
   });
 
-  it('triggers updatePaymentStatus when the payment status select is changed', async () => {
+  it('triggers updatePaymentStatus with the chosen method when marking as paid manually', async () => {
     await act(async () => {
       renderAdminAppointments();
     });
@@ -236,7 +236,15 @@ describe('AdminAppointments Component', () => {
       fireEvent.change(paymentStatusSelect, { target: { value: 'MANUAL' } });
     });
 
-    expect(appointmentsApi.updatePaymentStatus).toHaveBeenCalledWith(1, 'MANUAL');
+    // Selecting "Pago Manualmente" opens the payment method chooser instead of saving right away
+    expect(appointmentsApi.updatePaymentStatus).not.toHaveBeenCalled();
+
+    const dinheiroBtn = screen.getByRole('button', { name: /Dinheiro/i });
+    await act(async () => {
+      fireEvent.click(dinheiroBtn);
+    });
+
+    expect(appointmentsApi.updatePaymentStatus).toHaveBeenCalledWith(1, 'MANUAL', 'DINHEIRO');
   });
 
   it('triggers generatePix when clicking Pagar com PIX', async () => {

@@ -2,26 +2,29 @@ import api from '../../../services/api';
 import { normalizePage, type SpringPageResponse } from '../../../utils/pagination';
 export type { PageResponse } from '../../../utils/pagination';
 
+export interface ServiceProductUsageRequest {
+  productId: number;
+  quantityUsed: number;
+}
+
+export interface ServiceProductUsageResponse {
+  productId: number;
+  productName: string;
+  quantityUsed: number;
+  unit: string | null;
+  estimatedCost: number | null;
+}
+
 export interface SalonServiceData {
   id?: number;
   name: string;
   description: string;
   /** Opcional: referência &quot;a partir de&quot; */
   price?: number | null;
-  /** Minutos opcionais — para cálculo de sobreposição na agenda */
-  durationMin?: number | null;
-  /** Ex.: &quot;Em média 50 min&quot;, &quot;Em média 1h30&quot; */
-  durationEstimate?: string | null;
   active: boolean;
-}
-
-export function displayServiceDuration(
-  s: Pick<SalonServiceData, 'durationEstimate' | 'durationMin'>
-): string {
-  const text = s.durationEstimate?.trim();
-  if (text) return text;
-  if (s.durationMin != null && s.durationMin > 0) return `Em média ${s.durationMin} min`;
-  return 'Tempo a combinar';
+  /** Receita: quanto de cada produto este serviço consome por execução. */
+  productUsages?: ServiceProductUsageRequest[] | ServiceProductUsageResponse[] | null;
+  estimatedProductCost?: number | null;
 }
 
 export interface SalonServiceFilter {

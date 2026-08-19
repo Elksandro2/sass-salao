@@ -4,8 +4,6 @@ export const salonServiceFormSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').min(3, 'Mín. 3 caracteres').max(150, 'Máximo de 150 caracteres'),
   description: z.string().max(2000, 'Máximo de 2000 caracteres'),
   price: z.number().optional(),
-  durationMin: z.number().optional(),
-  durationEstimate: z.string().max(160, 'Máximo de 160 caracteres').optional(),
   active: z.boolean(),
 });
 

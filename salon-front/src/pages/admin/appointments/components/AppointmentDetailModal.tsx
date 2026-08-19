@@ -7,16 +7,14 @@ import { PermissionGate } from '../../../../components/permissions/PermissionGat
 import { useAlert } from '../../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../../utils/apiError';
 import { AppointmentProductsExpensesEditor } from './AppointmentProductsExpensesEditor';
+import { AppointmentServicesEditor } from './AppointmentServicesEditor';
+import { AppointmentProfitSection } from './AppointmentProfitSection';
 
 const labelCls = 'label-premium';
 const inputCls = 'input-premium';
 
 function formatMoney(value: number | null | undefined): string {
   return value != null ? `R$ ${value.toFixed(2)}` : '—';
-}
-
-function formatDuration(value: number | null | undefined): string {
-  return value != null ? `${value} min` : '—';
 }
 
 interface AppointmentDetailModalProps {
@@ -105,8 +103,7 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
 
           <div className="space-y-3">
             {services.map((svc) => {
-              const isCustomized =
-                svc.customPrice != null || svc.customDurationMin != null || !!svc.customServiceNotes;
+              const isCustomized = svc.customPrice != null || !!svc.customServiceNotes;
               return (
                 <div
                   key={svc.serviceId}
@@ -125,17 +122,6 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
                         </p>
                       )}
                       <p className="font-semibold text-[#3b3036]">{formatMoney(svc.effectivePrice)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <span className="text-xs font-semibold text-[#7a7074]">Duração</span>
-                    <div className="text-right">
-                      {svc.customDurationMin != null && svc.catalogDurationMin != null && (
-                        <p className="text-xs text-gray-400 line-through">
-                          Catálogo: {formatDuration(svc.catalogDurationMin)}
-                        </p>
-                      )}
-                      <p className="font-semibold text-[#3b3036]">{formatDuration(svc.effectiveDurationMin)}</p>
                     </div>
                   </div>
                   {svc.customServiceNotes && (
@@ -161,10 +147,14 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
               <span className="text-sm font-semibold text-[#3b3036]">Total</span>
               <div className="text-right">
                 <p className="font-bold text-[#3b3036]">{formatMoney(appointment.totalPrice)}</p>
-                <p className="text-xs text-gray-400">{formatDuration(appointment.totalDurationMin)}</p>
               </div>
             </div>
           )}
+
+          <AppointmentServicesEditor
+            appointment={appointment}
+            onSaved={(updated) => onNotesSaved?.(updated)}
+          />
 
           <div className="border-t border-[#eae1e1] pt-4">
             <AppointmentProductsExpensesEditor
@@ -172,6 +162,8 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
               onSaved={(updated) => onNotesSaved?.(updated)}
             />
           </div>
+
+          <AppointmentProfitSection appointmentId={appointment.id} />
 
           {appointment.clientNotes && (
             <div>

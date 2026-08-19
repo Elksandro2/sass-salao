@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Edit, Trash2, RotateCcw } from 'lucide-react';
@@ -7,8 +7,14 @@ import type { FilterField } from '../../../components/table/DataTable';
 import { ModalForm } from '../../../components/modal/ModalForm';
 import { ConfirmDialog } from '../../../components/modal/ConfirmDialog';
 import { PermissionGate } from '../../../components/permissions/PermissionGate';
-import { salonServicesApi, displayServiceDuration } from '../../services/services/services';
-import type { SalonServiceData, SalonServiceFilter } from '../../services/services/services';
+import { salonServicesApi } from '../../services/services/services';
+import type {
+  SalonServiceData,
+  SalonServiceFilter,
+  ServiceProductUsageResponse,
+} from '../../services/services/services';
+import { productsApi } from '../products/services/products';
+import type { ProductData } from '../products/services/products';
 import { salonServiceFormSchema } from './adminService.schema';
 import type { SalonServiceFormValues } from './adminService.schema';
 import { useAlert } from '../../../hooks/useAlert';
@@ -16,6 +22,11 @@ import { getApiErrorMessage } from '../../../utils/apiError';
 
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
+
+interface UsageRow {
+  productId: string;
+  quantityUsed: string;
+}
 
 export const AdminServices = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -27,6 +38,15 @@ export const AdminServices = () => {
   const [serviceTargetId, setServiceTargetId] = useState<number | null>(null);
   const [confirmAction, setConfirmAction] = useState<'delete' | 'reactivate'>('delete');
 
+  const [products, setProducts] = useState<ProductData[]>([]);
+  const [usageRows, setUsageRows] = useState<UsageRow[]>([]);
+
+  useEffect(() => {
+    productsApi
+      .findAll({ active: true }, 0, 1000)
+      .then((page) => setProducts(page.content))
+      .catch(() => setProducts([]));
+  }, []);
 
   const {
     register,
@@ -48,31 +68,46 @@ export const AdminServices = () => {
       setValue('name', service.name);
       setValue('description', service.description);
       setValue('price', service.price ?? undefined);
-      setValue('durationMin', service.durationMin ?? undefined);
-      setValue('durationEstimate', service.durationEstimate ?? '');
       setValue('active', service.active);
+      setUsageRows(
+        ((service.productUsages as ServiceProductUsageResponse[]) ?? []).map((u) => ({
+          productId: String(u.productId),
+          quantityUsed: String(u.quantityUsed),
+        }))
+      );
     } else {
       setEditingService(null);
       setValue('active', true);
+      setUsageRows([]);
     }
     setShowForm(true);
   };
 
+  const addUsageRow = () => {
+    setUsageRows((prev) => [...prev, { productId: '', quantityUsed: '' }]);
+  };
+
+  const removeUsageRow = (index: number) => {
+    setUsageRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateUsageRow = (index: number, patch: Partial<UsageRow>) => {
+    setUsageRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  };
+
   const onSubmit = async (data: SalonServiceFormValues) => {
-    const hasEst = (data.durationEstimate ?? '').trim().length > 0;
-    const hasMin = data.durationMin != null && Number(data.durationMin) > 0;
-    if (!hasEst && !hasMin) {
-      await showError(
-        'Informe o tempo estimado em texto (ex.: em média 50 min) e/ou minutos para encaixe na agenda.'
-      );
+    if (usageRows.some((r) => !r.productId || !r.quantityUsed)) {
+      await showError('Selecione o produto e a quantidade em todas as linhas da receita.');
       return;
     }
     try {
       const payload: SalonServiceData = {
         ...data,
         price: data.price ?? null,
-        durationEstimate: hasEst ? data.durationEstimate!.trim() : null,
-        durationMin: hasMin ? Number(data.durationMin) : null,
+        productUsages: usageRows.map((r) => ({
+          productId: Number(r.productId),
+          quantityUsed: Number(r.quantityUsed),
+        })),
       };
       if (editingService?.id) {
         await salonServicesApi.update(editingService.id, payload);
@@ -118,9 +153,12 @@ export const AdminServices = () => {
         item.price != null ? `A partir de R$ ${item.price.toFixed(2)}` : '—',
     },
     {
-      key: 'duration',
-      label: 'Tempo estimado',
-      render: (item: SalonServiceData) => displayServiceDuration(item),
+      key: 'estimatedProductCost',
+      label: 'Custo estimado',
+      render: (item: SalonServiceData) =>
+        item.estimatedProductCost != null && item.estimatedProductCost > 0
+          ? `R$ ${item.estimatedProductCost.toFixed(2)}`
+          : '—',
     },
     {
       key: 'active',
@@ -248,31 +286,60 @@ export const AdminServices = () => {
               O preço final pode ser registrado no fluxo de caixa ao concluir o atendimento.
             </p>
           </div>
-          <div>
-            <label className={labelCls}>Tempo estimado (mostrado ao cliente)</label>
-            <input
-              type="text"
-              placeholder="Ex.: Em média 50 min · Em média 1h20"
-              maxLength={160}
-              className={inputCls}
-              {...register('durationEstimate')}
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              Texto livre. Obrigatório informar isto ou os minutos abaixo (ou ambos).
+          <div className="border-t border-[#eae1e1]/50 pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-heading font-semibold text-sm text-[#3b3036]">
+                Receita (opcional)
+              </h4>
+              <button
+                type="button"
+                onClick={addUsageRow}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[#be8a83] hover:text-[#a6726b] cursor-pointer"
+              >
+                <Plus size={13} /> Adicionar produto
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 -mt-1 mb-3">
+              Quanto deste produto o serviço consome por execução — usado só pra calcular custo
+              interno nos relatórios.
             </p>
-          </div>
-          <div>
-            <label className={labelCls}>Minutos para encaixe na agenda (opcional)</label>
-            <input
-              type="number"
-              min={1}
-              placeholder="Só números — ajuda a evitar sobreposição de horários"
-              className={inputCls}
-              {...register('durationMin', {
-                setValueAs: (v) =>
-                  v === '' || v === undefined || v === null ? undefined : Number(v),
+            <div className="space-y-2">
+              {usageRows.map((row, index) => {
+                const product = products.find((p) => String(p.id) === row.productId);
+                return (
+                  <div key={index} className="flex items-center gap-2">
+                    <select
+                      className={`${inputCls} flex-1`}
+                      value={row.productId}
+                      onChange={(e) => updateUsageRow(index, { productId: e.target.value })}
+                    >
+                      <option value="">Selecione o produto...</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className={`${inputCls} w-24`}
+                      placeholder={product?.unit ? `Qtd. (${product.unit.toLowerCase()})` : 'Qtd.'}
+                      value={row.quantityUsed}
+                      onChange={(e) => updateUsageRow(index, { quantityUsed: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeUsageRow(index)}
+                      className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                );
               })}
-            />
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <label className="relative inline-flex items-center cursor-pointer">

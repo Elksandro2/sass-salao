@@ -49,6 +49,36 @@ export interface PayrollReportResponse {
   period: string;
 }
 
+export interface AppointmentProfitResponse {
+  appointmentId: number;
+  grossRevenue: number;
+  serviceRecipeCost: number;
+  productsSoldCost: number;
+  commissionCost: number;
+  netProfit: number;
+  positive: boolean;
+}
+
+export interface ServicePricingItemResponse {
+  serviceId: number;
+  serviceName: string;
+  catalogPrice: number | null;
+  timesPerformed: number;
+  totalRevenue: number;
+  recipeCostTotal: number;
+  commissionCostTotal: number;
+  fixedExpenseShare: number;
+  netProfit: number;
+  marginPercent: number;
+  healthy: boolean;
+}
+
+export interface ServicePricingAnalysisResponse {
+  items: ServicePricingItemResponse[];
+  totalFixedExpenses: number;
+  period: string;
+}
+
 export interface AppointmentFinancialResponse {
   id: number;
   scheduledAt: string | null;
@@ -81,6 +111,21 @@ export const reportsApi = {
     if (from) params.from = from;
     if (to) params.to = to;
     const { data } = await api.get<PayrollReportResponse>('/reports/payroll', { params });
+    return data;
+  },
+
+  getServicePricingAnalysis: async (from?: string, to?: string) => {
+    const params: Record<string, string> = {};
+    if (from) params.from = from;
+    if (to) params.to = to;
+    const { data } = await api.get<ServicePricingAnalysisResponse>('/reports/service-pricing', { params });
+    return data;
+  },
+
+  getAppointmentProfit: async (appointmentId: number) => {
+    const { data } = await api.get<AppointmentProfitResponse>(
+      `/reports/appointments/${appointmentId}/profit`
+    );
     return data;
   },
 

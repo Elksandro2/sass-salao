@@ -12,7 +12,7 @@ import {
   AlertCircle,
   Scissors,
 } from 'lucide-react';
-import { salonServicesApi, displayServiceDuration } from '../services/services/services';
+import { salonServicesApi } from '../services/services/services';
 import type { SalonServiceData } from '../services/services/services';
 import { employeesApi } from '../admin/employees/services/employees';
 import type { EmployeeData } from '../admin/employees/services/employees';
@@ -331,9 +331,6 @@ export const PublicAppointment = () => {
                       <p className="text-xs text-[#3b3036]/60 mb-3 leading-relaxed">
                         {srv.description || 'Tratamento especializado para você.'}
                       </p>
-                      <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                        <Clock size={14} /> {displayServiceDuration(srv)}
-                      </div>
                       {selectedServiceIds.includes(srv.id!) && (
                         <CheckCircle size={20} className="absolute top-3 right-3 text-[#be8a83]" />
                       )}

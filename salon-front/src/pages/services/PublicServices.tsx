@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { salonServicesApi, displayServiceDuration } from './services/services';
+import { salonServicesApi } from './services/services';
 import type { SalonServiceData } from './services/services';
 import { useAlert } from '../../hooks/useAlert';
 import { getApiErrorMessage } from '../../utils/apiError';
-import { Clock, Scissors } from 'lucide-react';
+import { Scissors } from 'lucide-react';
 
 export const PublicServices = () => {
   const [services, setServices] = useState<SalonServiceData[]>([]);
@@ -74,13 +74,6 @@ export const PublicServices = () => {
                 <p className="text-sm text-[#3b3036]/70 leading-relaxed">
                   {service.description || 'Tratamento especial para os seus cuidados.'}
                 </p>
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-dashed border-gray-100 flex items-center justify-between">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 text-gray-500 rounded-lg text-xs font-medium border border-gray-100">
-                  <Clock size={14} className="text-gray-400" />
-                  <span>{displayServiceDuration(service)}</span>
-                </div>
               </div>
             </div>
           ))}

@@ -49,6 +49,10 @@ export const Products = () => {
       setValue('stock', String(product.stock));
       setValue('price', String(product.price));
       setValue('active', product.active !== false);
+      setValue('brand', product.brand ?? '');
+      setValue('costPrice', product.costPrice != null ? String(product.costPrice) : '');
+      setValue('capacity', product.capacity != null ? String(product.capacity) : '');
+      setValue('unit', product.unit ?? '');
     } else {
       setEditingProduct(null);
       setValue('stock', '0');
@@ -64,6 +68,10 @@ export const Products = () => {
         stock: Number(data.stock),
         price: Number(data.price),
         active: data.active,
+        brand: data.brand?.trim() || null,
+        costPrice: data.costPrice ? Number(data.costPrice) : null,
+        capacity: data.capacity ? Number(data.capacity) : null,
+        unit: data.unit ? (data.unit as ProductData['unit']) : null,
       };
       if (editingProduct?.id) {
         await productsApi.update(editingProduct.id, payload);
@@ -231,6 +239,64 @@ export const Products = () => {
             {errors.price && (
               <span className="text-xs text-rose-500 font-semibold">{errors.price.message}</span>
             )}
+          </div>
+          <div className="border-t border-[#eae1e1]/50 pt-4">
+            <h4 className="font-heading font-semibold text-sm text-[#3b3036] mb-3">
+              Custeio (opcional)
+            </h4>
+            <p className="text-xs text-gray-400 -mt-2 mb-3">
+              Usado só internamente pra calcular custo por atendimento nos relatórios — não
+              aparece pra cliente.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Marca</label>
+                <input
+                  type="text"
+                  maxLength={100}
+                  className={inputCls}
+                  {...register('brand')}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Quanto o salão pagou (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className={`${inputCls} ${errors.costPrice ? 'border-rose-300' : ''}`}
+                  {...register('costPrice')}
+                />
+                {errors.costPrice && (
+                  <span className="text-xs text-rose-500 font-semibold">{errors.costPrice.message}</span>
+                )}
+              </div>
+              <div>
+                <label className={labelCls}>Capacidade da embalagem</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Ex.: 1000"
+                  className={`${inputCls} ${errors.capacity ? 'border-rose-300' : ''}`}
+                  {...register('capacity')}
+                />
+                {errors.capacity && (
+                  <span className="text-xs text-rose-500 font-semibold">{errors.capacity.message}</span>
+                )}
+              </div>
+              <div>
+                <label className={labelCls}>Unidade</label>
+                <select className={inputCls} {...register('unit')}>
+                  <option value="">Não informado</option>
+                  <option value="ML">Mililitros (ml)</option>
+                  <option value="L">Litros (L)</option>
+                  <option value="G">Gramas (g)</option>
+                  <option value="KG">Quilos (kg)</option>
+                  <option value="UNIDADE">Unidade</option>
+                </select>
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <label className="relative inline-flex items-center cursor-pointer">

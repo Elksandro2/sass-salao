@@ -1,6 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactElement } from 'react';
 import { formatApiDate, formatApiDateTime } from '../../../utils/datetime';
-import { Plus, Clock, User as UserIcon, Calendar as CalendarIcon, X, PencilLine } from 'lucide-react';
+import {
+  Plus,
+  Clock,
+  User as UserIcon,
+  Calendar as CalendarIcon,
+  X,
+  PencilLine,
+  CalendarClock,
+  CalendarCheck2,
+  CheckCircle2,
+  XCircle,
+  Ban,
+  CreditCard,
+  Banknote,
+  QrCode,
+  Wallet,
+} from 'lucide-react';
 import { Table } from '../../../components/table/Table';
 import { ConfirmDialog } from '../../../components/modal/ConfirmDialog';
 import { PixPaymentModal } from '../../../components/modal/PixPaymentModal';
@@ -91,6 +107,10 @@ export const AdminAppointments = () => {
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [currentPixAppointmentId, setCurrentPixAppointmentId] = useState<number | null>(null);
   const [isGeneratingPix, setIsGeneratingPix] = useState(false);
+
+  // Ao marcar pagamento como "Pago Manualmente" fora da plataforma, pede pra escolher a
+  // forma (crédito/débito/pix/dinheiro) antes de confirmar — não dá pra saber sozinho.
+  const [manualPaymentTarget, setManualPaymentTarget] = useState<number | null>(null);
 
   const parseDate = (dateValue: string | number[] | null | undefined): number => {
     if (!dateValue) return 0;
@@ -198,7 +218,6 @@ export const AdminAppointments = () => {
         ...prev,
         [serviceId]: {
           price: service?.price != null ? String(service.price) : '',
-          durationMin: service?.durationMin != null ? String(service.durationMin) : '',
           notes: '',
         },
       };
@@ -254,16 +273,12 @@ export const AdminAppointments = () => {
       // catálogo — se o usuário não mexeu no campo, ele fica null (usa o padrão).
       const services = selectedServiceIds.map((serviceId) => {
         const service = allServices.find((s) => s.id === serviceId);
-        const values = customizations[serviceId] ?? { price: '', durationMin: '', notes: '' };
+        const values = customizations[serviceId] ?? { price: '', notes: '' };
         const priceNum = values.price === '' ? null : Number(values.price);
-        const durationNum = values.durationMin === '' ? null : Number(values.durationMin);
         const customPrice = priceNum != null && priceNum !== service?.price ? priceNum : null;
-        const customDurationMin =
-          durationNum != null && durationNum !== service?.durationMin ? durationNum : null;
         return {
           serviceId,
           customPrice,
-          customDurationMin,
           customServiceNotes: values.notes || null,
         };
       });
@@ -336,9 +351,10 @@ export const AdminAppointments = () => {
     }
   };
 
-  const handlePaymentStatusChange = async (id: number, newPaymentStatus: string) => {
+  const handlePaymentStatusChange = async (id: number, newPaymentStatus: string, paymentMethod?: string) => {
     try {
-      await appointmentsApi.updatePaymentStatus(id, newPaymentStatus);
+      await appointmentsApi.updatePaymentStatus(id, newPaymentStatus, paymentMethod);
+      setManualPaymentTarget(null);
       loadAppointments();
     } catch (error) {
       await showError('Erro ao atualizar status de pagamento');
@@ -385,28 +401,47 @@ export const AdminAppointments = () => {
     }
   };
 
+  const paymentMethodLabels: Record<string, string> = {
+    CREDITO: 'Crédito',
+    DEBITO: 'Débito',
+    PIX: 'PIX',
+    DINHEIRO: 'Dinheiro',
+  };
+
   const getPaymentStatusBadge = (
     paymentStatus: string | null | undefined,
-    pixQrCode: string | null | undefined
+    pixQrCode: string | null | undefined,
+    paymentMethod: string | null | undefined
   ) => {
     if (!paymentStatus) return null;
     const styles: Record<string, string> = {
       PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
       PAID: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
       CANCELLED: 'bg-rose-50 text-rose-700 border border-rose-200',
-      MANUAL: 'bg-blue-50 text-blue-700 border border-blue-200',
+      MANUAL: 'bg-sky-50 text-sky-700 border border-sky-200',
+    };
+    const dotStyles: Record<string, string> = {
+      PENDING: 'bg-amber-500',
+      PAID: 'bg-emerald-500',
+      CANCELLED: 'bg-rose-500',
+      MANUAL: 'bg-sky-500',
     };
     const labels: Record<string, string> = {
-      PENDING: pixQrCode ? 'PIX gerado (Aguardando)' : 'Pagamento Pendente',
+      PENDING: pixQrCode ? 'PIX gerado — aguardando' : 'Pagamento pendente',
       PAID: 'Pago',
-      CANCELLED: 'Pagamento Cancelado',
-      MANUAL: 'Pago Manualmente',
+      CANCELLED: 'Pagamento cancelado',
+      MANUAL: 'Pago manualmente',
     };
+    const methodSuffix =
+      paymentMethod && (paymentStatus === 'PAID' || paymentStatus === 'MANUAL')
+        ? ` · ${paymentMethodLabels[paymentMethod] || paymentMethod}`
+        : '';
     return (
       <span
-        className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${styles[paymentStatus] || 'bg-gray-100 text-gray-600 border border-gray-200'}`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap ${styles[paymentStatus] || 'bg-gray-100 text-gray-600 border border-gray-200'}`}
       >
-        {labels[paymentStatus] || paymentStatus}
+        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotStyles[paymentStatus] || 'bg-gray-400'}`} />
+        {(labels[paymentStatus] || paymentStatus) + methodSuffix}
       </span>
     );
   };
@@ -415,10 +450,18 @@ export const AdminAppointments = () => {
     const styles: Record<string, string> = {
       PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
       REQUESTED: 'bg-sky-50 text-sky-700 border border-sky-200',
-      CONFIRMED: 'bg-[#be8a83]/10 text-[#a6726b] border border-[#be8a83]/20',
+      CONFIRMED: 'bg-[#be8a83]/10 text-[#a6726b] border border-[#be8a83]/25',
       DECLINED: 'bg-gray-100 text-gray-600 border border-gray-200',
       DONE: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
       CANCELLED: 'bg-rose-50 text-rose-700 border border-rose-200',
+    };
+    const icons: Record<string, ReactElement> = {
+      PENDING: <Clock size={12} />,
+      REQUESTED: <CalendarClock size={12} />,
+      CONFIRMED: <CalendarCheck2 size={12} />,
+      DECLINED: <Ban size={12} />,
+      DONE: <CheckCircle2 size={12} />,
+      CANCELLED: <XCircle size={12} />,
     };
     const labels: Record<string, string> = {
       PENDING: 'Pendente',
@@ -430,8 +473,9 @@ export const AdminAppointments = () => {
     };
     return (
       <span
-        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${styles[status] || 'bg-gray-100 text-gray-600 border border-gray-200'}`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${styles[status] || 'bg-gray-100 text-gray-600 border border-gray-200'}`}
       >
+        {icons[status]}
         {labels[status] || status}
       </span>
     );
@@ -455,7 +499,7 @@ export const AdminAppointments = () => {
       label: 'Serviço',
       render: (item: AppointmentResponse) => {
         const isCustomized = item.services.some(
-          (s) => s.customPrice != null || s.customDurationMin != null || !!s.customServiceNotes
+          (s) => s.customPrice != null || !!s.customServiceNotes
         );
         const names = item.services.map((s) => s.serviceName).join(', ');
         return (
@@ -493,7 +537,7 @@ export const AdminAppointments = () => {
         <div className="flex flex-col items-start gap-2.5">
           <div className="flex flex-wrap gap-1">
             {getStatusBadge(item.status)}
-            {getPaymentStatusBadge(item.paymentStatus, item.pixQrCode)}
+            {getPaymentStatusBadge(item.paymentStatus, item.pixQrCode, item.paymentMethod)}
           </div>
 
           {item.status === 'REQUESTED' && (
@@ -557,10 +601,18 @@ export const AdminAppointments = () => {
                 <div className="flex flex-col gap-0.5">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status Pagamento</span>
                   <select
-                    value={item.paymentStatus || 'PENDING'}
+                    value={manualPaymentTarget === item.id ? 'MANUAL' : item.paymentStatus || 'PENDING'}
                     disabled={!canChangePaymentStatus(item)}
                     title={getPaymentStatusChangeBlockReason(item) || undefined}
-                    onChange={(e) => handlePaymentStatusChange(item.id, e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'MANUAL') {
+                        setManualPaymentTarget(item.id);
+                      } else {
+                        setManualPaymentTarget(null);
+                        handlePaymentStatusChange(item.id, val);
+                      }
+                    }}
                     className={`text-xs px-2.5 py-1.5 border rounded-lg outline-none focus:ring-1 focus:ring-[#be8a83]/20 focus:border-[#be8a83] transition-all ${
                       !canChangePaymentStatus(item)
                         ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-60'
@@ -572,6 +624,49 @@ export const AdminAppointments = () => {
                     <option value="MANUAL">Pago Manualmente</option>
                     <option value="CANCELLED">Cancelado</option>
                   </select>
+
+                  {manualPaymentTarget === item.id && (
+                    <div className="flex flex-col gap-1 mt-1 p-2 bg-sky-50 border border-sky-200 rounded-lg" style={{ width: '150px' }}>
+                      <span className="text-[10px] font-bold text-sky-700 uppercase tracking-wider">Como foi pago?</span>
+                      <div className="grid grid-cols-2 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handlePaymentStatusChange(item.id, 'MANUAL', 'CREDITO')}
+                          className="flex items-center justify-center gap-1 px-1.5 py-1 bg-white border border-sky-200 hover:bg-sky-100 rounded-md text-[10px] font-semibold text-sky-700 cursor-pointer"
+                        >
+                          <CreditCard size={11} /> Crédito
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePaymentStatusChange(item.id, 'MANUAL', 'DEBITO')}
+                          className="flex items-center justify-center gap-1 px-1.5 py-1 bg-white border border-sky-200 hover:bg-sky-100 rounded-md text-[10px] font-semibold text-sky-700 cursor-pointer"
+                        >
+                          <Wallet size={11} /> Débito
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePaymentStatusChange(item.id, 'MANUAL', 'PIX')}
+                          className="flex items-center justify-center gap-1 px-1.5 py-1 bg-white border border-sky-200 hover:bg-sky-100 rounded-md text-[10px] font-semibold text-sky-700 cursor-pointer"
+                        >
+                          <QrCode size={11} /> PIX
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePaymentStatusChange(item.id, 'MANUAL', 'DINHEIRO')}
+                          className="flex items-center justify-center gap-1 px-1.5 py-1 bg-white border border-sky-200 hover:bg-sky-100 rounded-md text-[10px] font-semibold text-sky-700 cursor-pointer"
+                        >
+                          <Banknote size={11} /> Dinheiro
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setManualPaymentTarget(null)}
+                        className="text-[10px] text-gray-400 hover:text-gray-600 cursor-pointer mt-0.5"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </PermissionGate>
@@ -799,8 +894,7 @@ export const AdminAppointments = () => {
                       key={serviceId}
                       serviceName={service?.name}
                       defaultPrice={service?.price ?? null}
-                      defaultDurationMin={service?.durationMin ?? null}
-                      values={customizations[serviceId] ?? { price: '', durationMin: '', notes: '' }}
+                      values={customizations[serviceId] ?? { price: '', notes: '' }}
                       onChange={(values) =>
                         setCustomizations((prev) => ({ ...prev, [serviceId]: values }))
                       }

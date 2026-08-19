@@ -2,12 +2,22 @@ import api from '../../../../services/api';
 import { normalizePage, type SpringPageResponse } from '../../../../utils/pagination';
 export type { PageResponse } from '../../../../utils/pagination';
 
+export type ProductUnit = 'ML' | 'L' | 'G' | 'KG' | 'UNIDADE';
+
 export interface ProductData {
   id?: number;
   name: string;
   stock: number;
   price: number;
   active?: boolean;
+  brand?: string | null;
+  /** Quanto o salão pagou pela embalagem/produto (custeio interno, não é o preço de venda). */
+  costPrice?: number | null;
+  /** Capacidade da embalagem, na unidade de `unit` (ex.: 1000 para um frasco de 1000ml). */
+  capacity?: number | null;
+  unit?: ProductUnit | null;
+  /** Calculado pelo backend: custo por unidade de `unit`. */
+  unitCost?: number | null;
 }
 
 export interface ProductFilter {

@@ -2,17 +2,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ServiceCustomizationPanel } from '../ServiceCustomizationPanel';
 
-const emptyValues = { price: '', durationMin: '', notes: '' };
+const emptyValues = { price: '', notes: '' };
 
 describe('ServiceCustomizationPanel', () => {
   it('starts collapsed, hiding the input fields', () => {
     render(
-      <ServiceCustomizationPanel
-        defaultPrice={100}
-        defaultDurationMin={45}
-        values={emptyValues}
-        onChange={vi.fn()}
-      />
+      <ServiceCustomizationPanel defaultPrice={100} values={emptyValues} onChange={vi.fn()} />
     );
 
     expect(screen.getByText('Personalizar para este cliente')).toBeInTheDocument();
@@ -21,31 +16,19 @@ describe('ServiceCustomizationPanel', () => {
 
   it('expands to show fields pre-filled with the catalog defaults as placeholders', () => {
     render(
-      <ServiceCustomizationPanel
-        defaultPrice={100}
-        defaultDurationMin={45}
-        values={emptyValues}
-        onChange={vi.fn()}
-      />
+      <ServiceCustomizationPanel defaultPrice={100} values={emptyValues} onChange={vi.fn()} />
     );
 
     fireEvent.click(screen.getByText('Personalizar para este cliente'));
 
     expect(screen.getByPlaceholderText('100.00')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('45')).toBeInTheDocument();
     expect(screen.getByText('Padrão: R$ 100.00')).toBeInTheDocument();
-    expect(screen.getByText('Padrão: 45 min')).toBeInTheDocument();
   });
 
   it('calls onChange with the updated price when the price input changes', () => {
     const handleChange = vi.fn();
     render(
-      <ServiceCustomizationPanel
-        defaultPrice={100}
-        defaultDurationMin={45}
-        values={emptyValues}
-        onChange={handleChange}
-      />
+      <ServiceCustomizationPanel defaultPrice={100} values={emptyValues} onChange={handleChange} />
     );
 
     fireEvent.click(screen.getByText('Personalizar para este cliente'));
@@ -57,12 +40,7 @@ describe('ServiceCustomizationPanel', () => {
   it('calls onChange with the updated notes when the notes textarea changes', () => {
     const handleChange = vi.fn();
     render(
-      <ServiceCustomizationPanel
-        defaultPrice={100}
-        defaultDurationMin={45}
-        values={emptyValues}
-        onChange={handleChange}
-      />
+      <ServiceCustomizationPanel defaultPrice={100} values={emptyValues} onChange={handleChange} />
     );
 
     fireEvent.click(screen.getByText('Personalizar para este cliente'));
@@ -73,19 +51,13 @@ describe('ServiceCustomizationPanel', () => {
     expect(handleChange).toHaveBeenCalledWith({ ...emptyValues, notes: 'Cabelo longo' });
   });
 
-  it('shows "não definido/a" placeholders when there is no catalog default', () => {
+  it('shows "não definido" placeholder when there is no catalog default', () => {
     render(
-      <ServiceCustomizationPanel
-        defaultPrice={null}
-        defaultDurationMin={null}
-        values={emptyValues}
-        onChange={vi.fn()}
-      />
+      <ServiceCustomizationPanel defaultPrice={null} values={emptyValues} onChange={vi.fn()} />
     );
 
     fireEvent.click(screen.getByText('Personalizar para este cliente'));
 
     expect(screen.getByText('Padrão: não definido')).toBeInTheDocument();
-    expect(screen.getByText('Padrão: não definida')).toBeInTheDocument();
   });
 });
