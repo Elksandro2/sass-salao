@@ -24,6 +24,34 @@ public class EmployeeMercadoPagoController {
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
+    // --- Self-service (Meu Perfil): a própria funcionária conecta/desconecta a conta dela,
+    // sem depender da Admin clicar por ela em Admin → Equipe. "me" é literal na rota — o Spring
+    // prioriza esse mapeamento exato sobre "/{id}/mercadopago/..." pra qualquer chamada com
+    // "me" no lugar do id, então não há ambiguidade de rota entre os dois. ---
+
+    @GetMapping("/v1/employees/me/mercadopago/connect")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Gera o link de autorização OAuth pra funcionária logada conectar a própria conta Mercado Pago")
+    public ResponseEntity<MercadoPagoConnectResponse> connectMe() {
+        return ResponseEntity.ok(connectionService.generateAuthorizationUrlForCurrentUser());
+    }
+
+    @GetMapping("/v1/employees/me/mercadopago/status")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Consulta se a funcionária logada já conectou a própria conta Mercado Pago")
+    public ResponseEntity<MercadoPagoStatusResponse> statusMe() {
+        return ResponseEntity.ok(connectionService.getStatusForCurrentUser());
+    }
+
+    @DeleteMapping("/v1/employees/me/mercadopago")
+    @PreAuthorize("isAuthenticated()")
+    @Auditable(action = "EMPLOYEE_MP_ACCOUNT_DISCONNECTED", entityType = "Employee", captureArgs = false)
+    @Operation(summary = "A funcionária logada desconecta a própria conta Mercado Pago")
+    public ResponseEntity<Void> disconnectMe() {
+        connectionService.disconnectForCurrentUser();
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/v1/employees/{id}/mercadopago/connect")
     @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
     @Operation(summary = "Gera o link de autorização OAuth pra funcionária conectar a própria conta Mercado Pago")
@@ -61,9 +89,10 @@ public class EmployeeMercadoPagoController {
         // frontend — devolver um JSON de erro cru deixaria ela travada numa tela em branco.
         // Sempre volta pro app, com o resultado (sucesso ou erro) numa query string.
         try {
-            Long employeeId = connectionService.handleCallback(code, state);
+            var result = connectionService.handleCallback(code, state);
+            String path = "profile".equals(result.redirectTarget()) ? "/admin/profile" : "/admin/team";
             return ResponseEntity.status(302)
-                    .location(URI.create(frontendUrl + "/admin/team?mp_connected=" + employeeId))
+                    .location(URI.create(frontendUrl + path + "?mp_connected=" + result.employeeId()))
                     .build();
         } catch (Exception e) {
             return ResponseEntity.status(302)

@@ -6,15 +6,19 @@ import com.cristiane.salon.integrations.payment.marketplace.dto.MercadoPagoConne
 import com.cristiane.salon.integrations.payment.marketplace.dto.MercadoPagoStatusResponse;
 import com.cristiane.salon.integrations.payment.marketplace.entity.EmployeeMercadoPagoAccount;
 import com.cristiane.salon.integrations.payment.marketplace.repository.EmployeeMercadoPagoAccountRepository;
+import com.cristiane.salon.exception.UnauthorizedException;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
 import com.cristiane.salon.models.user.entity.User;
+import com.cristiane.salon.models.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Optional;
 
@@ -35,6 +39,9 @@ class EmployeeMercadoPagoConnectionServiceTest {
     @Mock
     private MercadoPagoOAuthGateway oAuthGateway;
 
+    @Mock
+    private UserRepository userRepository;
+
     private MercadoPagoSplitProperties splitProperties;
     private EmployeeMercadoPagoConnectionService service;
 
@@ -48,12 +55,19 @@ class EmployeeMercadoPagoConnectionServiceTest {
         splitProperties.setOauthRedirectUri("https://example.com/callback");
 
         service = new EmployeeMercadoPagoConnectionService(
-                employeeRepository, mpAccountRepository, oAuthGateway, splitProperties);
+                employeeRepository, mpAccountRepository, oAuthGateway, splitProperties, userRepository);
 
         employee = new Employee();
         employee.setId(5L);
         employee.setUser(new User());
         employee.getUser().setId(10L);
+    }
+
+    private void mockAuthenticatedUser(User user) {
+        var auth = new UsernamePasswordAuthenticationToken(user.getEmail(), null, java.util.List.of());
+        var secCtx = SecurityContextHolder.createEmptyContext();
+        secCtx.setAuthentication(auth);
+        SecurityContextHolder.setContext(secCtx);
     }
 
     @Test
@@ -107,9 +121,10 @@ class EmployeeMercadoPagoConnectionServiceTest {
                 new MercadoPagoOAuthGateway.MercadoPagoTokenResponse(
                         "access-123", "bearer", 21600, "read write", 999L, "refresh-456", "PUB-KEY"));
 
-        Long resultEmployeeId = service.handleCallback("auth-code", state);
+        var result = service.handleCallback("auth-code", state);
 
-        assertThat(resultEmployeeId).isEqualTo(5L);
+        assertThat(result.employeeId()).isEqualTo(5L);
+        assertThat(result.redirectTarget()).isEqualTo("team");
 
         ArgumentCaptor<EmployeeMercadoPagoAccount> captor = ArgumentCaptor.forClass(EmployeeMercadoPagoAccount.class);
         verify(mpAccountRepository).save(captor.capture());
@@ -244,6 +259,83 @@ class EmployeeMercadoPagoConnectionServiceTest {
                         "new-token", "bearer", 21600, "read write", 999L, "new-refresh-token", "PUB-KEY"));
 
         assertThat(service.resolveValidAccessToken(5L)).contains("new-token");
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void generateAuthorizationUrlForCurrentUser_shouldResolveEmployeeFromLoggedInUserAndTagRedirectAsProfile() {
+        employee.getUser().setEmail("funcionaria@example.com");
+        mockAuthenticatedUser(employee.getUser());
+        when(userRepository.findByEmail("funcionaria@example.com")).thenReturn(Optional.of(employee.getUser()));
+        when(employeeRepository.findByUserId(10L)).thenReturn(Optional.of(employee));
+        when(employeeRepository.existsById(5L)).thenReturn(true);
+        when(oAuthGateway.buildAuthorizationUrl(any()))
+                .thenAnswer(inv -> "https://auth.mercadopago.com/authorization?state=" + inv.getArgument(0));
+
+        MercadoPagoConnectResponse response = service.generateAuthorizationUrlForCurrentUser();
+        String state = extractState(response);
+
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
+        when(mpAccountRepository.findByEmployeeId(5L)).thenReturn(Optional.empty());
+        when(oAuthGateway.exchangeCodeForToken(any())).thenReturn(
+                new MercadoPagoOAuthGateway.MercadoPagoTokenResponse(
+                        "access-123", "bearer", 21600, "read write", 999L, "refresh-456", "PUB-KEY"));
+
+        var result = service.handleCallback("auth-code", state);
+
+        assertThat(result.employeeId()).isEqualTo(5L);
+        assertThat(result.redirectTarget()).isEqualTo("profile");
+    }
+
+    @Test
+    void generateAuthorizationUrlForCurrentUser_whenUserHasNoLinkedEmployee_shouldThrowResourceNotFoundException() {
+        User adminUser = new User();
+        adminUser.setId(20L);
+        adminUser.setEmail("admin@example.com");
+        mockAuthenticatedUser(adminUser);
+        when(userRepository.findByEmail("admin@example.com")).thenReturn(Optional.of(adminUser));
+        when(employeeRepository.findByUserId(20L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.generateAuthorizationUrlForCurrentUser())
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("não tem um cadastro de funcionária");
+    }
+
+    @Test
+    void generateAuthorizationUrlForCurrentUser_whenNotAuthenticated_shouldThrowUnauthorizedException() {
+        assertThatThrownBy(() -> service.generateAuthorizationUrlForCurrentUser())
+                .isInstanceOf(UnauthorizedException.class);
+    }
+
+    @Test
+    void getStatusForCurrentUser_shouldUseLoggedInUsersEmployeeId() {
+        employee.getUser().setEmail("funcionaria@example.com");
+        mockAuthenticatedUser(employee.getUser());
+        when(userRepository.findByEmail("funcionaria@example.com")).thenReturn(Optional.of(employee.getUser()));
+        when(employeeRepository.findByUserId(10L)).thenReturn(Optional.of(employee));
+        when(mpAccountRepository.findByEmployeeId(5L)).thenReturn(Optional.empty());
+
+        MercadoPagoStatusResponse result = service.getStatusForCurrentUser();
+
+        assertThat(result.connected()).isFalse();
+    }
+
+    @Test
+    void disconnectForCurrentUser_shouldUseLoggedInUsersEmployeeId() {
+        employee.getUser().setEmail("funcionaria@example.com");
+        mockAuthenticatedUser(employee.getUser());
+        when(userRepository.findByEmail("funcionaria@example.com")).thenReturn(Optional.of(employee.getUser()));
+        when(employeeRepository.findByUserId(10L)).thenReturn(Optional.of(employee));
+        EmployeeMercadoPagoAccount account = new EmployeeMercadoPagoAccount();
+        when(mpAccountRepository.findByEmployeeId(5L)).thenReturn(Optional.of(account));
+
+        service.disconnectForCurrentUser();
+
+        verify(mpAccountRepository).delete(account);
     }
 
     private String extractState(MercadoPagoConnectResponse response) {

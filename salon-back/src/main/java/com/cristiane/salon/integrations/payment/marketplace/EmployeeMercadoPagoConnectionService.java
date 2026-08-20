@@ -2,13 +2,17 @@ package com.cristiane.salon.integrations.payment.marketplace;
 
 import com.cristiane.salon.exception.BadRequestException;
 import com.cristiane.salon.exception.ResourceNotFoundException;
+import com.cristiane.salon.exception.UnauthorizedException;
 import com.cristiane.salon.integrations.payment.marketplace.dto.MercadoPagoConnectResponse;
 import com.cristiane.salon.integrations.payment.marketplace.dto.MercadoPagoStatusResponse;
 import com.cristiane.salon.integrations.payment.marketplace.entity.EmployeeMercadoPagoAccount;
 import com.cristiane.salon.integrations.payment.marketplace.repository.EmployeeMercadoPagoAccountRepository;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
+import com.cristiane.salon.models.user.entity.User;
+import com.cristiane.salon.models.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,14 +42,18 @@ public class EmployeeMercadoPagoConnectionService {
     private final EmployeeMercadoPagoAccountRepository mpAccountRepository;
     private final MercadoPagoOAuthGateway oAuthGateway;
     private final MercadoPagoSplitProperties splitProperties;
+    private final UserRepository userRepository;
 
     private final Map<String, PendingState> pendingStates = new ConcurrentHashMap<>();
 
-    private record PendingState(Long employeeId, long expiresAtEpochMs) {
+    private record PendingState(Long employeeId, String redirectTarget, long expiresAtEpochMs) {
         boolean isExpired() {
             return System.currentTimeMillis() > expiresAtEpochMs;
         }
     }
+
+    /** Onde o navegador volta depois do callback — depende de quem iniciou a conexão. */
+    public record CallbackResult(Long employeeId, String redirectTarget) {}
 
     private void assertSplitConfigured() {
         if (!splitProperties.isConfigured()) {
@@ -55,6 +63,10 @@ public class EmployeeMercadoPagoConnectionService {
     }
 
     public MercadoPagoConnectResponse generateAuthorizationUrl(Long employeeId) {
+        return generateAuthorizationUrl(employeeId, "team");
+    }
+
+    private MercadoPagoConnectResponse generateAuthorizationUrl(Long employeeId, String redirectTarget) {
         assertSplitConfigured();
 
         if (!employeeRepository.existsById(employeeId)) {
@@ -64,18 +76,51 @@ public class EmployeeMercadoPagoConnectionService {
         pendingStates.values().removeIf(PendingState::isExpired);
 
         String state = UUID.randomUUID().toString();
-        pendingStates.put(state, new PendingState(employeeId, System.currentTimeMillis() + STATE_TTL_MS));
+        pendingStates.put(state, new PendingState(employeeId, redirectTarget, System.currentTimeMillis() + STATE_TTL_MS));
 
         return new MercadoPagoConnectResponse(oAuthGateway.buildAuthorizationUrl(state));
     }
 
     /**
+     * Descobre o ID de funcionária vinculado ao usuário logado — usado pelos endpoints
+     * "/me" (Meu Perfil), pra qualquer funcionária/gerente conectar a própria conta Mercado
+     * Pago sozinha, sem depender da Admin clicar por ela em Admin → Equipe.
+     */
+    private Long resolveCurrentEmployeeId() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new UnauthorizedException("Usuário não autenticado");
+        }
+        String email = auth.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UnauthorizedException("Usuário não autenticado"));
+        return employeeRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Você não tem um cadastro de funcionária vinculado"))
+                .getId();
+    }
+
+    public MercadoPagoConnectResponse generateAuthorizationUrlForCurrentUser() {
+        return generateAuthorizationUrl(resolveCurrentEmployeeId(), "profile");
+    }
+
+    @Transactional(readOnly = true)
+    public MercadoPagoStatusResponse getStatusForCurrentUser() {
+        return getStatus(resolveCurrentEmployeeId());
+    }
+
+    @Transactional
+    public void disconnectForCurrentUser() {
+        disconnect(resolveCurrentEmployeeId());
+    }
+
+    /**
      * Chamado pelo controller quando o Mercado Pago redireciona de volta com o código de
-     * autorização. Devolve o ID da funcionária conectada, pro controller montar o redirect
-     * de sucesso pro frontend.
+     * autorização. Devolve o ID da funcionária conectada e pra onde mandar o navegador de
+     * volta — Admin → Equipe (se quem iniciou foi a Admin) ou Meu Perfil (se foi a própria
+     * funcionária pelo self-service).
      */
     @Transactional
-    public Long handleCallback(String code, String state) {
+    public CallbackResult handleCallback(String code, String state) {
         assertSplitConfigured();
 
         PendingState pending = pendingStates.remove(state);
@@ -101,7 +146,7 @@ public class EmployeeMercadoPagoConnectionService {
 
         mpAccountRepository.save(account);
 
-        return employee.getId();
+        return new CallbackResult(employee.getId(), pending.redirectTarget());
     }
 
     @Transactional
