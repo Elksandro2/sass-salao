@@ -32,10 +32,12 @@ export const AppointmentServicesEditor = ({ appointment, onSaved }: AppointmentS
   const [isSaving, setIsSaving] = useState(false);
   const { error: showError, success: showSuccess } = useAlert();
 
+  // Trava só quando o PAGAMENTO já aconteceu (PAID ou MANUAL) — não pelo status do
+  // agendamento em si. Um atendimento concluído mas ainda não pago continua editável.
   const readOnly =
-    appointment.status === 'DONE' ||
     appointment.status === 'CANCELLED' ||
-    appointment.paymentStatus === 'PAID';
+    appointment.paymentStatus === 'PAID' ||
+    appointment.paymentStatus === 'MANUAL';
 
   useEffect(() => {
     salonServicesApi

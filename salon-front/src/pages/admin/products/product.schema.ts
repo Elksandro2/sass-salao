@@ -17,6 +17,8 @@ export const productFormSchema = z.object({
     .optional()
     .refine((v) => !v || Number(v) > 0, 'Deve ser maior que zero'),
   unit: z.enum(['', 'ML', 'L', 'G', 'KG', 'UNIDADE']).optional(),
+  availableForSale: z.boolean(),
+  usedInServiceRecipe: z.boolean(),
 });
 
 export type ProductFormValues = z.infer<typeof productFormSchema>;

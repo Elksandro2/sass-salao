@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { X, Calendar, Clock, Inbox } from 'lucide-react';
 import { clientsApi } from '../services/clients';
 import type { ClientDetailsResponse } from '../services/clients';
+import type { AppointmentResponse } from '../../../appointments/services/appointments';
 import { getApiErrorMessage } from '../../../../utils/apiError';
 import { useAlert } from '../../../../hooks/useAlert';
 import { maskCPF } from '../../../../utils/formatters';
 import { ClientAnamnesisSection } from './ClientAnamnesisSection';
+import { AppointmentDetailModal } from '../../appointments/components/AppointmentDetailModal';
 
 type DrawerTab = 'history' | 'anamnesis';
 
@@ -19,6 +21,7 @@ export function ClientDrawer({ isOpen, onClose, clientId }: ClientDrawerProps) {
   const [client, setClient] = useState<ClientDetailsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [tab, setTab] = useState<DrawerTab>('history');
+  const [detailTarget, setDetailTarget] = useState<AppointmentResponse | null>(null);
   const { error: showError } = useAlert();
 
   useEffect(() => {
@@ -168,9 +171,11 @@ export function ClientDrawer({ isOpen, onClose, clientId }: ClientDrawerProps) {
                 ) : (
                   <div className="space-y-3">
                     {client.appointments.map((appt) => (
-                      <div
+                      <button
                         key={appt.id}
-                        className="p-4 border border-[#eae1e1] dark:border-[#1e293b] bg-white/60 dark:bg-[#161c2a]/80 rounded-2xl hover:bg-white dark:hover:bg-[#161c2a] transition-all duration-200 shadow-2xs"
+                        type="button"
+                        onClick={() => setDetailTarget(appt)}
+                        className="w-full text-left p-4 border border-[#eae1e1] dark:border-[#1e293b] bg-white/60 dark:bg-[#161c2a]/80 rounded-2xl hover:bg-white dark:hover:bg-[#161c2a] hover:border-[#be8a83]/50 transition-all duration-200 shadow-2xs cursor-pointer"
                       >
                         <div className="flex justify-between items-start">
                           <div>
@@ -234,12 +239,18 @@ export function ClientDrawer({ isOpen, onClose, clientId }: ClientDrawerProps) {
                             <span className="text-gray-400">Status de Pagamento:</span>
                             <span
                               className={`font-bold ${
-                                appt.paymentStatus === 'PAID'
+                                appt.paymentStatus === 'PAID' || appt.paymentStatus === 'MANUAL'
                                   ? 'text-emerald-600 dark:text-emerald-400'
-                                  : 'text-amber-600 dark:text-amber-400'
+                                  : appt.paymentStatus === 'CANCELLED'
+                                    ? 'text-rose-600 dark:text-rose-400'
+                                    : 'text-amber-600 dark:text-amber-400'
                               }`}
                             >
-                              {appt.paymentStatus === 'PAID' ? 'PAGO' : 'PENDENTE'}
+                              {appt.paymentStatus === 'PAID' || appt.paymentStatus === 'MANUAL'
+                                ? 'PAGO'
+                                : appt.paymentStatus === 'CANCELLED'
+                                  ? 'CANCELADO'
+                                  : 'PENDENTE'}
                             </span>
                           </div>
                         )}
@@ -252,7 +263,7 @@ export function ClientDrawer({ isOpen, onClose, clientId }: ClientDrawerProps) {
                             </span>
                           </div>
                         )}
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -263,6 +274,24 @@ export function ClientDrawer({ isOpen, onClose, clientId }: ClientDrawerProps) {
           )}
         </div>
       </div>
+
+      {detailTarget && (
+        <AppointmentDetailModal
+          appointment={detailTarget}
+          onClose={() => setDetailTarget(null)}
+          onNotesSaved={(updated) => {
+            setDetailTarget(updated);
+            setClient((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    appointments: prev.appointments.map((a) => (a.id === updated.id ? updated : a)),
+                  }
+                : prev
+            );
+          }}
+        />
+      )}
     </div>
   );
 }

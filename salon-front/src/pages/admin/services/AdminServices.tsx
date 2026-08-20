@@ -44,7 +44,7 @@ export const AdminServices = () => {
   useEffect(() => {
     productsApi
       .findAll({ active: true }, 0, 1000)
-      .then((page) => setProducts(page.content))
+      .then((page) => setProducts(page.content.filter((p) => p.usedInServiceRecipe !== false)))
       .catch(() => setProducts([]));
   }, []);
 

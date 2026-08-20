@@ -14,6 +14,8 @@ import { productsApi } from '../products/services/products';
 import type { ProductData } from '../products/services/products';
 import { salonServicesApi } from '../../services/services/services';
 import type { SalonServiceData } from '../../services/services/services';
+import { employeesApi } from '../employees/services/employees';
+import type { EmployeeData } from '../employees/services/employees';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import { useAlert } from '../../../hooks/useAlert';
 
@@ -54,6 +56,9 @@ export const CashFlow = () => {
   const [serviceSearch, setServiceSearch] = useState('');
   const [showSvcDropdown, setShowSvcDropdown] = useState(false);
 
+  const [employees, setEmployees] = useState<EmployeeData[]>([]);
+  const [sellerEmployeeId, setSellerEmployeeId] = useState('');
+
   const loadCashFlows = async () => {
     setIsLoading(true);
     try {
@@ -75,14 +80,16 @@ export const CashFlow = () => {
 
   const loadSuggestions = async () => {
     try {
-      const [prodsData, svcsData] = await Promise.all([
+      const [prodsData, svcsData, empsData] = await Promise.all([
         productsApi.findAll({ active: true }, 0, 1000),
         salonServicesApi.findAll({ active: true }, 0, 1000),
+        employeesApi.findAll({ active: true }, 0, 1000),
       ]);
       setProducts(prodsData.content);
       setServices(svcsData.content);
+      setEmployees(empsData.content);
     } catch (err) {
-      console.error('Erro ao carregar produtos/serviços para sugestão', err);
+      console.error('Erro ao carregar produtos/serviços/funcionárias para sugestão', err);
     }
   };
 
@@ -114,6 +121,7 @@ export const CashFlow = () => {
     setCart([]);
     setProductSearch('');
     setServiceSearch('');
+    setSellerEmployeeId('');
     loadSuggestions(); // Refresh product/service suggestions from backend
     setShowForm(true);
   };
@@ -193,6 +201,7 @@ export const CashFlow = () => {
             productId: item.product.id!,
             quantity: item.quantity,
           })),
+          employeeId: sellerEmployeeId ? Number(sellerEmployeeId) : undefined,
         };
       }
 
@@ -221,7 +230,7 @@ export const CashFlow = () => {
   const filteredProducts = products.filter((p) => {
     if (!productSearch) return false;
     const matchesName = p.name.toLowerCase().includes(productSearch.toLowerCase());
-    return matchesName && p.active;
+    return matchesName && p.active && p.availableForSale !== false;
   });
 
   const filteredServices = services.filter((s) => {
@@ -236,7 +245,29 @@ export const CashFlow = () => {
       label: 'Data',
       render: (item: CashFlowData) => new Date(item.date).toLocaleDateString('pt-BR'),
     },
-    { key: 'description', label: 'Descrição' },
+    {
+      key: 'description',
+      label: 'Descrição',
+      render: (item: CashFlowData) => (
+        <div>
+          <span>{item.description}</span>
+          {item.employeeName && (
+            <div className="text-xs text-[#7a7074] mt-0.5">
+              Vendido por <span className="font-semibold">{item.employeeName}</span>
+              {item.commissionAmount != null && (
+                <>
+                  {' '}
+                  · comissão{' '}
+                  <span className="font-semibold text-[#be8a83]">
+                    R$ {item.commissionAmount.toFixed(2)}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      ),
+    },
     {
       key: 'type',
       label: 'Tipo',
@@ -514,6 +545,40 @@ export const CashFlow = () => {
                     <span className="text-base font-bold text-emerald-700">
                       R$ {cartTotal.toFixed(2)}
                     </span>
+                  </div>
+
+                  <div>
+                    <label className={labelCls}>Quem vendeu (opcional)</label>
+                    <select
+                      className={inputCls}
+                      value={sellerEmployeeId}
+                      onChange={(e) => setSellerEmployeeId(e.target.value)}
+                    >
+                      <option value="">Não informar</option>
+                      {employees.map((emp) => (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.name}
+                        </option>
+                      ))}
+                    </select>
+                    {sellerEmployeeId &&
+                      (() => {
+                        const seller = employees.find((e) => String(e.id) === sellerEmployeeId);
+                        const pct = seller?.productCommissionValue;
+                        if (pct == null) {
+                          return (
+                            <p className="text-xs text-gray-400 mt-1">
+                              Essa funcionária não tem comissão sobre produtos configurada.
+                            </p>
+                          );
+                        }
+                        const commission = (cartTotal * pct) / 100;
+                        return (
+                          <p className="text-xs text-[#be8a83] font-semibold mt-1">
+                            Comissão estimada ({pct}%): R$ {commission.toFixed(2)}
+                          </p>
+                        );
+                      })()}
                   </div>
                 </div>
               ) : (

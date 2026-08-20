@@ -52,9 +52,13 @@ export const Products = () => {
       setValue('costPrice', product.costPrice != null ? String(product.costPrice) : '');
       setValue('capacity', product.capacity != null ? String(product.capacity) : '');
       setValue('unit', product.unit ?? '');
+      setValue('availableForSale', product.availableForSale !== false);
+      setValue('usedInServiceRecipe', product.usedInServiceRecipe !== false);
     } else {
       setEditingProduct(null);
       setValue('active', true);
+      setValue('availableForSale', true);
+      setValue('usedInServiceRecipe', true);
     }
     setShowForm(true);
   };
@@ -69,6 +73,8 @@ export const Products = () => {
         costPrice: data.costPrice ? Number(data.costPrice) : null,
         capacity: data.capacity ? Number(data.capacity) : null,
         unit: data.unit ? (data.unit as ProductData['unit']) : null,
+        availableForSale: data.availableForSale,
+        usedInServiceRecipe: data.usedInServiceRecipe,
       };
       if (editingProduct?.id) {
         await productsApi.update(editingProduct.id, payload);
@@ -282,6 +288,24 @@ export const Products = () => {
                 </select>
               </div>
             </div>
+          </div>
+
+          <div className="border-t border-[#eae1e1]/50 pt-4 space-y-2">
+            <h4 className="font-heading font-semibold text-sm text-[#3b3036] mb-1">
+              Onde este produto aparece
+            </h4>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" className="rounded" {...register('availableForSale')} />
+              <span className="text-sm text-[#3b3036]">
+                Disponível para venda (Fluxo de Caixa e produtos vendidos no atendimento)
+              </span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" className="rounded" {...register('usedInServiceRecipe')} />
+              <span className="text-sm text-[#3b3036]">
+                Usado em receita de serviço (quanto o serviço consome)
+              </span>
+            </label>
           </div>
         </div>
       </ModalForm>

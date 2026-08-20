@@ -54,7 +54,8 @@ export interface AppointmentProfitResponse {
   grossRevenue: number;
   serviceRecipeCost: number;
   productsSoldCost: number;
-  commissionCost: number;
+  serviceCommissionCost: number;
+  productCommissionCost: number;
   netProfit: number;
   positive: boolean;
 }

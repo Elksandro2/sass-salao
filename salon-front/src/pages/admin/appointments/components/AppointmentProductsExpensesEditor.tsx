@@ -47,15 +47,18 @@ export const AppointmentProductsExpensesEditor = ({
   const [isSavingExpenses, setIsSavingExpenses] = useState(false);
   const { error: showError, success: showSuccess } = useAlert();
 
+  // Trava só quando o PAGAMENTO já aconteceu (PAID ou MANUAL) — não pelo status do
+  // agendamento em si. Um atendimento concluído mas ainda não pago continua editável
+  // (ex.: cliente comprou mais um produto na saída, antes de fechar a conta).
   const readOnly =
-    appointment.status === 'DONE' ||
     appointment.status === 'CANCELLED' ||
-    appointment.paymentStatus === 'PAID';
+    appointment.paymentStatus === 'PAID' ||
+    appointment.paymentStatus === 'MANUAL';
 
   useEffect(() => {
     productsApi
       .findAll({ active: true }, 0, 1000)
-      .then((page) => setCatalog(page.content))
+      .then((page) => setCatalog(page.content.filter((p) => p.availableForSale !== false)))
       .catch(() => setCatalog([]));
   }, []);
 

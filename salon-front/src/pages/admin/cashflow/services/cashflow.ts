@@ -15,6 +15,11 @@ export interface CashFlowData {
   date: string;
   appointmentId?: number | null;
   items?: CashFlowItemData[];
+  /** Quem vendeu, numa venda avulsa de produto — opcional, usado só pra calcular comissão. */
+  employeeId?: number | null;
+  employeeName?: string | null;
+  /** Comissão da venda avulsa, calculada pelo backend quando um vendedor é informado. */
+  commissionAmount?: number | null;
 }
 
 export const cashFlowApi = {

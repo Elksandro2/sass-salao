@@ -73,8 +73,12 @@ export const AppointmentProfitSection = ({ appointmentId }: AppointmentProfitSec
                   <span className="text-rose-600">− {formatMoney(profit.productsSoldCost)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-[#7a7074]">Comissão estimada</span>
-                  <span className="text-rose-600">− {formatMoney(profit.commissionCost)}</span>
+                  <span className="text-[#7a7074]">Comissão sobre serviços</span>
+                  <span className="text-rose-600">− {formatMoney(profit.serviceCommissionCost)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-[#7a7074]">Comissão sobre produtos vendidos</span>
+                  <span className="text-rose-600">− {formatMoney(profit.productCommissionCost)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-bold pt-2 border-t border-[#eae1e1]">
                   <span>Lucro líquido</span>

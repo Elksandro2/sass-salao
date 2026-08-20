@@ -17,6 +17,10 @@ export interface ProductData {
   unit?: ProductUnit | null;
   /** Calculado pelo backend: custo por unidade de `unit`. */
   unitCost?: number | null;
+  /** Aparece no seletor de venda avulsa (Fluxo de Caixa) e de produtos vendidos no atendimento. */
+  availableForSale?: boolean;
+  /** Aparece no seletor de receita de serviço (quanto o serviço consome). */
+  usedInServiceRecipe?: boolean;
 }
 
 export interface ProductFilter {
