@@ -7,7 +7,6 @@ export type ProductUnit = 'ML' | 'L' | 'G' | 'KG' | 'UNIDADE';
 export interface ProductData {
   id?: number;
   name: string;
-  stock: number;
   price: number;
   active?: boolean;
   brand?: string | null;

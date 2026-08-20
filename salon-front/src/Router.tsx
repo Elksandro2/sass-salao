@@ -45,6 +45,7 @@ const AdminIndexRedirect = () => {
 
 export const Router = () => {
   const [isPortalEnabled, setIsPortalEnabled] = useState<boolean | null>(null);
+  const [isSelfRegistrationEnabled, setIsSelfRegistrationEnabled] = useState(false);
   const { isAuthenticated } = useAuth();
   usePushNotification(isAuthenticated);
 
@@ -55,6 +56,8 @@ export const Router = () => {
         const portalFlag = flags.find((f) => f.name === 'ENABLE_CUSTOMER_PORTAL');
         // Por segurança, se a flag não existir ainda, assumimos desativada (conforme valor padrão da migration)
         setIsPortalEnabled(portalFlag ? portalFlag.enabled : false);
+        const selfRegFlag = flags.find((f) => f.name === 'ENABLE_SELF_REGISTRATION');
+        setIsSelfRegistrationEnabled(selfRegFlag ? selfRegFlag.enabled : false);
       } catch (error) {
         console.error('Erro ao carregar feature flags:', error);
         // Em caso de falha de conexão com a API, assume-se ativa para não bloquear se houver falha de rede temporária
@@ -120,7 +123,10 @@ export const Router = () => {
       )}
 
       <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      <Route
+        path="/register"
+        element={isSelfRegistrationEnabled ? <Register /> : <Navigate to="/login" replace />}
+      />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 

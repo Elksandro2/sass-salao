@@ -46,7 +46,6 @@ export const Products = () => {
     if (product) {
       setEditingProduct(product);
       setValue('name', product.name);
-      setValue('stock', String(product.stock));
       setValue('price', String(product.price));
       setValue('active', product.active !== false);
       setValue('brand', product.brand ?? '');
@@ -55,7 +54,6 @@ export const Products = () => {
       setValue('unit', product.unit ?? '');
     } else {
       setEditingProduct(null);
-      setValue('stock', '0');
       setValue('active', true);
     }
     setShowForm(true);
@@ -65,7 +63,6 @@ export const Products = () => {
     try {
       const payload: ProductData = {
         name: data.name,
-        stock: Number(data.stock),
         price: Number(data.price),
         active: data.active,
         brand: data.brand?.trim() || null,
@@ -111,7 +108,6 @@ export const Products = () => {
   const columns = [
     { key: 'name', label: 'Nome do Produto' },
     { key: 'price', label: 'Preço', render: (item: ProductData) => `R$ ${item.price.toFixed(2)}` },
-    { key: 'stock', label: 'Estoque' },
     {
       key: 'active',
       label: 'Status',
@@ -218,17 +214,6 @@ export const Products = () => {
             )}
           </div>
           <div>
-            <label className={labelCls}>Estoque Inicial *</label>
-            <input
-              type="number"
-              className={`${inputCls} ${errors.stock ? 'border-rose-300' : ''}`}
-              {...register('stock')}
-            />
-            {errors.stock && (
-              <span className="text-xs text-rose-500 font-semibold">{errors.stock.message}</span>
-            )}
-          </div>
-          <div>
             <label className={labelCls}>Preço (R$) *</label>
             <input
               type="number"
@@ -297,13 +282,6 @@ export const Products = () => {
                 </select>
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" {...register('active')} />
-              <div className="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#be8a83]"></div>
-            </label>
-            <span className="text-sm font-semibold text-[#3b3036]">Produto Ativo</span>
           </div>
         </div>
       </ModalForm>

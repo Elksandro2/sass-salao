@@ -303,13 +303,13 @@ export const AdminServices = () => {
               Quanto deste produto o serviço consome por execução — usado só pra calcular custo
               interno nos relatórios.
             </p>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {usageRows.map((row, index) => {
                 const product = products.find((p) => String(p.id) === row.productId);
                 return (
-                  <div key={index} className="flex items-center gap-2">
+                  <div key={index} className="flex flex-col gap-2 p-2.5 bg-[#fcf9f9]/50 border border-[#eae1e1]/60 rounded-lg">
                     <select
-                      className={`${inputCls} flex-1`}
+                      className={`${inputCls} block w-full`}
                       value={row.productId}
                       onChange={(e) => updateUsageRow(index, { productId: e.target.value })}
                     >
@@ -320,33 +320,28 @@ export const AdminServices = () => {
                         </option>
                       ))}
                     </select>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      className={`${inputCls} w-24`}
-                      placeholder={product?.unit ? `Qtd. (${product.unit.toLowerCase()})` : 'Qtd.'}
-                      value={row.quantityUsed}
-                      onChange={(e) => updateUsageRow(index, { quantityUsed: e.target.value })}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeUsageRow(index)}
-                      className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className={`${inputCls} flex-1`}
+                        placeholder={product?.unit ? `Qtd. (${product.unit.toLowerCase()})` : 'Qtd.'}
+                        value={row.quantityUsed}
+                        onChange={(e) => updateUsageRow(index, { quantityUsed: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeUsageRow(index)}
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer shrink-0"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" {...register('active')} />
-              <div className="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#be8a83]"></div>
-            </label>
-            <span className="text-sm font-semibold text-[#3b3036]">Serviço Ativo</span>
           </div>
         </div>
       </ModalForm>

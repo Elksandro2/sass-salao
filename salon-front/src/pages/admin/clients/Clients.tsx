@@ -281,7 +281,7 @@ export const Clients = () => {
             )}
           </div>
           <div>
-            <label className={labelCls}>Telefone</label>
+            <label className={labelCls}>Telefone (opcional)</label>
             <input
               type="text"
               maxLength={20}
@@ -293,24 +293,16 @@ export const Clients = () => {
             )}
           </div>
           <div>
-            <label className={labelCls}>CPF</label>
+            <label className={labelCls}>CPF (opcional)</label>
             <input
               type="text"
               className={`input-premium ${errors.cpf ? 'border-rose-300 focus:border-rose-500' : ''}`}
               {...register('cpf')}
             />
+            <p className="text-xs text-gray-400 mt-1">Necessário só para pagamento via PIX.</p>
             {errors.cpf && (
               <span className="text-xs text-rose-500 font-semibold">{errors.cpf.message}</span>
             )}
-          </div>
-          <div className="flex items-center gap-3">
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" {...register('active')} />
-              <div className="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#be8a83]"></div>
-            </label>
-            <span className="text-sm font-semibold text-[#3b3036] dark:text-gray-200">
-              Conta Ativa
-            </span>
           </div>
         </div>
       </ModalForm>

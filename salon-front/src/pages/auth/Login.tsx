@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { getDefaultAdminPath } from '../../config/adminNav';
 import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff } from 'lucide-react';
@@ -20,6 +21,7 @@ export const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
+  const { enabled: selfRegistrationEnabled } = useFeatureFlag('ENABLE_SELF_REGISTRATION');
   const navigate = useNavigate();
   const location = useLocation();
   const passwordResetSuccess = Boolean((location.state as { passwordResetSuccess?: boolean } | null)?.passwordResetSuccess);
@@ -237,12 +239,14 @@ export const Login = () => {
               {isLoading ? 'Acessando...' : 'Entrar na minha conta'}
             </button>
 
-            <div className="text-center pt-4 text-sm">
-              <span className="text-[#7a7074]">Não tem uma conta? </span>
-              <Link to="/register" className="text-[#be8a83] font-semibold hover:underline">
-                Cadastre-se
-              </Link>
-            </div>
+            {selfRegistrationEnabled && (
+              <div className="text-center pt-4 text-sm">
+                <span className="text-[#7a7074]">Não tem uma conta? </span>
+                <Link to="/register" className="text-[#be8a83] font-semibold hover:underline">
+                  Cadastre-se
+                </Link>
+              </div>
+            )}
           </form>
         </div>
       </div>

@@ -114,20 +114,18 @@ export const CashFlow = () => {
     setCart([]);
     setProductSearch('');
     setServiceSearch('');
-    loadSuggestions(); // Refresh stock details from backend
+    loadSuggestions(); // Refresh product/service suggestions from backend
     setShowForm(true);
   };
 
   // Cart Helper Operations
   const addToCart = (product: ProductData) => {
-    if (!product.id || product.stock == null || product.stock <= 0) return;
+    if (!product.id) return;
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
         return prev.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: Math.min(item.quantity + 1, product.stock!) }
-            : item
+          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
       return [...prev, { product, quantity: 1 }];
@@ -144,8 +142,7 @@ export const CashFlow = () => {
     setCart((prev) =>
       prev.map((item) => {
         if (item.product.id === productId) {
-          const maxStock = item.product.stock || 0;
-          const newQty = Math.max(1, Math.min(qty, maxStock));
+          const newQty = Math.max(1, qty);
           return { ...item, quantity: newQty };
         }
         return item;
@@ -224,7 +221,7 @@ export const CashFlow = () => {
   const filteredProducts = products.filter((p) => {
     if (!productSearch) return false;
     const matchesName = p.name.toLowerCase().includes(productSearch.toLowerCase());
-    return matchesName && p.active && p.stock != null && p.stock > 0;
+    return matchesName && p.active;
   });
 
   const filteredServices = services.filter((s) => {
@@ -435,14 +432,13 @@ export const CashFlow = () => {
                         >
                           <span className="font-medium">{p.name}</span>
                           <span className="text-xs text-[#7a7074] group-hover:text-[#be8a83]">
-                            R$ {p.price.toFixed(2)} | Disponível:{' '}
-                            <strong className="text-emerald-600">{p.stock}</strong>
+                            R$ {p.price.toFixed(2)}
                           </span>
                         </button>
                       ))
                     ) : (
                       <div className="p-4 text-xs text-[#7a7074] text-center">
-                        Nenhum produto ativo com estoque encontrado
+                        Nenhum produto ativo encontrado
                       </div>
                     )}
                   </div>
@@ -465,10 +461,7 @@ export const CashFlow = () => {
                               {item.product.name}
                             </div>
                             <div className="text-xs text-[#7a7074] mt-0.5">
-                              Preço Unit.: R$ {item.product.price.toFixed(2)} |{' '}
-                              <span className="font-semibold text-emerald-600">
-                                Disponível: {item.product.stock}
-                              </span>
+                              Preço Unit.: R$ {item.product.price.toFixed(2)}
                             </div>
                           </div>
 
@@ -485,7 +478,6 @@ export const CashFlow = () => {
                                 type="number"
                                 value={item.quantity}
                                 min={1}
-                                max={item.product.stock}
                                 onChange={(e) =>
                                   updateCartQty(item.product.id!, parseInt(e.target.value) || 1)
                                 }

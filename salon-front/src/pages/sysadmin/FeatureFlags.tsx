@@ -4,6 +4,20 @@ import { getApiErrorMessage } from '../../utils/apiError';
 import { useAlert } from '../../hooks/useAlert';
 import { ShieldAlert, AlertCircle } from 'lucide-react';
 
+// Nomes legíveis em pt-BR pras flags conhecidas — só cosmético, pra não mostrar o
+// nome técnico (ex.: "ENABLE_SELF_REGISTRATION") como título do card. Uma flag nova
+// que ainda não está aqui continua aparecendo normalmente, só que com o nome técnico
+// como título (fallback abaixo) — a tela não deixa de ser dinâmica por causa disso.
+const FLAG_LABELS: Record<string, string> = {
+  EMAIL_NOTIFICATIONS: 'Notificações por E-mail',
+  CLIENT_BOOKING: 'Agendamento pelo Cliente',
+  ENABLE_CUSTOMER_PORTAL: 'Portal do Cliente',
+  ENABLE_AI_RECOMMENDATIONS: 'Recomendações de IA',
+  ENABLE_SELF_REGISTRATION: 'Auto-cadastro na Tela de Login',
+};
+
+const getFlagLabel = (name: string) => FLAG_LABELS[name] || name;
+
 export const FeatureFlags = () => {
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,8 +92,8 @@ export const FeatureFlags = () => {
             >
               <div>
                 <div className="flex justify-between items-start gap-4 mb-3">
-                  <span className="font-semibold text-[#3b3036] font-mono text-base break-all">
-                    {flag.name}
+                  <span className="font-semibold text-[#3b3036] text-base break-words">
+                    {getFlagLabel(flag.name)}
                   </span>
                   <span
                     className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 ${

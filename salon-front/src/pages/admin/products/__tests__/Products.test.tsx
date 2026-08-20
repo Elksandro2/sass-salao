@@ -27,8 +27,8 @@ vi.mock('../../../../hooks/useAlert', () => ({
 }));
 
 const mockProducts = [
-  { id: 1, name: 'Shampoo', price: 25.5, stock: 5, active: true },
-  { id: 2, name: 'Condicionador', price: 28.0, stock: 3, active: false },
+  { id: 1, name: 'Shampoo', price: 25.5, active: true },
+  { id: 2, name: 'Condicionador', price: 28.0, active: false },
 ];
 
 const mockPage = (content: typeof mockProducts) => ({
@@ -79,7 +79,6 @@ describe('Products Page', () => {
       id: 2,
       name: 'Condicionador',
       price: 28.0,
-      stock: 3,
       active: true,
     });
 
