@@ -14,20 +14,23 @@ public record AppointmentProfitResponse(
         BigDecimal serviceRecipeCost,
         /** Custo dos produtos vendidos (retail) neste atendimento. */
         BigDecimal productsSoldCost,
-        /** Comissão estimada da profissional sobre este atendimento específico. */
-        BigDecimal commissionCost,
+        /** Comissão estimada da profissional sobre os serviços deste atendimento. */
+        BigDecimal serviceCommissionCost,
+        /** Comissão estimada da profissional sobre os produtos vendidos neste atendimento. */
+        BigDecimal productCommissionCost,
         BigDecimal netProfit,
         boolean positive
 ) {
     public static AppointmentProfitResponse of(
             Long appointmentId, BigDecimal grossRevenue, BigDecimal serviceRecipeCost,
-            BigDecimal productsSoldCost, BigDecimal commissionCost) {
+            BigDecimal productsSoldCost, BigDecimal serviceCommissionCost, BigDecimal productCommissionCost) {
         BigDecimal netProfit = grossRevenue
                 .subtract(serviceRecipeCost)
                 .subtract(productsSoldCost)
-                .subtract(commissionCost);
+                .subtract(serviceCommissionCost)
+                .subtract(productCommissionCost);
         return new AppointmentProfitResponse(
-                appointmentId, grossRevenue, serviceRecipeCost, productsSoldCost, commissionCost,
-                netProfit, netProfit.signum() >= 0);
+                appointmentId, grossRevenue, serviceRecipeCost, productsSoldCost,
+                serviceCommissionCost, productCommissionCost, netProfit, netProfit.signum() >= 0);
     }
 }

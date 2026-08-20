@@ -691,7 +691,8 @@ class ReportServiceTest {
         assertEquals(new BigDecimal("100.00"), result.grossRevenue());
         assertEquals(BigDecimal.ZERO, result.serviceRecipeCost());
         assertEquals(BigDecimal.ZERO, result.productsSoldCost());
-        assertEquals(new BigDecimal("10.00"), result.commissionCost());
+        assertEquals(new BigDecimal("10.00"), result.serviceCommissionCost());
+        assertEquals(BigDecimal.ZERO, result.productCommissionCost());
         assertEquals(new BigDecimal("90.00"), result.netProfit());
         assertThat(result.positive()).isTrue();
     }
@@ -736,8 +737,46 @@ class ReportServiceTest {
 
         // custo = 40/1000 * 30 = 1.20; salário fixo não gera comissão por atendimento
         assertThat(result.serviceRecipeCost()).isEqualByComparingTo("1.20");
-        assertEquals(BigDecimal.ZERO, result.commissionCost());
+        assertEquals(BigDecimal.ZERO, result.serviceCommissionCost());
+        assertEquals(BigDecimal.ZERO, result.productCommissionCost());
         assertThat(result.netProfit()).isEqualByComparingTo("98.80");
+    }
+
+    @Test
+    void getAppointmentProfit_withProductSaleCommission_shouldReportItSeparatelyFromServiceCommission() {
+        Employee emp = new Employee();
+        emp.setId(1L);
+        User user = new User();
+        user.setName("Alice");
+        emp.setUser(user);
+        emp.setRemunerationType(RemunerationType.COMISSIONADO);
+        emp.setCommissionScope(CommissionScope.INDIVIDUAL);
+        emp.setRemunerationValue(new BigDecimal("10.00")); // 10% sobre serviços
+        emp.setProductCommissionValue(new BigDecimal("20.00")); // 20% sobre produtos vendidos
+
+        SalonService service = new SalonService();
+        service.setId(1L);
+        service.setPrice(new BigDecimal("100.00"));
+
+        com.cristiane.salon.models.product.entity.Product shampoo =
+                new com.cristiane.salon.models.product.entity.Product();
+        shampoo.setId(20L);
+        shampoo.setName("Shampoo");
+        shampoo.setPrice(new BigDecimal("50.00"));
+
+        Appointment apt = new Appointment();
+        apt.setId(5L);
+        apt.setEmployee(emp);
+        withService(apt, service);
+        withProduct(apt, new BigDecimal("50.00"), 1);
+
+        when(appointmentRepository.findById(5L)).thenReturn(java.util.Optional.of(apt));
+
+        AppointmentProfitResponse result = reportService.getAppointmentProfit(5L);
+
+        // Comissão de serviço = 10% de 100 = 10.00; comissão de produto = 20% de 50 = 10.00
+        assertThat(result.serviceCommissionCost()).isEqualByComparingTo("10.00");
+        assertThat(result.productCommissionCost()).isEqualByComparingTo("10.00");
     }
 
     @Test

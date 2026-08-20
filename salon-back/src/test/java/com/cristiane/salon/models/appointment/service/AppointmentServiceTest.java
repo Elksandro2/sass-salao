@@ -2025,14 +2025,37 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void updateServices_whenAppointmentAlreadyDone_shouldThrowBusinessException() {
+    void updateServices_whenAppointmentPaid_shouldThrowBusinessException() {
         Appointment apt = appointmentWithStatus(AppointmentStatus.DONE);
+        apt.setPaymentStatus(com.cristiane.salon.models.appointment.enums.PaymentStatus.PAID);
         when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
 
         var request = new AppointmentServiceRequest(8L, null, null);
 
         assertThatThrownBy(() -> appointmentService.updateServices(1L, List.of(request)))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void updateServices_whenDoneButNotPaid_shouldAllowEditingAndSyncCashFlowAmount() {
+        // Atendimento concluído mas ainda não pago já foi faturado no Caixa (todo DONE fatura) —
+        // editar os serviços agora precisa manter esse lançamento em dia com o novo total.
+        Appointment apt = appointmentWithStatus(AppointmentStatus.DONE);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        com.cristiane.salon.models.cashflow.entity.CashFlow existingEntry =
+                new com.cristiane.salon.models.cashflow.entity.CashFlow();
+        existingEntry.setAmount(new BigDecimal("100.00"));
+        when(cashFlowRepository.findByAppointmentId(1L)).thenReturn(Optional.of(existingEntry));
+
+        var request = new AppointmentServiceRequest(8L, new BigDecimal("150.00"), null);
+
+        AppointmentResponse result = appointmentService.updateServices(1L, List.of(request));
+
+        assertThat(result.totalPrice()).isEqualByComparingTo("150.00");
+        verify(cashFlowRepository).save(argThat(cf -> cf.getAmount().compareTo(new BigDecimal("150.00")) == 0));
     }
 
     @Test
@@ -2104,14 +2127,32 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void updateProducts_whenAppointmentAlreadyDone_shouldThrowBusinessException() {
+    void updateProducts_whenAppointmentManuallyPaid_shouldThrowBusinessException() {
         Appointment apt = appointmentWithStatus(AppointmentStatus.DONE);
+        apt.setPaymentStatus(com.cristiane.salon.models.appointment.enums.PaymentStatus.MANUAL);
         when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
 
         var request = new com.cristiane.salon.models.appointment.dto.AppointmentProductRequest(30L, 1, null);
 
         assertThatThrownBy(() -> appointmentService.updateProducts(1L, List.of(request)))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void updateProducts_whenDoneButNotPaid_shouldAllowAddingProductAfterConclusion() {
+        // Cenário real: cliente compra um produto na saída, depois que o atendimento já foi
+        // marcado como concluído mas antes de fechar o pagamento.
+        Appointment apt = appointmentWithStatus(AppointmentStatus.DONE);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(productRepository.findById(30L)).thenReturn(Optional.of(shampooProduct()));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(cashFlowRepository.findByAppointmentId(1L)).thenReturn(Optional.empty());
+
+        var request = new com.cristiane.salon.models.appointment.dto.AppointmentProductRequest(30L, 1, null);
+
+        AppointmentResponse result = appointmentService.updateProducts(1L, List.of(request));
+
+        assertThat(result.products()).hasSize(1);
     }
 
     @Test

@@ -14,7 +14,9 @@ public record ProductResponse(
         BigDecimal costPrice,
         BigDecimal capacity,
         ProductUnit unit,
-        BigDecimal unitCost
+        BigDecimal unitCost,
+        Boolean availableForSale,
+        Boolean usedInServiceRecipe
 ) {
     public static ProductResponse fromEntity(Product product) {
         return new ProductResponse(
@@ -26,7 +28,9 @@ public record ProductResponse(
                 product.getCostPrice(),
                 product.getCapacity(),
                 product.getUnit(),
-                product.getUnitCost()
+                product.getUnitCost(),
+                product.getAvailableForSale(),
+                product.getUsedInServiceRecipe()
         );
     }
 }

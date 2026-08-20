@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CashFlowRepository extends JpaRepository<CashFlow, Long> {
@@ -28,4 +29,8 @@ public interface CashFlowRepository extends JpaRepository<CashFlow, Long> {
     // (evita faturamento duplicado) — substitui um findAll().stream().anyMatch(...) que fazia
     // full table scan a cada confirmação de pagamento.
     boolean existsByAppointmentId(Long appointmentId);
+
+    // Usado pra manter o valor lançado no Caixa em dia quando produtos/serviços/despesas de um
+    // agendamento já faturado (mas ainda não pago) são editados — ver assertNotBilled.
+    Optional<CashFlow> findByAppointmentId(Long appointmentId);
 }

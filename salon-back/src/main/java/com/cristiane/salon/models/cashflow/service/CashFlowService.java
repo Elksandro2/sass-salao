@@ -13,6 +13,8 @@ import com.cristiane.salon.models.cashflow.dto.CashFlowItemRequest;
 import com.cristiane.salon.models.cashflow.entity.CashFlow;
 import com.cristiane.salon.models.cashflow.enums.CashFlowType;
 import com.cristiane.salon.models.cashflow.repository.CashFlowRepository;
+import com.cristiane.salon.models.employee.entity.Employee;
+import com.cristiane.salon.models.employee.repository.EmployeeRepository;
 import com.cristiane.salon.models.product.entity.Product;
 import com.cristiane.salon.models.product.repository.ProductRepository;
 import com.cristiane.salon.utils.DateRangeValidator;
@@ -35,6 +37,7 @@ public class CashFlowService {
     private final CashFlowRepository cashFlowRepository;
     private final AppointmentRepository appointmentRepository;
     private final ProductRepository productRepository;
+    private final EmployeeRepository employeeRepository;
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
     private final SalonClock salonClock;
@@ -87,6 +90,17 @@ public class CashFlowService {
             }
 
             cashFlow.setAmount(totalAmount);
+
+            if (request.employeeId() != null) {
+                Employee employee = employeeRepository.findById(request.employeeId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Funcionária não encontrada"));
+                cashFlow.setEmployee(employee);
+                if (employee.getProductCommissionValue() != null) {
+                    cashFlow.setCommissionAmount(
+                            totalAmount.multiply(employee.getProductCommissionValue())
+                                    .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP));
+                }
+            }
 
             String itemsSummary = String.join(", ", itemDescriptions);
             String desc = request.description();

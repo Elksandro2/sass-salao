@@ -42,6 +42,8 @@ public class ProductService {
         product.setCostPrice(request.costPrice());
         product.setCapacity(request.capacity());
         product.setUnit(request.unit());
+        product.setAvailableForSale(request.availableForSale() != null ? request.availableForSale() : true);
+        product.setUsedInServiceRecipe(request.usedInServiceRecipe() != null ? request.usedInServiceRecipe() : true);
 
         return ProductResponse.fromEntity(productRepository.save(product));
     }
@@ -54,6 +56,8 @@ public class ProductService {
         if (request.name() != null) product.setName(request.name());
         if (request.price() != null) product.setPrice(request.price());
         if (request.active() != null) product.setActive(request.active());
+        if (request.availableForSale() != null) product.setAvailableForSale(request.availableForSale());
+        if (request.usedInServiceRecipe() != null) product.setUsedInServiceRecipe(request.usedInServiceRecipe());
         product.setBrand(blankToNull(request.brand()));
         product.setCostPrice(request.costPrice());
         product.setCapacity(request.capacity());

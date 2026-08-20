@@ -63,7 +63,7 @@ class CashFlowControllerTest extends BaseControllerTest {
     @Test
     @WithMockUser
     void findByPeriodReturns200() throws Exception {
-        CashFlowResponse response = new CashFlowResponse(1L, "INCOME", new BigDecimal("100.0"), "Desc", LocalDate.now(), null);
+        CashFlowResponse response = new CashFlowResponse(1L, "INCOME", new BigDecimal("100.0"), "Desc", LocalDate.now(), null, null, null, null);
         org.springframework.data.domain.Page<CashFlowResponse> page =
                 new org.springframework.data.domain.PageImpl<>(List.of(response));
         when(cashFlowService.findByPeriod(any(), any(), any())).thenReturn(page);

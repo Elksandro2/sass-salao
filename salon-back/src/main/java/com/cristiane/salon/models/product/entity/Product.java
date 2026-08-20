@@ -47,6 +47,16 @@ public class Product {
     @Column(length = 10)
     private ProductUnit unit;
 
+    // --- Controla em qual seletor o produto aparece: um shampoo pra levar pra casa não deveria
+    // poluir o seletor de receita de serviço, e uma tintura só de uso interno não deveria
+    // aparecer pra venda avulsa. Os dois podem estar marcados ao mesmo tempo. ---
+
+    @Column(name = "available_for_sale", nullable = false)
+    private Boolean availableForSale = true;
+
+    @Column(name = "used_in_service_recipe", nullable = false)
+    private Boolean usedInServiceRecipe = true;
+
     /** Custo por unidade de {@link #unit} — null se custo ou capacidade não estiverem cadastrados. */
     public BigDecimal getUnitCost() {
         if (costPrice == null || capacity == null || capacity.signum() <= 0) {

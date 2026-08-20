@@ -20,6 +20,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -53,6 +54,9 @@ class CashFlowServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private com.cristiane.salon.models.employee.repository.EmployeeRepository employeeRepository;
 
     @Mock
     private AuditLogService auditLogService;
@@ -187,7 +191,7 @@ class CashFlowServiceTest {
     void create_whenSaleAndTypeIsNotIncome_shouldThrowBadRequestException() {
         // Arrange
         CashFlowItemRequest item = new CashFlowItemRequest(1L, 2);
-        CashFlowRequest request = new CashFlowRequest("EXPENSE", BigDecimal.ZERO, "desc", salonClock.today(), null, List.of(item));
+        CashFlowRequest request = new CashFlowRequest("EXPENSE", BigDecimal.ZERO, "desc", salonClock.today(), null, List.of(item), null);
 
         // Act & Assert
         assertThatThrownBy(() -> cashFlowService.create(request))
@@ -199,7 +203,7 @@ class CashFlowServiceTest {
     void create_whenSaleAndProductNotFound_shouldThrowResourceNotFoundException() {
         // Arrange
         CashFlowItemRequest item = new CashFlowItemRequest(99L, 2);
-        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "desc", salonClock.today(), null, List.of(item));
+        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "desc", salonClock.today(), null, List.of(item), null);
         when(productRepository.findById(99L)).thenReturn(Optional.empty());
 
         // Act & Assert
@@ -212,7 +216,7 @@ class CashFlowServiceTest {
     void create_whenSaleAndProductInactive_shouldThrowBadRequestException() {
         // Arrange
         CashFlowItemRequest item = new CashFlowItemRequest(2L, 2);
-        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "desc", salonClock.today(), null, List.of(item));
+        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "desc", salonClock.today(), null, List.of(item), null);
         when(productRepository.findById(2L)).thenReturn(Optional.of(inactiveProduct));
 
         // Act & Assert
@@ -225,7 +229,7 @@ class CashFlowServiceTest {
     void create_whenSaleSuccessAndDefaultDescription_shouldSaveAndAudit() {
         // Arrange
         CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2); // 2 * 50 = 100
-        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "Venda de Produtos", salonClock.today(), null, List.of(item1));
+        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "Venda de Produtos", salonClock.today(), null, List.of(item1), null);
         when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
 
         CashFlow saved = new CashFlow();
@@ -270,10 +274,52 @@ class CashFlowServiceTest {
     }
 
     @Test
+    void create_whenSaleWithEmployee_shouldCalculateAndPersistCommission() {
+        // Arrange: venda de 2x Shampoo (R$50 cada = R$100), funcionária com 20% de comissão em produtos
+        CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2);
+        CashFlowRequest request = new CashFlowRequest(
+                "INCOME", BigDecimal.ZERO, "Venda de Produtos", salonClock.today(), null, List.of(item1), 7L);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
+
+        com.cristiane.salon.models.employee.entity.Employee employee =
+                new com.cristiane.salon.models.employee.entity.Employee();
+        employee.setId(7L);
+        employee.setProductCommissionValue(new BigDecimal("20.00"));
+        User employeeUser = new User();
+        employeeUser.setName("Valcleide");
+        employee.setUser(employeeUser);
+        when(employeeRepository.findById(7L)).thenReturn(Optional.of(employee));
+
+        when(cashFlowRepository.save(any(CashFlow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        cashFlowService.create(request);
+
+        // Assert: comissão = 20% de 100 = 20.00
+        ArgumentCaptor<CashFlow> captor = ArgumentCaptor.forClass(CashFlow.class);
+        verify(cashFlowRepository).save(captor.capture());
+        assertThat(captor.getValue().getEmployee()).isEqualTo(employee);
+        assertThat(captor.getValue().getCommissionAmount()).isEqualByComparingTo("20.00");
+    }
+
+    @Test
+    void create_whenSaleWithUnknownEmployee_shouldThrowResourceNotFoundException() {
+        CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2);
+        CashFlowRequest request = new CashFlowRequest(
+                "INCOME", BigDecimal.ZERO, "Venda de Produtos", salonClock.today(), null, List.of(item1), 99L);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
+        when(employeeRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> cashFlowService.create(request))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Funcionária não encontrada");
+    }
+
+    @Test
     void create_whenSaleSuccessAndCustomDescription_shouldConcatenateItemsDescription() {
         // Arrange
         CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 1);
-        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "Venda especial", salonClock.today(), null, List.of(item1));
+        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "Venda especial", salonClock.today(), null, List.of(item1), null);
         when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
 
         CashFlow saved = new CashFlow();
@@ -297,7 +343,7 @@ class CashFlowServiceTest {
     @Test
     void create_whenNoItemsAndInvalidType_shouldThrowBadRequestException() {
         // Arrange
-        CashFlowRequest request = new CashFlowRequest("INVALID", BigDecimal.TEN, "desc", salonClock.today(), null, null);
+        CashFlowRequest request = new CashFlowRequest("INVALID", BigDecimal.TEN, "desc", salonClock.today(), null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> cashFlowService.create(request))
@@ -308,7 +354,7 @@ class CashFlowServiceTest {
     @Test
     void create_whenNoItemsAndAppointmentNotFound_shouldThrowResourceNotFoundException() {
         // Arrange
-        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.TEN, "desc", salonClock.today(), 99L, null);
+        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.TEN, "desc", salonClock.today(), 99L, null, null);
         when(appointmentRepository.findById(99L)).thenReturn(Optional.empty());
 
         // Act & Assert
@@ -322,7 +368,7 @@ class CashFlowServiceTest {
         // Arrange
         Appointment app = new Appointment();
         app.setId(5L);
-        CashFlowRequest request = new CashFlowRequest("EXPENSE", BigDecimal.TEN, "desc", salonClock.today(), 5L, null);
+        CashFlowRequest request = new CashFlowRequest("EXPENSE", BigDecimal.TEN, "desc", salonClock.today(), 5L, null, null);
         when(appointmentRepository.findById(5L)).thenReturn(Optional.of(app));
 
         CashFlow saved = new CashFlow();
@@ -358,7 +404,7 @@ class CashFlowServiceTest {
     @Test
     void create_whenAuditLogThrowsException_shouldSilentFail() {
         // Arrange
-        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.TEN, "desc", salonClock.today(), null, null);
+        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.TEN, "desc", salonClock.today(), null, null, null);
         CashFlow saved = new CashFlow();
         saved.setId(60L);
         saved.setType(CashFlowType.INCOME);

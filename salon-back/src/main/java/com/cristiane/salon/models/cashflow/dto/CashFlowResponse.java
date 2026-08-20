@@ -10,7 +10,11 @@ public record CashFlowResponse(
         BigDecimal amount,
         String description,
         LocalDate date,
-        Long appointmentId
+        Long appointmentId,
+        Long employeeId,
+        String employeeName,
+        /** Comissão da venda avulsa de produto, se um vendedor foi informado. */
+        BigDecimal commissionAmount
 ) {
     public static CashFlowResponse fromEntity(CashFlow cashFlow) {
         return new CashFlowResponse(
@@ -19,7 +23,10 @@ public record CashFlowResponse(
                 cashFlow.getAmount(),
                 cashFlow.getDescription(),
                 cashFlow.getDate(),
-                cashFlow.getAppointment() != null ? cashFlow.getAppointment().getId() : null
+                cashFlow.getAppointment() != null ? cashFlow.getAppointment().getId() : null,
+                cashFlow.getEmployee() != null ? cashFlow.getEmployee().getId() : null,
+                cashFlow.getEmployee() != null ? cashFlow.getEmployee().getUser().getName() : null,
+                cashFlow.getCommissionAmount()
         );
     }
 }

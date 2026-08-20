@@ -30,5 +30,11 @@ public record ProductRequest(
         @DecimalMin(value = "0.01", message = "A capacidade deve ser maior que zero")
         BigDecimal capacity,
 
-        ProductUnit unit
+        ProductUnit unit,
+
+        /** Aparece no seletor de venda avulsa (Fluxo de Caixa) e de produtos vendidos no atendimento. */
+        Boolean availableForSale,
+
+        /** Aparece no seletor de receita de serviço (quanto o serviço consome). */
+        Boolean usedInServiceRecipe
 ) {}

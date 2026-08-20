@@ -345,17 +345,32 @@ public class AppointmentService {
     }
 
     /**
-     * Depois que o atendimento foi faturado (DONE ou pago), produtos/despesas não podem mais
-     * mudar — o valor já foi lançado no Caixa/PIX e recalcular por baixo criaria divergência
-     * silenciosa entre o que foi cobrado e o que o agendamento mostra.
+     * O que trava a edição é o PAGAMENTO já ter acontecido (PAID, via plataforma, ou MANUAL,
+     * confirmado pela equipe fora da plataforma) — não o status do agendamento em si. Um
+     * atendimento marcado DONE mas ainda não pago continua editável (ex.: cliente comprou mais
+     * um produto na saída, antes de fechar a conta); se ele já tiver sido faturado no Caixa
+     * nesse meio tempo (todo DONE fatura, ver billAppointmentOnce), o valor lançado é
+     * resincronizado com o novo total logo após a edição — ver syncCashFlowAmountIfAlreadyBilled.
      */
     private void assertNotBilled(Appointment appointment, String acao) {
         if (appointment.getStatus() == AppointmentStatus.CANCELLED) {
             throw new BusinessException("Não é possível " + acao + " um agendamento cancelado.");
         }
-        if (appointment.getStatus() == AppointmentStatus.DONE || appointment.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new BusinessException("Não é possível " + acao + " depois que o atendimento foi concluído ou pago.");
+        if (appointment.getPaymentStatus() == PaymentStatus.PAID || appointment.getPaymentStatus() == PaymentStatus.MANUAL) {
+            throw new BusinessException("Não é possível " + acao + " depois que o atendimento foi pago.");
         }
+    }
+
+    /**
+     * Se este agendamento já tinha sido faturado no Caixa (por ter passado por DONE antes desta
+     * edição), mantém o valor lançado em dia com o novo total — sem isso, editar produtos/
+     * despesas depois do DONE reintroduziria a divergência que assertNotBilled existe pra evitar.
+     */
+    private void syncCashFlowAmountIfAlreadyBilled(Appointment appointment) {
+        cashFlowRepository.findByAppointmentId(appointment.getId()).ifPresent(cashFlow -> {
+            cashFlow.setAmount(appointment.getGrandTotal());
+            cashFlowRepository.save(cashFlow);
+        });
     }
 
     /**
@@ -395,6 +410,7 @@ public class AppointmentService {
         appointment.getServices().addAll(buildServiceItems(appointment, serviceRequests, resolvedServices, true));
 
         Appointment saved = appointmentRepository.save(appointment);
+        syncCashFlowAmountIfAlreadyBilled(saved);
         return AppointmentResponse.fromEntity(saved);
     }
 
@@ -409,6 +425,7 @@ public class AppointmentService {
         appointment.getProducts().addAll(buildProductItems(appointment, productRequests));
 
         Appointment saved = appointmentRepository.save(appointment);
+        syncCashFlowAmountIfAlreadyBilled(saved);
         return AppointmentResponse.fromEntity(saved);
     }
 
@@ -423,6 +440,7 @@ public class AppointmentService {
         appointment.getExpenses().addAll(buildExpenseItems(appointment, expenseRequests));
 
         Appointment saved = appointmentRepository.save(appointment);
+        syncCashFlowAmountIfAlreadyBilled(saved);
         return AppointmentResponse.fromEntity(saved);
     }
 

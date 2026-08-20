@@ -103,22 +103,26 @@ public class ReportService {
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal commissionCost = calculateAppointmentCommission(appointment);
+        CommissionBreakdown commission = calculateAppointmentCommission(appointment);
 
         return AppointmentProfitResponse.of(
-                appointment.getId(), grossRevenue, recipeCost, productsSoldCost, commissionCost);
+                appointment.getId(), grossRevenue, recipeCost, productsSoldCost,
+                commission.serviceCommission(), commission.productCommission());
     }
+
+    /** Comissão sobre serviços separada da comissão sobre produtos vendidos — a Cristiane quer ver quanto cada uma pesa isoladamente. */
+    private record CommissionBreakdown(BigDecimal serviceCommission, BigDecimal productCommission) {}
 
     /**
      * Comissão estimada da profissional sobre ESTE atendimento — trata a comissão como se fosse
      * sempre individual (não dá pra atribuir comissão GLOBAL a um único atendimento de forma
      * exata); é uma estimativa pra dar noção de margem, não o valor exato da folha.
      */
-    private BigDecimal calculateAppointmentCommission(Appointment appointment) {
+    private CommissionBreakdown calculateAppointmentCommission(Appointment appointment) {
         Employee employee = appointment.getEmployee();
         if (employee == null || employee.getRemunerationType() == null
                 || employee.getRemunerationType() == RemunerationType.SALARIO_FIXO) {
-            return BigDecimal.ZERO;
+            return new CommissionBreakdown(BigDecimal.ZERO, BigDecimal.ZERO);
         }
 
         BigDecimal servicePct = employee.getRemunerationType() == RemunerationType.COMISSIONADO
@@ -135,7 +139,7 @@ public class ReportService {
                         .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
-        return serviceCommission.add(productCommission);
+        return new CommissionBreakdown(serviceCommission, productCommission);
     }
 
     /**

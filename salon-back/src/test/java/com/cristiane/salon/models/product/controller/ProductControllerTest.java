@@ -60,7 +60,7 @@ class ProductControllerTest extends BaseControllerTest {
     @Test
     @WithMockUser
     void reactivateReturns200() throws Exception {
-        ProductResponse dummyResponse = new ProductResponse(1L, "XYZ", new BigDecimal("10.0"), true, null, null, null, null, null);
+        ProductResponse dummyResponse = new ProductResponse(1L, "XYZ", new BigDecimal("10.0"), true, null, null, null, null, null, null, null);
         when(productService.reactivate(any())).thenReturn(dummyResponse);
 
         mvc.perform(patch("/v1/products/1/reactivate"))
@@ -70,7 +70,7 @@ class ProductControllerTest extends BaseControllerTest {
     @Test
     @WithMockUser
     void findAllReturnsPageOfProducts() throws Exception {
-        ProductResponse response = new ProductResponse(1L, "Hair Spray", new BigDecimal("15.50"), true, null, null, null, null, null);
+        ProductResponse response = new ProductResponse(1L, "Hair Spray", new BigDecimal("15.50"), true, null, null, null, null, null, null, null);
         org.springframework.data.domain.Page<ProductResponse> page =
                 new org.springframework.data.domain.PageImpl<>(List.of(response));
         when(productService.findAll(any(), any())).thenReturn(page);
@@ -85,7 +85,7 @@ class ProductControllerTest extends BaseControllerTest {
     @Test
     @WithMockUser
     void findByIdReturnsProduct() throws Exception {
-        ProductResponse response = new ProductResponse(2L, "Shampoo", new BigDecimal("25.00"), true, null, null, null, null, null);
+        ProductResponse response = new ProductResponse(2L, "Shampoo", new BigDecimal("25.00"), true, null, null, null, null, null, null, null);
         when(productService.findById(eq(2L))).thenReturn(response);
 
         mvc.perform(get("/v1/products/2")
@@ -97,7 +97,7 @@ class ProductControllerTest extends BaseControllerTest {
     @Test
     @WithMockUser
     void updateReturnsUpdatedProduct() throws Exception {
-        ProductResponse response = new ProductResponse(2L, "New Shampoo", new BigDecimal("28.00"), true, null, null, null, null, null);
+        ProductResponse response = new ProductResponse(2L, "New Shampoo", new BigDecimal("28.00"), true, null, null, null, null, null, null, null);
         when(productService.update(eq(2L), any())).thenReturn(response);
 
         String body = "{\"name\":\"New Shampoo\",\"price\":28.00}";

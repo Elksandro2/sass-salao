@@ -25,5 +25,8 @@ public record CashFlowRequest(
         
         Long appointmentId,
 
-        List<CashFlowItemRequest> items
+        List<CashFlowItemRequest> items,
+
+        /** Quem vendeu, numa venda avulsa de produto — opcional, usado só pra calcular comissão. */
+        Long employeeId
 ) {}

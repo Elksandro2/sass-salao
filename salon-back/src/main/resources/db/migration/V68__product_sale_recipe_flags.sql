@@ -1,0 +1,2 @@
+ALTER TABLE tb_product ADD COLUMN available_for_sale BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE tb_product ADD COLUMN used_in_service_recipe BOOLEAN NOT NULL DEFAULT TRUE;
