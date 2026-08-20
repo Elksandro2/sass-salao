@@ -31,6 +31,7 @@ import { Reports } from './pages/admin/reports/Reports';
 import { AuditLog } from './pages/admin/audit/AuditLog';
 import { NotFound } from './pages/error/NotFound';
 import { Profile } from './pages/profile/Profile';
+import { AdminProfile } from './pages/admin/profile/AdminProfile';
 import { featureFlagsService } from './services/featureFlags';
 import { useAuth } from './hooks/useAuth';
 import { usePushNotification } from './hooks/usePushNotification';
@@ -229,6 +230,14 @@ export const Router = () => {
           element={
             <ProtectedRoute allowedRoles={['ADMIN']}>
               <SalonProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/profile"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE_DE_ATENDIMENTO', 'FUNCIONARIA']}>
+              <AdminProfile />
             </ProtectedRoute>
           }
         />

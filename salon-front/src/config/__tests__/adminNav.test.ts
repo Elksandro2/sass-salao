@@ -13,9 +13,9 @@ describe('adminNav', () => {
     });
   });
 
-  it('FUNCIONARIA only sees the Agendamentos item', () => {
+  it('FUNCIONARIA only sees the Agendamentos and Meu Perfil items', () => {
     const visible = getVisibleAdminNavItems('FUNCIONARIA');
-    expect(visible.map((i) => i.to)).toEqual(['/admin/appointments']);
+    expect(visible.map((i) => i.to)).toEqual(['/admin/appointments', '/admin/profile']);
   });
 
   it('ADMIN sees every configured nav item', () => {

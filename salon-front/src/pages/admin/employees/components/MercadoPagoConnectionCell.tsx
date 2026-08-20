@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link2, Link2Off, Loader2 } from 'lucide-react';
+import { Link2, Link2Off, Loader2, Copy } from 'lucide-react';
 import { employeeMercadoPagoApi } from '../services/mercadoPago';
 import { PermissionGate } from '../../../../components/permissions/PermissionGate';
 import { useAlert } from '../../../../hooks/useAlert';
@@ -15,7 +15,8 @@ interface MercadoPagoConnectionCellProps {
 export const MercadoPagoConnectionCell = ({ employeeId, splitApplicable }: MercadoPagoConnectionCellProps) => {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const { error: showError, confirm } = useAlert();
+  const { error: showError, success: showSuccess, confirm } = useAlert();
+  const [isCopying, setIsCopying] = useState(false);
 
   const loadStatus = async () => {
     try {
@@ -40,6 +41,21 @@ export const MercadoPagoConnectionCell = ({ employeeId, splitApplicable }: Merca
     } catch (err) {
       await showError(getApiErrorMessage(err, 'Erro ao gerar link de conexão com o Mercado Pago'));
       setIsBusy(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    setIsCopying(true);
+    try {
+      const { authorizationUrl } = await employeeMercadoPagoApi.connect(employeeId);
+      await navigator.clipboard.writeText(authorizationUrl);
+      await showSuccess(
+        'Link copiado! Mande pra funcionária (WhatsApp, etc.) — ela abre no próprio celular e loga na conta Mercado Pago dela. O link expira em pouco tempo, então é melhor enviar na hora.'
+      );
+    } catch (err) {
+      await showError(getApiErrorMessage(err, 'Erro ao gerar/copiar o link de conexão'));
+    } finally {
+      setIsCopying(false);
     }
   };
 
@@ -95,14 +111,24 @@ export const MercadoPagoConnectionCell = ({ employeeId, splitApplicable }: Merca
       endpoint={`/v1/employees/${employeeId}/mercadopago/connect`}
       fallback={<span className="text-3xs text-gray-400">Não conectada</span>}
     >
-      <button
-        onClick={handleConnect}
-        disabled={isBusy}
-        className="inline-flex items-center gap-1 px-2 py-1 text-3xs font-semibold text-[#be8a83] border border-[#be8a83]/40 hover:bg-[#be8a83]/5 rounded-lg transition-all cursor-pointer disabled:opacity-50"
-      >
-        {isBusy ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
-        Conectar Mercado Pago
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={handleConnect}
+          disabled={isBusy || isCopying}
+          className="inline-flex items-center gap-1 px-2 py-1 text-3xs font-semibold text-[#be8a83] border border-[#be8a83]/40 hover:bg-[#be8a83]/5 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+        >
+          {isBusy ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
+          Conectar Mercado Pago
+        </button>
+        <button
+          onClick={handleCopyLink}
+          disabled={isBusy || isCopying}
+          title="Copiar link pra mandar pra funcionária conectar sozinha (WhatsApp, etc.)"
+          className="p-1.5 text-[#7a7074] hover:bg-gray-50 border border-gray-200 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+        >
+          {isCopying ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}
+        </button>
+      </div>
     </PermissionGate>
   );
 };

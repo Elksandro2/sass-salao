@@ -12,6 +12,7 @@ import {
   Mail,
   Store,
   StickyNote,
+  CircleUser,
 } from 'lucide-react';
 
 export interface AdminNavItem {
@@ -39,6 +40,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { to: '/admin/recommendations', label: 'Recomendações de IA', icon: Lightbulb, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
   { to: '/admin/email-outbox', label: 'Central de E-mails', icon: Mail, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
   { to: '/admin/salon-profile', label: 'Perfil do Salão', icon: Store, allowedRoles: ['ADMIN'] },
+  { to: '/admin/profile', label: 'Meu Perfil', icon: CircleUser, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO', 'FUNCIONARIA'] },
 ];
 
 /** SYSADMIN tem bypass total no ProtectedRoute/AdminLayout, então enxerga tudo. */
