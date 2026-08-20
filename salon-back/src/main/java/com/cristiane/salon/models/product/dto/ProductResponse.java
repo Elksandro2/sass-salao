@@ -8,7 +8,6 @@ import java.math.BigDecimal;
 public record ProductResponse(
         Long id,
         String name,
-        Integer stock,
         BigDecimal price,
         Boolean active,
         String brand,
@@ -21,7 +20,6 @@ public record ProductResponse(
         return new ProductResponse(
                 product.getId(),
                 product.getName(),
-                product.getStock(),
                 product.getPrice(),
                 product.getActive(),
                 product.getBrand(),

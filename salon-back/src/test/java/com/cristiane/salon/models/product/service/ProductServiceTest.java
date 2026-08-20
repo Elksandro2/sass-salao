@@ -40,8 +40,8 @@ class ProductServiceTest {
     @Test
     void findAll_shouldReturnPageFromRepository() {
         // Arrange
-        Product p1 = new Product(1L, "P1", 5, new BigDecimal("10.0"), true, null, null, null, null);
-        Product p2 = new Product(2L, "P2", 2, new BigDecimal("20.0"), false, null, null, null, null);
+        Product p1 = new Product(1L, "P1", new BigDecimal("10.0"), true, null, null, null, null);
+        Product p2 = new Product(2L, "P2", new BigDecimal("20.0"), false, null, null, null, null);
         Pageable pageable = PageRequest.of(0, 10);
         Page<Product> page = new PageImpl<>(Arrays.asList(p1, p2));
         when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
@@ -60,7 +60,7 @@ class ProductServiceTest {
     void findById_shouldReturnProduct_whenProductExists() {
         // Arrange
         Long id = 1L;
-        Product p = new Product(id, "P", 5, new BigDecimal("10.0"), true, null, null, null, null);
+        Product p = new Product(id, "P", new BigDecimal("10.0"), true, null, null, null, null);
         when(productRepository.findById(id)).thenReturn(Optional.of(p));
 
         // Act
@@ -86,8 +86,8 @@ class ProductServiceTest {
     @Test
     void create_shouldSaveProductWithDefaultValues_whenRequestFieldsAreNull() {
         // Arrange
-        ProductRequest request = new ProductRequest("New Product", null, new BigDecimal("15.0"), null, null, null, null, null);
-        Product saved = new Product(1L, "New Product", 0, new BigDecimal("15.0"), true, null, null, null, null);
+        ProductRequest request = new ProductRequest("New Product", new BigDecimal("15.0"), null, null, null, null, null);
+        Product saved = new Product(1L, "New Product", new BigDecimal("15.0"), true, null, null, null, null);
         when(productRepository.save(any(Product.class))).thenReturn(saved);
 
         // Act
@@ -96,12 +96,10 @@ class ProductServiceTest {
         // Assert
         assertThat(result).isNotNull();
         assertThat(result.id()).isEqualTo(1L);
-        assertThat(result.stock()).isEqualTo(0);
         assertThat(result.active()).isTrue();
 
-        verify(productRepository).save(argThat(product -> 
+        verify(productRepository).save(argThat(product ->
                 product.getName().equals("New Product") &&
-                product.getStock() == 0 &&
                 product.getPrice().equals(new BigDecimal("15.0")) &&
                 product.getActive()
         ));
@@ -110,8 +108,8 @@ class ProductServiceTest {
     @Test
     void create_shouldSaveProductWithSpecifiedValues_whenRequestFieldsAreProvided() {
         // Arrange
-        ProductRequest request = new ProductRequest("Custom Product", 10, new BigDecimal("15.0"), false, null, null, null, null);
-        Product saved = new Product(1L, "Custom Product", 10, new BigDecimal("15.0"), false, null, null, null, null);
+        ProductRequest request = new ProductRequest("Custom Product", new BigDecimal("15.0"), false, null, null, null, null);
+        Product saved = new Product(1L, "Custom Product", new BigDecimal("15.0"), false, null, null, null, null);
         when(productRepository.save(any(Product.class))).thenReturn(saved);
 
         // Act
@@ -119,7 +117,6 @@ class ProductServiceTest {
 
         // Assert
         assertThat(result).isNotNull();
-        assertThat(result.stock()).isEqualTo(10);
         assertThat(result.active()).isFalse();
     }
 
@@ -127,7 +124,7 @@ class ProductServiceTest {
     void update_shouldThrowResourceNotFoundException_whenProductDoesNotExist() {
         // Arrange
         Long id = 1L;
-        ProductRequest request = new ProductRequest("Updated", 5, new BigDecimal("20.0"), true, null, null, null, null);
+        ProductRequest request = new ProductRequest("Updated", new BigDecimal("20.0"), true, null, null, null, null);
         when(productRepository.findById(id)).thenReturn(Optional.empty());
 
         // Act & Assert
@@ -139,10 +136,10 @@ class ProductServiceTest {
     void update_shouldOnlyUpdateNonNullFields() {
         // Arrange
         Long id = 1L;
-        Product product = new Product(id, "Old Name", 10, new BigDecimal("10.0"), true, null, null, null, null);
-        ProductRequest request = new ProductRequest("New Name", null, new BigDecimal("12.0"), null, null, null, null, null);
+        Product product = new Product(id, "Old Name", new BigDecimal("10.0"), true, null, null, null, null);
+        ProductRequest request = new ProductRequest("New Name", new BigDecimal("12.0"), null, null, null, null, null);
 
-        Product saved = new Product(id, "New Name", 10, new BigDecimal("12.0"), true, null, null, null, null);
+        Product saved = new Product(id, "New Name", new BigDecimal("12.0"), true, null, null, null, null);
         when(productRepository.findById(id)).thenReturn(Optional.of(product));
         when(productRepository.save(any(Product.class))).thenReturn(saved);
 
@@ -152,13 +149,11 @@ class ProductServiceTest {
         // Assert
         assertThat(result).isNotNull();
         assertThat(result.name()).isEqualTo("New Name");
-        assertThat(result.stock()).isEqualTo(10);
         assertThat(result.price()).isEqualTo(new BigDecimal("12.0"));
         assertThat(result.active()).isTrue();
 
-        verify(productRepository).save(argThat(p -> 
+        verify(productRepository).save(argThat(p ->
                 p.getName().equals("New Name") &&
-                p.getStock() == 10 &&
                 p.getPrice().equals(new BigDecimal("12.0")) &&
                 p.getActive()
         ));
@@ -168,7 +163,7 @@ class ProductServiceTest {
     void delete_shouldMarkProductAsInactive() {
         // Arrange
         Long id = 1L;
-        Product product = new Product(id, "P", 5, new BigDecimal("10.0"), true, null, null, null, null);
+        Product product = new Product(id, "P", new BigDecimal("10.0"), true, null, null, null, null);
         when(productRepository.findById(id)).thenReturn(Optional.of(product));
 
         // Act
@@ -194,8 +189,8 @@ class ProductServiceTest {
     void reactivate_shouldMarkProductAsActive() {
         // Arrange
         Long id = 1L;
-        Product product = new Product(id, "P", 5, new BigDecimal("10.0"), false, null, null, null, null);
-        Product saved = new Product(id, "P", 5, new BigDecimal("10.0"), true, null, null, null, null);
+        Product product = new Product(id, "P", new BigDecimal("10.0"), false, null, null, null, null);
+        Product saved = new Product(id, "P", new BigDecimal("10.0"), true, null, null, null, null);
 
         when(productRepository.findById(id)).thenReturn(Optional.of(product));
         when(productRepository.save(product)).thenReturn(saved);

@@ -1440,9 +1440,9 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void updateStatus_whenStatusDoneWithProducts_shouldBillGrandTotalAndDeductStock() {
+    void updateStatus_whenStatusDoneWithProducts_shouldBillGrandTotal() {
         // Arrange: agendamento com serviço (R$100) + 2 unidades de um produto (R$50 cada) —
-        // o valor faturado deve ser a soma (R$200), e o estoque do produto deve baixar em 2.
+        // o valor faturado deve ser a soma (R$200).
         Appointment apt = new Appointment();
         apt.setId(1L);
         apt.setScheduledAt(salonClock.now().plusDays(1));
@@ -1467,9 +1467,6 @@ class AppointmentServiceTest {
         ArgumentCaptor<CashFlow> cashFlowCaptor = ArgumentCaptor.forClass(CashFlow.class);
         verify(cashFlowRepository).save(cashFlowCaptor.capture());
         assertThat(cashFlowCaptor.getValue().getAmount()).isEqualByComparingTo("200.00");
-
-        assertThat(product.getStock()).isEqualTo(8);
-        verify(productRepository).save(product);
     }
 
     @Test
@@ -1975,7 +1972,6 @@ class AppointmentServiceTest {
         product.setId(30L);
         product.setName("Shampoo");
         product.setPrice(new BigDecimal("50.00"));
-        product.setStock(10);
         product.setActive(true);
         return product;
     }

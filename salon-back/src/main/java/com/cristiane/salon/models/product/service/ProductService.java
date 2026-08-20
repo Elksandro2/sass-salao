@@ -36,7 +36,6 @@ public class ProductService {
     public ProductResponse create(ProductRequest request) {
         Product product = new Product();
         product.setName(request.name());
-        product.setStock(request.stock() != null ? request.stock() : 0);
         product.setPrice(request.price());
         product.setActive(request.active() != null ? request.active() : true);
         product.setBrand(blankToNull(request.brand()));
@@ -53,7 +52,6 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Produto não encontrado"));
 
         if (request.name() != null) product.setName(request.name());
-        if (request.stock() != null) product.setStock(request.stock());
         if (request.price() != null) product.setPrice(request.price());
         if (request.active() != null) product.setActive(request.active());
         product.setBrand(blankToNull(request.brand()));

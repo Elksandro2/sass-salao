@@ -818,20 +818,9 @@ public class AppointmentService {
             cashFlow.setDate(salonClock.today());
             cashFlow.setAppointment(appointment);
             cashFlowRepository.save(cashFlow);
-            deductProductStock(appointment);
         } catch (DataIntegrityViolationException e) {
             log.warn("Agendamento {} já havia sido faturado por outra transação concorrente — ignorando.",
                     appointment.getId());
-        }
-    }
-
-    /** Baixa o estoque dos produtos vendidos neste atendimento, uma única vez (junto do faturamento). */
-    private void deductProductStock(Appointment appointment) {
-        for (AppointmentProductItem item : appointment.getProducts()) {
-            Product product = item.getProduct();
-            int remaining = Math.max(0, product.getStock() - item.getQuantity());
-            product.setStock(remaining);
-            productRepository.save(product);
         }
     }
 }

@@ -5,6 +5,7 @@ import com.cristiane.salon.exception.ConflictException;
 import com.cristiane.salon.exception.ResourceNotFoundException;
 import com.cristiane.salon.exception.UnauthorizedException;
 import com.cristiane.salon.models.audit.AuditLogService;
+import com.cristiane.salon.models.featureflag.service.FeatureFlagService;
 import com.cristiane.salon.models.user.dto.LoginRequest;
 import com.cristiane.salon.models.user.dto.RegisterRequest;
 import com.cristiane.salon.models.user.dto.TokenResponse;
@@ -30,9 +31,16 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final AuditLogService auditLogService;
+    private final FeatureFlagService featureFlagService;
 
     @Transactional
     public TokenResponse register(RegisterRequest request) {
+        // Auto-cadastro desligado por padrão nesta versão: cliente é criado só pelo lado
+        // administrativo. Reforça em nível de service, não só escondendo o link na tela de
+        // login — chamar o endpoint direto não deve furar essa regra.
+        if (!featureFlagService.isEnabled("ENABLE_SELF_REGISTRATION")) {
+            throw new BadRequestException("O auto-cadastro está desativado no momento.");
+        }
         try {
             if (userRepository.findByEmail(request.email()).isPresent()) {
                 throw new ConflictException("Email já cadastrado");

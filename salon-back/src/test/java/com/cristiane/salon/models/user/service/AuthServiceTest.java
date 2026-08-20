@@ -1,9 +1,11 @@
 package com.cristiane.salon.models.user.service;
 
+import com.cristiane.salon.exception.BadRequestException;
 import com.cristiane.salon.exception.ConflictException;
 import com.cristiane.salon.exception.ResourceNotFoundException;
 import com.cristiane.salon.exception.UnauthorizedException;
 import com.cristiane.salon.models.audit.AuditLogService;
+import com.cristiane.salon.models.featureflag.service.FeatureFlagService;
 import com.cristiane.salon.models.user.dto.LoginRequest;
 import com.cristiane.salon.models.user.dto.RegisterRequest;
 import com.cristiane.salon.models.user.dto.TokenResponse;
@@ -51,6 +53,9 @@ class AuthServiceTest {
     @Mock
     private AuditLogService auditLogService;
 
+    @Mock
+    private FeatureFlagService featureFlagService;
+
     @InjectMocks
     private AuthService authService;
 
@@ -85,6 +90,7 @@ class AuthServiceTest {
     void register_whenSuccessful_shouldSaveUserGenerateTokensAndLogSuccess() {
         // Arrange
         RegisterRequest request = new RegisterRequest("Carlos", "carlos@example.com", "password", "81999999999");
+        when(featureFlagService.isEnabled("ENABLE_SELF_REGISTRATION")).thenReturn(true);
         when(userRepository.findByEmail("carlos@example.com")).thenReturn(Optional.empty());
         when(roleRepository.findByName("CLIENTE")).thenReturn(Optional.of(clientRole));
         when(passwordEncoder.encode("password")).thenReturn("encoded_pass");
@@ -120,6 +126,7 @@ class AuthServiceTest {
     void register_whenEmailAlreadyExists_shouldThrowConflictExceptionAndLogFailure() {
         // Arrange
         RegisterRequest request = new RegisterRequest("Carlos", "carlos@example.com", "password", "81999999999");
+        when(featureFlagService.isEnabled("ENABLE_SELF_REGISTRATION")).thenReturn(true);
         when(userRepository.findByEmail("carlos@example.com")).thenReturn(Optional.of(activeUser));
 
         // Act & Assert
@@ -144,6 +151,7 @@ class AuthServiceTest {
     void register_whenRoleClientNotFound_shouldThrowResourceNotFoundExceptionAndLogFailure() {
         // Arrange
         RegisterRequest request = new RegisterRequest("Carlos", "carlos@example.com", "password", "81999999999");
+        when(featureFlagService.isEnabled("ENABLE_SELF_REGISTRATION")).thenReturn(true);
         when(userRepository.findByEmail("carlos@example.com")).thenReturn(Optional.empty());
         when(roleRepository.findByName("CLIENTE")).thenReturn(Optional.empty());
 
@@ -163,6 +171,21 @@ class AuthServiceTest {
                 eq("FAILURE"),
                 eq("Role CLIENTE não encontrada")
         );
+    }
+
+    @Test
+    void register_whenSelfRegistrationDisabled_shouldThrowBadRequestExceptionWithoutSavingUser() {
+        // Arrange
+        RegisterRequest request = new RegisterRequest("Carlos", "carlos@example.com", "password", "81999999999");
+        when(featureFlagService.isEnabled("ENABLE_SELF_REGISTRATION")).thenReturn(false);
+
+        // Act & Assert
+        assertThatThrownBy(() -> authService.register(request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("O auto-cadastro está desativado no momento.");
+
+        verify(userRepository, never()).save(any(User.class));
+        verify(auditLogService, never()).logAction(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test

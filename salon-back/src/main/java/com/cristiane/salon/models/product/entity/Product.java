@@ -23,9 +23,6 @@ public class Product {
     @Column(nullable = false, length = 150)
     private String name;
 
-    @Column(nullable = false)
-    private Integer stock = 0;
-
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 

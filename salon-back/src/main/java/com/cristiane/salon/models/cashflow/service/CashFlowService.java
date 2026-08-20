@@ -80,14 +80,6 @@ public class CashFlowService {
                     throw new BadRequestException("Produto '" + product.getName() + "' não está ativo.");
                 }
 
-                if (product.getStock() == null || product.getStock() < item.quantity()) {
-                    throw new BadRequestException("Estoque insuficiente para o produto: " + product.getName() +
-                            " (Solicitado: " + item.quantity() + ", Disponível: " + (product.getStock() != null ? product.getStock() : 0) + ")");
-                }
-
-                product.setStock(product.getStock() - item.quantity());
-                productRepository.save(product);
-
                 BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(item.quantity()));
                 totalAmount = totalAmount.add(itemTotal);
 

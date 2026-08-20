@@ -72,7 +72,6 @@ class AppointmentTest {
         Product product = new Product();
         product.setName("Shampoo");
         product.setPrice(new BigDecimal("50.00"));
-        product.setStock(10);
         product.setActive(true);
         return product;
     }

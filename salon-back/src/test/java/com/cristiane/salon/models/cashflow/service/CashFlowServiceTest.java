@@ -77,14 +77,12 @@ class CashFlowServiceTest {
         activeProduct.setId(1L);
         activeProduct.setName("Shampoo");
         activeProduct.setPrice(BigDecimal.valueOf(50.00));
-        activeProduct.setStock(10);
         activeProduct.setActive(true);
 
         inactiveProduct = new Product();
         inactiveProduct.setId(2L);
         inactiveProduct.setName("Condicionador");
         inactiveProduct.setPrice(BigDecimal.valueOf(40.00));
-        inactiveProduct.setStock(5);
         inactiveProduct.setActive(false);
     }
 
@@ -224,34 +222,7 @@ class CashFlowServiceTest {
     }
 
     @Test
-    void create_whenSaleAndStockInsufficient_shouldThrowBadRequestException() {
-        // Arrange
-        CashFlowItemRequest item = new CashFlowItemRequest(1L, 15); // Stock is 10
-        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "desc", salonClock.today(), null, List.of(item));
-        when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
-
-        // Act & Assert
-        assertThatThrownBy(() -> cashFlowService.create(request))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessage("Estoque insuficiente para o produto: Shampoo (Solicitado: 15, Disponível: 10)");
-    }
-
-    @Test
-    void create_whenSaleAndStockIsNull_shouldThrowBadRequestException() {
-        // Arrange
-        activeProduct.setStock(null);
-        CashFlowItemRequest item = new CashFlowItemRequest(1L, 1);
-        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "desc", salonClock.today(), null, List.of(item));
-        when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
-
-        // Act & Assert
-        assertThatThrownBy(() -> cashFlowService.create(request))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessage("Estoque insuficiente para o produto: Shampoo (Solicitado: 1, Disponível: 0)");
-    }
-
-    @Test
-    void create_whenSaleSuccessAndDefaultDescription_shouldSaveDecreaseStockAndAudit() {
+    void create_whenSaleSuccessAndDefaultDescription_shouldSaveAndAudit() {
         // Arrange
         CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2); // 2 * 50 = 100
         CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "Venda de Produtos", salonClock.today(), null, List.of(item1));
@@ -286,8 +257,6 @@ class CashFlowServiceTest {
         assertThat(response.amount()).isEqualTo(BigDecimal.valueOf(100.00));
         assertThat(response.description()).isEqualTo("Venda de Produtos: 2x Shampoo");
 
-        assertThat(activeProduct.getStock()).isEqualTo(8);
-        verify(productRepository).save(activeProduct);
         verify(cashFlowRepository).save(any(CashFlow.class));
         verify(auditLogService).logAction(
                 eq(10L),
