@@ -17,8 +17,8 @@ vi.mock('../../../../hooks/useAlert', () => ({
 }));
 
 const mockEmployees = [
-  { employeeId: 1, employeeName: 'Mariana', doneAppointmentsCount: 5, doneAppointmentsValue: 500, calculatedPayout: 200 },
-  { employeeId: 2, employeeName: 'Joana', doneAppointmentsCount: 3, doneAppointmentsValue: 300, calculatedPayout: 100 },
+  { employeeId: 1, employeeName: 'Mariana', doneAppointmentsCount: 5, doneAppointmentsValue: 500, doneProductsValue: 0, calculatedPayout: 200 },
+  { employeeId: 2, employeeName: 'Joana', doneAppointmentsCount: 3, doneAppointmentsValue: 300, doneProductsValue: 0, calculatedPayout: 100 },
 ];
 
 const mockHistory = [
