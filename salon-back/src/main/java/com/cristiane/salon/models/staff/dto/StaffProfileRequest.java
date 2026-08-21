@@ -5,7 +5,6 @@ import com.cristiane.salon.models.staff.enums.Gender;
 import com.cristiane.salon.models.staff.enums.PixKeyType;
 import com.cristiane.salon.models.staff.validation.ValidCpf;
 import com.cristiane.salon.models.staff.validation.ValidPixKey;
-import com.cristiane.salon.models.employee.entity.CommissionScope;
 import com.cristiane.salon.models.employee.entity.RemunerationType;
 import jakarta.validation.constraints.*;
 
@@ -117,18 +116,16 @@ public record StaffProfileRequest(
         @Size(max = 2000, message = "As observações devem ter no máximo 2000 caracteres")
         String notes,
 
-        // --- Remuneração: exigida só para FUNCIONARIA (ver FuncionariaStrategy) ---
+        // --- Remuneração: exigida só para FUNCIONARIA (ver FuncionariaStrategy). Comissão não
+        // é mais cadastrada aqui — vem do SalonService de cada serviço realizado (e da comissão
+        // única de produto em SalonBusinessSettings). remunerationValue só se aplica a
+        // SALARIO_FIXO/FIXO_E_COMISSIONADO (salário base); para COMISSIONADO fica ignorado. ---
 
         RemunerationType remunerationType,
-        CommissionScope commissionScope,
 
         @DecimalMin(value = "0.0", message = "O valor de remuneração não pode ser negativo")
         @Digits(integer = 8, fraction = 2, message = "Valor de remuneração inválido")
-        BigDecimal remunerationValue,
-
-        @DecimalMin(value = "0.0", message = "O valor de comissão não pode ser negativo")
-        @Digits(integer = 8, fraction = 2, message = "Valor de comissão inválido")
-        BigDecimal commissionValue
+        BigDecimal remunerationValue
 ) {
     /** CPF só com dígitos — usado para cifrar e para gerar o hash de duplicidade. */
     public String cpfDigitsOnly() {

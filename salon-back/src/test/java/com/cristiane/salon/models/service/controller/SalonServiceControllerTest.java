@@ -61,7 +61,7 @@ class SalonServiceControllerTest extends BaseControllerTest {
     @WithMockUser
     void reactivateReturns200() throws Exception {
         SalonServiceResponse dummyResponse = new SalonServiceResponse(
-                1L, "cut", "description", new BigDecimal("50.0"), true, java.util.List.of(), null
+                1L, "cut", "description", new BigDecimal("50.0"), true, java.util.List.of(), null, null
         );
         when(salonServiceManager.reactivate(any())).thenReturn(dummyResponse);
 
@@ -73,7 +73,7 @@ class SalonServiceControllerTest extends BaseControllerTest {
     @WithMockUser
     void findAllReturnsPageOfServices() throws Exception {
         SalonServiceResponse response = new SalonServiceResponse(
-                1L, "Haircut", "Classic trim", new BigDecimal("45.00"), true, java.util.List.of(), null
+                1L, "Haircut", "Classic trim", new BigDecimal("45.00"), true, java.util.List.of(), null, null
         );
         org.springframework.data.domain.Page<SalonServiceResponse> page =
                 new org.springframework.data.domain.PageImpl<>(List.of(response));
@@ -90,7 +90,7 @@ class SalonServiceControllerTest extends BaseControllerTest {
     @WithMockUser
     void findByIdReturnsService() throws Exception {
         SalonServiceResponse response = new SalonServiceResponse(
-                2L, "Manicure", "Nail care", new BigDecimal("30.00"), true, java.util.List.of(), null
+                2L, "Manicure", "Nail care", new BigDecimal("30.00"), true, java.util.List.of(), null, null
         );
         when(salonServiceManager.findById(eq(2L))).thenReturn(response);
 
@@ -104,7 +104,7 @@ class SalonServiceControllerTest extends BaseControllerTest {
     @WithMockUser
     void updateReturnsUpdatedService() throws Exception {
         SalonServiceResponse response = new SalonServiceResponse(
-                2L, "Pedicure", "Nail care", new BigDecimal("35.00"), true, java.util.List.of(), null
+                2L, "Pedicure", "Nail care", new BigDecimal("35.00"), true, java.util.List.of(), null, null
         );
         when(salonServiceManager.update(eq(2L), any())).thenReturn(response);
 

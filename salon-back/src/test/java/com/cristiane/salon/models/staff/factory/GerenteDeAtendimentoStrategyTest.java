@@ -1,7 +1,6 @@
 package com.cristiane.salon.models.staff.factory;
 
 import com.cristiane.salon.exception.BadRequestException;
-import com.cristiane.salon.models.employee.entity.CommissionScope;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.entity.RemunerationType;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
@@ -35,7 +34,7 @@ class GerenteDeAtendimentoStrategyTest {
         strategy = new GerenteDeAtendimentoStrategy(employeeRepository);
     }
 
-    private StaffProfileRequest requestWith(RemunerationType type, CommissionScope scope, BigDecimal value) {
+    private StaffProfileRequest requestWith(RemunerationType type, BigDecimal value) {
         return new StaffProfileRequest(
                 "Ana", "ana@example.com", "Senha@123", "GERENTE_DE_ATENDIMENTO",
                 "Ana Souza", null, "111.444.777-35", LocalDate.of(1988, 1, 1), null,
@@ -43,8 +42,7 @@ class GerenteDeAtendimentoStrategyTest {
                 "50000-000", "Rua A", "10", null, "Boa Vista", "Recife", null,
                 null, null,
                 LocalDate.now(), null,
-                type, scope,
-                value, null
+                type, value
         );
     }
 
@@ -55,17 +53,17 @@ class GerenteDeAtendimentoStrategyTest {
 
     @Test
     void validate_whenNoRemunerationFieldsSet_shouldNotThrow() {
-        strategy.validate(requestWith(null, null, null));
+        strategy.validate(requestWith(null, null));
     }
 
     @Test
     void validate_whenSalarioFixoWithValue_shouldNotThrow() {
-        strategy.validate(requestWith(RemunerationType.SALARIO_FIXO, null, new BigDecimal("3000")));
+        strategy.validate(requestWith(RemunerationType.SALARIO_FIXO, new BigDecimal("3000")));
     }
 
     @Test
     void validate_whenSalarioFixoWithoutValue_shouldThrow() {
-        assertThatThrownBy(() -> strategy.validate(requestWith(RemunerationType.SALARIO_FIXO, null, null)))
+        assertThatThrownBy(() -> strategy.validate(requestWith(RemunerationType.SALARIO_FIXO, null)))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("valor do salário fixo");
     }
@@ -73,17 +71,9 @@ class GerenteDeAtendimentoStrategyTest {
     @Test
     void validate_whenComissionado_shouldThrow() {
         assertThatThrownBy(() -> strategy.validate(
-                requestWith(RemunerationType.COMISSIONADO, CommissionScope.INDIVIDUAL, new BigDecimal("10"))))
+                requestWith(RemunerationType.COMISSIONADO, new BigDecimal("10"))))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Salário Fixo");
-    }
-
-    @Test
-    void validate_whenCommissionScopeSet_shouldThrow() {
-        assertThatThrownBy(() -> strategy.validate(
-                requestWith(RemunerationType.SALARIO_FIXO, CommissionScope.GLOBAL, new BigDecimal("3000"))))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("comissão não se aplicam");
     }
 
     @Test
@@ -91,7 +81,7 @@ class GerenteDeAtendimentoStrategyTest {
         User user = new User();
         user.setId(1L);
 
-        strategy.onStaffCreated(user, requestWith(RemunerationType.SALARIO_FIXO, null, new BigDecimal("3000")));
+        strategy.onStaffCreated(user, requestWith(RemunerationType.SALARIO_FIXO, new BigDecimal("3000")));
 
         ArgumentCaptor<Employee> captor = ArgumentCaptor.forClass(Employee.class);
         verify(employeeRepository).save(captor.capture());
@@ -107,7 +97,7 @@ class GerenteDeAtendimentoStrategyTest {
         User user = new User();
         user.setId(1L);
 
-        strategy.onStaffCreated(user, requestWith(null, null, null));
+        strategy.onStaffCreated(user, requestWith(null, null));
 
         verify(employeeRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }

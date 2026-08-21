@@ -1,6 +1,9 @@
 package com.cristiane.salon.integrations.payment.marketplace;
 
-import com.cristiane.salon.models.employee.entity.CommissionScope;
+import com.cristiane.salon.models.appointment.entity.Appointment;
+import com.cristiane.salon.models.appointment.entity.AppointmentProductItem;
+import com.cristiane.salon.models.appointment.entity.AppointmentServiceItem;
+import com.cristiane.salon.models.businesssettings.service.SalonBusinessSettingsService;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.entity.RemunerationType;
 import lombok.RequiredArgsConstructor;
@@ -14,30 +17,28 @@ import java.util.Optional;
  * Calcula a divisão de um pagamento entre salão e funcionária, protegendo o valor dela da
  * taxa do Mercado Pago (a variação sempre cai na comissão do salão, nunca no que ela recebe).
  *
- * <p>Só faz sentido dividir POR ATENDIMENTO quando a comissão dela é individual sobre o valor
- * daquele serviço específico — ou seja, {@code COMISSIONADO}/{@code FIXO_E_COMISSIONADO} com
- * {@code commissionScope = INDIVIDUAL}. Salário fixo e comissão GLOBAL (calculada sobre o total
- * do salão no período) não têm um "valor desta transação" que faça sentido isolar — continuam
- * sendo pagos pelo fluxo manual existente (relatório + PIX avulso).
+ * <p>A comissão dela nesse atendimento é a soma de duas fontes independentes: comissão de
+ * serviço (% de cada {@link com.cristiane.salon.models.service.entity.SalonService} realizado,
+ * só para COMISSIONADO/FIXO_E_COMISSIONADO) + comissão de produto (% única do salão sobre
+ * produtos vendidos, vale pra qualquer tipo de remuneração — inclusive Salário Fixo).
  */
 @Component
 @RequiredArgsConstructor
 public class SplitPaymentCalculator {
 
     private final MercadoPagoSplitProperties splitProperties;
+    private final SalonBusinessSettingsService businessSettingsService;
 
     public record SplitResult(BigDecimal applicationFee, BigDecimal employeeShare) {
     }
 
-    public Optional<SplitResult> calculate(BigDecimal grossAmount, Employee employee) {
-        BigDecimal commissionPercent = resolveIndividualCommissionPercent(employee);
-        if (commissionPercent == null || commissionPercent.compareTo(BigDecimal.ZERO) <= 0) {
+    public Optional<SplitResult> calculate(Appointment appointment, Employee employee) {
+        BigDecimal grossAmount = appointment.getGrandTotal();
+        BigDecimal employeeShare = computeEmployeeShare(appointment, employee);
+
+        if (employeeShare == null || employeeShare.compareTo(BigDecimal.ZERO) <= 0) {
             return Optional.empty();
         }
-
-        BigDecimal employeeShare = grossAmount
-                .multiply(commissionPercent)
-                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
 
         BigDecimal mpFeeEstimate = grossAmount
                 .multiply(splitProperties.getPixFeeRate())
@@ -55,17 +56,35 @@ public class SplitPaymentCalculator {
         return Optional.of(new SplitResult(applicationFee, employeeShare));
     }
 
-    private BigDecimal resolveIndividualCommissionPercent(Employee employee) {
-        RemunerationType type = employee.getRemunerationType();
-        if (type == null || employee.getCommissionScope() != CommissionScope.INDIVIDUAL) {
-            return null;
+    private BigDecimal computeEmployeeShare(Appointment appointment, Employee employee) {
+        if (employee == null || employee.getRemunerationType() == null) {
+            return BigDecimal.ZERO;
         }
-        if (type == RemunerationType.COMISSIONADO) {
-            return employee.getRemunerationValue();
+
+        BigDecimal serviceCommission = BigDecimal.ZERO;
+        if (employee.getRemunerationType() == RemunerationType.COMISSIONADO
+                || employee.getRemunerationType() == RemunerationType.FIXO_E_COMISSIONADO) {
+            for (AppointmentServiceItem item : appointment.getServices()) {
+                BigDecimal pct = item.getSalonService().getCommissionPercent();
+                if (pct == null) continue;
+                BigDecimal price = item.getEffectivePrice() != null ? item.getEffectivePrice() : BigDecimal.ZERO;
+                serviceCommission = serviceCommission.add(
+                        price.multiply(pct).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP));
+            }
         }
-        if (type == RemunerationType.FIXO_E_COMISSIONADO) {
-            return employee.getCommissionValue();
+
+        // Comissão de produto é exceção universal — vale pra qualquer tipo de remuneração,
+        // inclusive Salário Fixo, como incentivo à venda.
+        BigDecimal productPct = businessSettingsService.getProductCommissionPercent();
+        BigDecimal productCommission = BigDecimal.ZERO;
+        if (productPct != null && productPct.compareTo(BigDecimal.ZERO) > 0) {
+            for (AppointmentProductItem item : appointment.getProducts()) {
+                BigDecimal price = item.getEffectiveTotalPrice() != null ? item.getEffectiveTotalPrice() : BigDecimal.ZERO;
+                productCommission = productCommission.add(
+                        price.multiply(productPct).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP));
+            }
         }
-        return null;
+
+        return serviceCommission.add(productCommission);
     }
 }

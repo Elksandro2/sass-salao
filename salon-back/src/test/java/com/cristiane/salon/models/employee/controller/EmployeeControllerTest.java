@@ -5,7 +5,6 @@ import com.cristiane.salon.controllers.BaseControllerTest;
 import com.cristiane.salon.models.employee.controller.EmployeeController;
 import com.cristiane.salon.models.employee.dto.EmployeeBookingResponse;
 import com.cristiane.salon.models.employee.dto.EmployeeResponse;
-import com.cristiane.salon.models.employee.entity.CommissionScope;
 import com.cristiane.salon.models.employee.entity.RemunerationType;
 import com.cristiane.salon.models.employee.service.EmployeeService;
 import org.junit.jupiter.api.Test;
@@ -65,8 +64,7 @@ class EmployeeControllerTest extends BaseControllerTest {
     void findAllReturnsPageOfEmployees() throws Exception {
         EmployeeResponse response = new EmployeeResponse(
                 1L, 1L, "Alice", "alice@example.com", "FUNCIONARIA",
-                RemunerationType.COMISSIONADO, CommissionScope.INDIVIDUAL,
-                BigDecimal.ZERO, BigDecimal.TEN, null
+                RemunerationType.COMISSIONADO, null
         );
         org.springframework.data.domain.Page<EmployeeResponse> page =
                 new org.springframework.data.domain.PageImpl<>(List.of(response));
@@ -95,8 +93,7 @@ class EmployeeControllerTest extends BaseControllerTest {
     void updateReturnsUpdatedEmployee() throws Exception {
         EmployeeResponse response = new EmployeeResponse(
                 2L, 1L, "Alice", "alice@example.com", "FUNCIONARIA",
-                RemunerationType.SALARIO_FIXO, null,
-                BigDecimal.TEN, BigDecimal.ZERO, null
+                RemunerationType.SALARIO_FIXO, BigDecimal.TEN
         );
         when(employeeService.update(eq(2L), any())).thenReturn(response);
 

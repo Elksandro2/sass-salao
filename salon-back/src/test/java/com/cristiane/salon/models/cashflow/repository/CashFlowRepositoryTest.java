@@ -6,7 +6,6 @@ import com.cristiane.salon.models.appointment.enums.AppointmentStatus;
 import com.cristiane.salon.models.appointment.repository.AppointmentRepository;
 import com.cristiane.salon.models.cashflow.entity.CashFlow;
 import com.cristiane.salon.models.cashflow.enums.CashFlowType;
-import com.cristiane.salon.models.employee.entity.CommissionScope;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.entity.RemunerationType;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
@@ -104,9 +103,7 @@ class CashFlowRepositoryTest {
         Employee employee = new Employee();
         employee.setUser(employeeUser);
         employee.setRemunerationType(RemunerationType.COMISSIONADO);
-        employee.setCommissionScope(CommissionScope.INDIVIDUAL);
         employee.setRemunerationValue(BigDecimal.ZERO);
-        employee.setCommissionValue(BigDecimal.TEN);
         employee = employeeRepository.save(employee);
 
         SalonService salonService = new SalonService();

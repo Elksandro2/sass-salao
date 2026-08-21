@@ -2,7 +2,6 @@ package com.cristiane.salon.models.employee.dto;
 
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.entity.RemunerationType;
-import com.cristiane.salon.models.employee.entity.CommissionScope;
 import java.math.BigDecimal;
 
 public record EmployeeResponse(
@@ -12,10 +11,7 @@ public record EmployeeResponse(
         String email,
         String roleName,
         RemunerationType remunerationType,
-        CommissionScope commissionScope,
-        BigDecimal remunerationValue,
-        BigDecimal commissionValue,
-        BigDecimal productCommissionValue
+        BigDecimal remunerationValue
 ) {
     public static EmployeeResponse fromEntity(Employee employee) {
         return new EmployeeResponse(
@@ -25,10 +21,7 @@ public record EmployeeResponse(
                 employee.getUser().getEmail(),
                 employee.getUser().getRoleName(),
                 employee.getRemunerationType(),
-                employee.getCommissionScope(),
-                employee.getRemunerationValue(),
-                employee.getCommissionValue(),
-                employee.getProductCommissionValue()
+                employee.getRemunerationValue()
         );
     }
 }

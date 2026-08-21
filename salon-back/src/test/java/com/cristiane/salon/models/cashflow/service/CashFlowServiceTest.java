@@ -61,6 +61,9 @@ class CashFlowServiceTest {
     @Mock
     private AuditLogService auditLogService;
 
+    @Mock
+    private com.cristiane.salon.models.businesssettings.service.SalonBusinessSettingsService businessSettingsService;
+
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -284,7 +287,7 @@ class CashFlowServiceTest {
         com.cristiane.salon.models.employee.entity.Employee employee =
                 new com.cristiane.salon.models.employee.entity.Employee();
         employee.setId(7L);
-        employee.setProductCommissionValue(new BigDecimal("20.00"));
+        when(businessSettingsService.getProductCommissionPercent()).thenReturn(new BigDecimal("20.00"));
         User employeeUser = new User();
         employeeUser.setName("Valcleide");
         employee.setUser(employeeUser);

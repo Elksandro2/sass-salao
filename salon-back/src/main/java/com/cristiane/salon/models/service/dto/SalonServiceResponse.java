@@ -14,7 +14,8 @@ public record SalonServiceResponse(
         Boolean active,
         List<ServiceProductUsageResponse> productUsages,
         /** Soma dos custos conhecidos da receita — parcial se algum produto não tem custo/capacidade cadastrados. */
-        BigDecimal estimatedProductCost
+        BigDecimal estimatedProductCost,
+        BigDecimal commissionPercent
 ) {
     public static SalonServiceResponse fromEntity(SalonService service) {
         return fromEntity(service, Collections.emptyList());
@@ -33,7 +34,8 @@ public record SalonServiceResponse(
                 service.getPrice(),
                 service.getActive(),
                 productUsages,
-                totalCost
+                totalCost,
+                service.getCommissionPercent()
         );
     }
 }

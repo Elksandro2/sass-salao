@@ -3,12 +3,12 @@ package com.cristiane.salon.models.report.service;
 import com.cristiane.salon.models.appointment.entity.Appointment;
 import com.cristiane.salon.models.appointment.enums.AppointmentStatus;
 import com.cristiane.salon.models.appointment.repository.AppointmentRepository;
+import com.cristiane.salon.models.businesssettings.service.SalonBusinessSettingsService;
 import com.cristiane.salon.models.cashflow.entity.CashFlow;
 import com.cristiane.salon.models.cashflow.enums.CashFlowType;
 import com.cristiane.salon.models.cashflow.repository.CashFlowRepository;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.entity.RemunerationType;
-import com.cristiane.salon.models.employee.entity.CommissionScope;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
 import com.cristiane.salon.models.report.dto.AppointmentProfitResponse;
 import com.cristiane.salon.models.report.dto.AppointmentReportResponse;
@@ -26,7 +26,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,6 +56,9 @@ class ReportServiceTest {
 
     @Mock
     private com.cristiane.salon.models.fixedexpense.repository.FixedExpenseRepository fixedExpenseRepository;
+
+    @Mock
+    private SalonBusinessSettingsService businessSettingsService;
 
     // SalonClock real, não mock: os testes dependem do "hoje"/"agora" de verdade no fuso
     // do salão, e um mock devolveria null silenciosamente.
@@ -144,34 +146,27 @@ class ReportServiceTest {
         emp2.setId(2L);
         emp2.setUser(user2);
         emp2.setRemunerationType(RemunerationType.COMISSIONADO);
-        emp2.setCommissionScope(CommissionScope.INDIVIDUAL);
-        emp2.setRemunerationValue(new BigDecimal("10.00")); // 10%
 
-        User user3 = new User();
-        user3.setName("Carol");
-        Employee emp3 = new Employee();
-        emp3.setId(3L);
-        emp3.setUser(user3);
-        emp3.setRemunerationType(RemunerationType.COMISSIONADO);
-        emp3.setCommissionScope(CommissionScope.GLOBAL);
-        emp3.setRemunerationValue(new BigDecimal("5.00")); // 5%
+        when(employeeRepository.findAll()).thenReturn(List.of(emp1, emp2));
 
-        when(employeeRepository.findAll()).thenReturn(List.of(emp1, emp2, emp3));
+        // Create Appointments for period — Bob's service pays 10% commission
+        SalonService serviceFlat = new SalonService();
+        serviceFlat.setPrice(new BigDecimal("200.00"));
 
-        // Create Appointments for period
-        SalonService service = new SalonService();
-        service.setPrice(new BigDecimal("200.00"));
+        SalonService serviceCommissioned = new SalonService();
+        serviceCommissioned.setPrice(new BigDecimal("200.00"));
+        serviceCommissioned.setCommissionPercent(new BigDecimal("10"));
 
         Appointment aptBob = new Appointment();
         aptBob.setStatus(AppointmentStatus.DONE);
         aptBob.setEmployee(emp2);
-        withService(aptBob, service);
+        withService(aptBob, serviceCommissioned);
         aptBob.setScheduledAt(salonClock.now());
 
         Appointment aptAlice = new Appointment();
         aptAlice.setStatus(AppointmentStatus.DONE);
         aptAlice.setEmployee(emp1);
-        withService(aptAlice, service);
+        withService(aptAlice, serviceFlat);
         aptAlice.setScheduledAt(salonClock.now());
 
         when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of(aptBob, aptAlice));
@@ -182,15 +177,14 @@ class ReportServiceTest {
         // Then
         // total income = 1000
         // emp1: fixed = 400
-        // emp2: commission (individual, 10% of 200) = 20.00
-        // emp3: commission (global, 5% of all DONE appointments = 5% of 400) = 20.00
+        // emp2: commission (10% of 200) = 20.00
         // totalSalaryPaid = 400.00
-        // totalCommissionPaid = 20.00 (Bob) + 20.00 (Carol) = 40.00
-        // netProfit = 1000 - 0 (expense) - 400 (salary) - 40 (commission) = 560.00
+        // totalCommissionPaid = 20.00
+        // netProfit = 1000 - 0 (expense) - 400 (salary) - 20 (commission) = 580.00
         assertEquals(new BigDecimal("1000.00"), report.totalIncome());
         assertEquals(new BigDecimal("400.00"), report.totalSalaryPaid());
-        assertEquals(new BigDecimal("40.00"), report.totalCommissionPaid());
-        assertEquals(new BigDecimal("560.00"), report.netProfit());
+        assertEquals(new BigDecimal("20.00"), report.totalCommissionPaid());
+        assertEquals(new BigDecimal("580.00"), report.netProfit());
     }
 
     @Test
@@ -211,14 +205,13 @@ class ReportServiceTest {
         emp.setUser(user);
         emp.setRemunerationType(RemunerationType.FIXO_E_COMISSIONADO);
         emp.setRemunerationValue(new BigDecimal("400.00")); // Base salary
-        emp.setCommissionValue(new BigDecimal("10.00")); // 10%
-        emp.setCommissionScope(CommissionScope.INDIVIDUAL);
 
         when(employeeRepository.findAll()).thenReturn(List.of(emp));
 
-        // Create Appointment
+        // Create Appointment — the service pays 10% commission
         SalonService service = new SalonService();
         service.setPrice(new BigDecimal("200.00"));
+        service.setCommissionPercent(new BigDecimal("10"));
 
         Appointment apt = new Appointment();
         apt.setStatus(AppointmentStatus.DONE);
@@ -236,10 +229,9 @@ class ReportServiceTest {
         assertEquals(new BigDecimal("400.00"), report.totalSalaryPaid());
         assertEquals(new BigDecimal("20.00"), report.totalCommissionPaid());
         assertEquals(new BigDecimal("580.00"), report.netProfit());
-        
+
         EmployeeFinanceResponse detail = report.employeeFinanceDetails().get(0);
         assertEquals(new BigDecimal("400.00"), detail.remunerationValue());
-        assertEquals(new BigDecimal("10.00"), detail.commissionValue());
         assertEquals(new BigDecimal("420.00"), detail.calculatedPayout());
     }
 
@@ -297,17 +289,6 @@ class ReportServiceTest {
         emp2.setId(2L);
         emp2.setUser(user2);
         emp2.setRemunerationType(RemunerationType.COMISSIONADO);
-        emp2.setCommissionScope(CommissionScope.INDIVIDUAL);
-        emp2.setRemunerationValue(new BigDecimal("10.00")); // 10%
-
-        User user3 = new User();
-        user3.setName("Carol");
-        Employee emp3 = new Employee();
-        emp3.setId(3L);
-        emp3.setUser(user3);
-        emp3.setRemunerationType(RemunerationType.COMISSIONADO);
-        emp3.setCommissionScope(CommissionScope.GLOBAL);
-        emp3.setRemunerationValue(new BigDecimal("5.00")); // 5%
 
         User user4 = new User();
         user4.setName("Dave");
@@ -316,58 +297,55 @@ class ReportServiceTest {
         emp4.setUser(user4);
         emp4.setRemunerationType(RemunerationType.FIXO_E_COMISSIONADO);
         emp4.setRemunerationValue(new BigDecimal("300.00")); // Base
-        emp4.setCommissionValue(new BigDecimal("10.00")); // 10%
-        emp4.setCommissionScope(CommissionScope.INDIVIDUAL);
 
-        when(employeeRepository.findAll()).thenReturn(List.of(emp1, emp2, emp3, emp4));
+        when(employeeRepository.findAll()).thenReturn(List.of(emp1, emp2, emp4));
 
-        // Create Appointments for period
-        SalonService service = new SalonService();
-        service.setPrice(new BigDecimal("200.00"));
+        // Create Appointments for period — cada uma tem um serviço próprio de R$200,
+        // com % de comissão configurado no serviço (10%) para Bob e Dave.
+        SalonService serviceFlat = new SalonService();
+        serviceFlat.setPrice(new BigDecimal("200.00"));
+
+        SalonService serviceCommissioned = new SalonService();
+        serviceCommissioned.setPrice(new BigDecimal("200.00"));
+        serviceCommissioned.setCommissionPercent(new BigDecimal("10"));
 
         Appointment aptBob = new Appointment();
         aptBob.setStatus(AppointmentStatus.DONE);
         aptBob.setEmployee(emp2);
-        withService(aptBob, service);
+        withService(aptBob, serviceCommissioned);
         aptBob.setScheduledAt(salonClock.now());
 
         Appointment aptAlice = new Appointment();
         aptAlice.setStatus(AppointmentStatus.DONE);
         aptAlice.setEmployee(emp1);
-        withService(aptAlice, service);
+        withService(aptAlice, serviceFlat);
         aptAlice.setScheduledAt(salonClock.now());
 
         Appointment aptDave = new Appointment();
         aptDave.setStatus(AppointmentStatus.DONE);
         aptDave.setEmployee(emp4);
-        withService(aptDave, service);
+        withService(aptDave, serviceCommissioned);
         aptDave.setScheduledAt(salonClock.now());
 
-        // Total done appointments value = 200 (Bob) + 200 (Alice) + 200 (Dave) = 600
         when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of(aptBob, aptAlice, aptDave));
 
         // When
         PayrollReportResponse response = reportService.generatePayrollReport(salonClock.today(), salonClock.today());
 
         // Then
-        assertEquals(4, response.items().size());
-        
-        // Alice: FIXED -> base = 0, payout = 400
+        assertEquals(3, response.items().size());
+
+        // Alice: FIXED -> receita do atendimento = 200, payout = 400 (só salário)
         PayrollReportResponse.PayrollItem itemAlice = response.items().stream().filter(i -> i.employeeId().equals(1L)).findFirst().orElseThrow();
-        assertEquals(BigDecimal.ZERO, itemAlice.baseAmount());
+        assertEquals(new BigDecimal("200.00"), itemAlice.baseAmount());
         assertEquals(new BigDecimal("400.00"), itemAlice.calculatedPay());
 
-        // Bob: COMMISSIONED INDIVIDUAL (10% of 200) -> base = 200, payout = 20
+        // Bob: COMISSIONADO (10% de 200) -> receita = 200, payout = 20
         PayrollReportResponse.PayrollItem itemBob = response.items().stream().filter(i -> i.employeeId().equals(2L)).findFirst().orElseThrow();
         assertEquals(new BigDecimal("200.00"), itemBob.baseAmount());
         assertEquals(new BigDecimal("20.00"), itemBob.calculatedPay());
 
-        // Carol: COMMISSIONED GLOBAL (5% of 600) -> base = 600, payout = 30
-        PayrollReportResponse.PayrollItem itemCarol = response.items().stream().filter(i -> i.employeeId().equals(3L)).findFirst().orElseThrow();
-        assertEquals(new BigDecimal("600.00"), itemCarol.baseAmount());
-        assertEquals(new BigDecimal("30.00"), itemCarol.calculatedPay());
-
-        // Dave: HYBRID INDIVIDUAL (300 salary + 10% of 200) -> base = 200, payout = 320
+        // Dave: HYBRID (300 salário + 10% de 200) -> receita = 200, payout = 320
         PayrollReportResponse.PayrollItem itemDave = response.items().stream().filter(i -> i.employeeId().equals(4L)).findFirst().orElseThrow();
         assertEquals(new BigDecimal("200.00"), itemDave.baseAmount());
         assertEquals(new BigDecimal("320.00"), itemDave.calculatedPay());
@@ -441,47 +419,6 @@ class ReportServiceTest {
     }
 
     @Test
-    void shouldCalculateGlobalHybridCommissionCorrectly() {
-        // Given
-        Employee emp = new Employee();
-        emp.setId(1L);
-        User user = new User();
-        user.setName("Alice");
-        emp.setUser(user);
-        emp.setRemunerationType(RemunerationType.FIXO_E_COMISSIONADO);
-        emp.setCommissionScope(CommissionScope.GLOBAL);
-        emp.setRemunerationValue(new BigDecimal("500.00")); // Base
-        emp.setCommissionValue(new BigDecimal("10.00")); // 10%
-
-        SalonService service = new SalonService();
-        service.setPrice(new BigDecimal("150.00"));
-
-        Appointment apt = new Appointment();
-        apt.setStatus(AppointmentStatus.DONE);
-        apt.setEmployee(emp);
-        withService(apt, service);
-        apt.setScheduledAt(salonClock.now());
-
-        when(employeeRepository.findAll()).thenReturn(List.of(emp));
-        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of(apt));
-        when(cashFlowRepository.findByDateBetween(any(LocalDate.class), any(LocalDate.class)))
-                .thenReturn(List.of());
-
-        // When
-        FinancialReportResponse report = reportService.generateFinancialReport(salonClock.today(), salonClock.today().plusDays(1));
-
-        // Then
-        // Global done value = 150.00
-        // Salary = 500.00
-        // Commission = 10% of 150.00 = 15.00
-        // Total payout = 515.00
-        assertEquals(new BigDecimal("500.00"), report.totalSalaryPaid());
-        assertEquals(new BigDecimal("15.00"), report.totalCommissionPaid());
-        EmployeeFinanceResponse detail = report.employeeFinanceDetails().get(0);
-        assertEquals(new BigDecimal("515.00"), detail.calculatedPayout());
-    }
-
-    @Test
     void shouldHandleNullRemunerationValuesGracefully() {
         // Given
         Employee emp = new Employee();
@@ -490,9 +427,7 @@ class ReportServiceTest {
         user.setName("Alice");
         emp.setUser(user);
         emp.setRemunerationType(RemunerationType.FIXO_E_COMISSIONADO);
-        emp.setCommissionScope(CommissionScope.INDIVIDUAL);
         emp.setRemunerationValue(null);
-        emp.setCommissionValue(null);
 
         SalonService service = new SalonService();
         service.setPrice(new BigDecimal("100.00"));
@@ -550,20 +485,20 @@ class ReportServiceTest {
 
     @Test
     void shouldCalculateProductCommissionIndependentlyFromServiceCommission() {
-        // Given: funcionária comissionada em serviços (10%) e com uma comissão separada sobre
-        // produtos (20%), escopo individual para ambas.
+        // Given: funcionária comissionada em serviços (10%, configurado no serviço) e comissão
+        // única do salão sobre produtos (20%).
         Employee emp = new Employee();
         emp.setId(1L);
         User user = new User();
         user.setName("Alice");
         emp.setUser(user);
         emp.setRemunerationType(RemunerationType.COMISSIONADO);
-        emp.setCommissionScope(CommissionScope.INDIVIDUAL);
-        emp.setRemunerationValue(new BigDecimal("10.00")); // 10% sobre serviços
-        emp.setProductCommissionValue(new BigDecimal("20.00")); // 20% sobre produtos
+
+        when(businessSettingsService.getProductCommissionPercent()).thenReturn(new BigDecimal("20.00"));
 
         SalonService service = new SalonService();
         service.setPrice(new BigDecimal("100.00"));
+        service.setCommissionPercent(new BigDecimal("10"));
 
         Appointment apt = new Appointment();
         apt.setStatus(AppointmentStatus.DONE);
@@ -589,18 +524,17 @@ class ReportServiceTest {
 
     @Test
     void shouldNotApplyProductCommissionWhenNotConfigured() {
-        // Given: funcionária comissionada só em serviços, sem productCommissionValue definido.
+        // Given: comissão de serviço configurada, mas sem % de produto configurado no salão.
         Employee emp = new Employee();
         emp.setId(1L);
         User user = new User();
         user.setName("Alice");
         emp.setUser(user);
         emp.setRemunerationType(RemunerationType.COMISSIONADO);
-        emp.setCommissionScope(CommissionScope.INDIVIDUAL);
-        emp.setRemunerationValue(new BigDecimal("10.00"));
 
         SalonService service = new SalonService();
         service.setPrice(new BigDecimal("100.00"));
+        service.setCommissionPercent(new BigDecimal("10"));
 
         Appointment apt = new Appointment();
         apt.setStatus(AppointmentStatus.DONE);
@@ -629,12 +563,12 @@ class ReportServiceTest {
         user.setName("Alice");
         emp.setUser(user);
         emp.setRemunerationType(RemunerationType.COMISSIONADO);
-        emp.setCommissionScope(CommissionScope.INDIVIDUAL);
-        emp.setRemunerationValue(new BigDecimal("10.00"));
-        emp.setProductCommissionValue(new BigDecimal("20.00"));
+
+        when(businessSettingsService.getProductCommissionPercent()).thenReturn(new BigDecimal("20.00"));
 
         SalonService service = new SalonService();
         service.setPrice(new BigDecimal("100.00"));
+        service.setCommissionPercent(new BigDecimal("10"));
 
         Appointment apt = new Appointment();
         apt.setStatus(AppointmentStatus.DONE);
@@ -672,12 +606,11 @@ class ReportServiceTest {
         user.setName("Alice");
         emp.setUser(user);
         emp.setRemunerationType(RemunerationType.COMISSIONADO);
-        emp.setCommissionScope(CommissionScope.INDIVIDUAL);
-        emp.setRemunerationValue(new BigDecimal("10.00"));
 
         SalonService service = new SalonService();
         service.setId(1L);
         service.setPrice(new BigDecimal("100.00"));
+        service.setCommissionPercent(new BigDecimal("10"));
 
         Appointment apt = new Appointment();
         apt.setId(5L);
@@ -750,13 +683,13 @@ class ReportServiceTest {
         user.setName("Alice");
         emp.setUser(user);
         emp.setRemunerationType(RemunerationType.COMISSIONADO);
-        emp.setCommissionScope(CommissionScope.INDIVIDUAL);
-        emp.setRemunerationValue(new BigDecimal("10.00")); // 10% sobre serviços
-        emp.setProductCommissionValue(new BigDecimal("20.00")); // 20% sobre produtos vendidos
+
+        when(businessSettingsService.getProductCommissionPercent()).thenReturn(new BigDecimal("20.00"));
 
         SalonService service = new SalonService();
         service.setId(1L);
         service.setPrice(new BigDecimal("100.00"));
+        service.setCommissionPercent(new BigDecimal("10"));
 
         com.cristiane.salon.models.product.entity.Product shampoo =
                 new com.cristiane.salon.models.product.entity.Product();
@@ -791,18 +724,17 @@ class ReportServiceTest {
 
     @Test
     void generateServicePricingAnalysis_shouldAllocateFixedExpensesProportionallyToRevenueAndSortByWorstMargin() {
-        // Given: Corte (R$100, comissionada 10%) feito 2x = R$200 de receita
+        // Given: Corte (R$100, comissão 10% configurada no serviço) feito 2x = R$200 de receita
         Employee commissionedEmployee = new Employee();
         commissionedEmployee.setId(1L);
         commissionedEmployee.setUser(new User());
         commissionedEmployee.setRemunerationType(RemunerationType.COMISSIONADO);
-        commissionedEmployee.setRemunerationValue(new BigDecimal("10"));
-        commissionedEmployee.setCommissionScope(CommissionScope.INDIVIDUAL);
 
         SalonService corte = new SalonService();
         corte.setId(1L);
         corte.setName("Corte");
         corte.setPrice(new BigDecimal("100.00"));
+        corte.setCommissionPercent(new BigDecimal("10"));
 
         Appointment aptCorte1 = new Appointment();
         aptCorte1.setStatus(AppointmentStatus.DONE);
@@ -857,7 +789,7 @@ class ReportServiceTest {
         var escovaItem = response.items().stream().filter(i -> i.serviceId().equals(2L)).findFirst().orElseThrow();
         assertThat(escovaItem.timesPerformed()).isEqualTo(1);
         assertThat(escovaItem.totalRevenue()).isEqualByComparingTo("50.00");
-        assertThat(escovaItem.commissionCostTotal()).isEqualByComparingTo(BigDecimal.ZERO); // salário fixo não comissiona
+        assertThat(escovaItem.commissionCostTotal()).isEqualByComparingTo(BigDecimal.ZERO); // sem % configurado no serviço
         assertThat(escovaItem.fixedExpenseShare()).isEqualByComparingTo("20.00");
         // 50 - 0 - 0 - 20 = 30
         assertThat(escovaItem.netProfit()).isEqualByComparingTo("30.00");
@@ -906,4 +838,3 @@ class ReportServiceTest {
         assertThat(response.items().get(0).netProfit()).isEqualByComparingTo("-470.00");
     }
 }
-

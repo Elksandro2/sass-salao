@@ -61,6 +61,7 @@ public class SalonServiceManager {
         }
         service.setPrice(request.price());
         service.setActive(request.active() != null ? request.active() : true);
+        service.setCommissionPercent(request.commissionPercent());
 
         SalonService saved = salonServiceRepository.save(service);
         List<ServiceProductUsageResponse> usages = replaceProductUsages(saved, request.productUsages());
@@ -80,6 +81,7 @@ public class SalonServiceManager {
         if (request.description() != null) service.setDescription(request.description());
         service.setPrice(request.price());
         if (request.active() != null) service.setActive(request.active());
+        service.setCommissionPercent(request.commissionPercent());
 
         SalonService saved = salonServiceRepository.save(service);
         List<ServiceProductUsageResponse> usages = replaceProductUsages(saved, request.productUsages());

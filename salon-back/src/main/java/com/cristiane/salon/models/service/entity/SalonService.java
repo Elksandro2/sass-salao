@@ -32,4 +32,13 @@ public class SalonService {
 
     @Column(nullable = false)
     private Boolean active = true;
+
+    /**
+     * Comissão (%) paga a qualquer funcionária Comissionada ou Fixo+Comissionada que realizar
+     * este serviço — é do serviço, não da funcionária: dois serviços diferentes pagam
+     * percentuais diferentes, mas qualquer uma que fizer o mesmo serviço recebe o mesmo %.
+     * Null/zero = este serviço não paga comissão de serviço (só a de produto, se vender algo).
+     */
+    @Column(name = "commission_percent", precision = 5, scale = 2)
+    private BigDecimal commissionPercent;
 }

@@ -6,7 +6,6 @@ import com.cristiane.salon.models.employee.dto.EmployeeBookingResponse;
 import com.cristiane.salon.models.employee.dto.EmployeeFilter;
 import com.cristiane.salon.models.employee.dto.EmployeeRequest;
 import com.cristiane.salon.models.employee.dto.EmployeeResponse;
-import com.cristiane.salon.models.employee.entity.CommissionScope;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.entity.RemunerationType;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
@@ -128,7 +127,7 @@ class EmployeeServiceTest {
     @Test
     void create_whenUserAlreadyEmployee_shouldThrowBadRequestException() {
         // Arrange
-        EmployeeRequest request = new EmployeeRequest(10L, null, null, null, null, null);
+        EmployeeRequest request = new EmployeeRequest(10L, null, null);
         when(employeeRepository.findByUserId(10L)).thenReturn(Optional.of(employee));
 
         // Act & Assert
@@ -140,7 +139,7 @@ class EmployeeServiceTest {
     @Test
     void create_whenUserNotFound_shouldThrowResourceNotFoundException() {
         // Arrange
-        EmployeeRequest request = new EmployeeRequest(99L, null, null, null, null, null);
+        EmployeeRequest request = new EmployeeRequest(99L, null, null);
         when(employeeRepository.findByUserId(99L)).thenReturn(Optional.empty());
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
@@ -153,7 +152,7 @@ class EmployeeServiceTest {
     @Test
     void create_whenUserHasInvalidRole_shouldThrowBadRequestException() {
         // Arrange
-        EmployeeRequest request = new EmployeeRequest(11L, null, null, null, null, null);
+        EmployeeRequest request = new EmployeeRequest(11L, null, null);
         when(employeeRepository.findByUserId(11L)).thenReturn(Optional.empty());
         when(userRepository.findById(11L)).thenReturn(Optional.of(clientUser));
 
@@ -166,7 +165,7 @@ class EmployeeServiceTest {
     @Test
     void create_whenRemunerationTypeIsNull_shouldSaveSuccessfully() {
         // Arrange
-        EmployeeRequest request = new EmployeeRequest(10L, null, null, null, null, null);
+        EmployeeRequest request = new EmployeeRequest(10L, null, null);
         when(employeeRepository.findByUserId(10L)).thenReturn(Optional.empty());
         when(userRepository.findById(10L)).thenReturn(Optional.of(staffUser));
         when(employeeRepository.save(any(Employee.class))).thenAnswer(invocation -> {
@@ -185,22 +184,9 @@ class EmployeeServiceTest {
     }
 
     @Test
-    void create_whenComissionadoWithoutCommissionScope_shouldThrowBadRequestException() {
-        // Arrange
-        EmployeeRequest request = new EmployeeRequest(10L, RemunerationType.COMISSIONADO, null, null, null, null);
-        when(employeeRepository.findByUserId(10L)).thenReturn(Optional.empty());
-        when(userRepository.findById(10L)).thenReturn(Optional.of(staffUser));
-
-        // Act & Assert
-        assertThatThrownBy(() -> employeeService.create(request))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessage("O escopo da comissão é obrigatório para funcionários comissionados ou mistos");
-    }
-
-    @Test
     void create_whenSalarioFixoAndRemunerationValueNegative_shouldThrowBadRequestException() {
         // Arrange
-        EmployeeRequest request = new EmployeeRequest(10L, RemunerationType.SALARIO_FIXO, null, BigDecimal.valueOf(-10), null, null);
+        EmployeeRequest request = new EmployeeRequest(10L, RemunerationType.SALARIO_FIXO, BigDecimal.valueOf(-10));
         when(employeeRepository.findByUserId(10L)).thenReturn(Optional.empty());
         when(userRepository.findById(10L)).thenReturn(Optional.of(staffUser));
 
@@ -211,48 +197,9 @@ class EmployeeServiceTest {
     }
 
     @Test
-    void create_whenComissionadoAndCommissionExceeds100_shouldThrowBadRequestException() {
+    void create_whenComissionadoSuccess_shouldSaveWithNullRemunerationValue() {
         // Arrange
-        EmployeeRequest request = new EmployeeRequest(10L, RemunerationType.COMISSIONADO, CommissionScope.INDIVIDUAL, BigDecimal.valueOf(101), null, null);
-        when(employeeRepository.findByUserId(10L)).thenReturn(Optional.empty());
-        when(userRepository.findById(10L)).thenReturn(Optional.of(staffUser));
-
-        // Act & Assert
-        assertThatThrownBy(() -> employeeService.create(request))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessage("A porcentagem de comissão não pode exceder 100%");
-    }
-
-    @Test
-    void create_whenFixoEComissionadoAndCommissionValueNegative_shouldThrowBadRequestException() {
-        // Arrange
-        EmployeeRequest request = new EmployeeRequest(10L, RemunerationType.FIXO_E_COMISSIONADO, CommissionScope.INDIVIDUAL, BigDecimal.valueOf(1000), BigDecimal.valueOf(-1), null);
-        when(employeeRepository.findByUserId(10L)).thenReturn(Optional.empty());
-        when(userRepository.findById(10L)).thenReturn(Optional.of(staffUser));
-
-        // Act & Assert
-        assertThatThrownBy(() -> employeeService.create(request))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessage("O valor da comissão não pode ser negativo");
-    }
-
-    @Test
-    void create_whenFixoEComissionadoAndCommissionValueExceeds100_shouldThrowBadRequestException() {
-        // Arrange
-        EmployeeRequest request = new EmployeeRequest(10L, RemunerationType.FIXO_E_COMISSIONADO, CommissionScope.INDIVIDUAL, BigDecimal.valueOf(1000), BigDecimal.valueOf(100.01), null);
-        when(employeeRepository.findByUserId(10L)).thenReturn(Optional.empty());
-        when(userRepository.findById(10L)).thenReturn(Optional.of(staffUser));
-
-        // Act & Assert
-        assertThatThrownBy(() -> employeeService.create(request))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessage("A porcentagem de comissão não pode exceder 100%");
-    }
-
-    @Test
-    void create_whenSalarioFixoSuccess_shouldSaveWithCorrectDefaults() {
-        // Arrange
-        EmployeeRequest request = new EmployeeRequest(10L, RemunerationType.SALARIO_FIXO, null, null, null, null);
+        EmployeeRequest request = new EmployeeRequest(10L, RemunerationType.COMISSIONADO, null);
         when(employeeRepository.findByUserId(10L)).thenReturn(Optional.empty());
         when(userRepository.findById(10L)).thenReturn(Optional.of(staffUser));
         when(employeeRepository.save(any(Employee.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -262,18 +209,35 @@ class EmployeeServiceTest {
 
         // Assert
         assertThat(result).isNotNull();
-        verify(employeeRepository).save(argThat(emp -> 
+        verify(employeeRepository).save(argThat(emp ->
+            emp.getRemunerationType() == RemunerationType.COMISSIONADO &&
+            emp.getRemunerationValue() == null
+        ));
+    }
+
+    @Test
+    void create_whenSalarioFixoSuccess_shouldSaveWithCorrectDefaults() {
+        // Arrange
+        EmployeeRequest request = new EmployeeRequest(10L, RemunerationType.SALARIO_FIXO, null);
+        when(employeeRepository.findByUserId(10L)).thenReturn(Optional.empty());
+        when(userRepository.findById(10L)).thenReturn(Optional.of(staffUser));
+        when(employeeRepository.save(any(Employee.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        EmployeeResponse result = employeeService.create(request);
+
+        // Assert
+        assertThat(result).isNotNull();
+        verify(employeeRepository).save(argThat(emp ->
             emp.getRemunerationType() == RemunerationType.SALARIO_FIXO &&
-            emp.getCommissionScope() == null &&
-            emp.getRemunerationValue().compareTo(BigDecimal.ZERO) == 0 &&
-            emp.getCommissionValue() == null
+            emp.getRemunerationValue().compareTo(BigDecimal.ZERO) == 0
         ));
     }
 
     @Test
     void create_whenFixoEComissionadoSuccess_shouldSaveCorrectly() {
         // Arrange
-        EmployeeRequest request = new EmployeeRequest(10L, RemunerationType.FIXO_E_COMISSIONADO, CommissionScope.GLOBAL, BigDecimal.valueOf(1500), BigDecimal.valueOf(10), null);
+        EmployeeRequest request = new EmployeeRequest(10L, RemunerationType.FIXO_E_COMISSIONADO, BigDecimal.valueOf(1500));
         when(employeeRepository.findByUserId(10L)).thenReturn(Optional.empty());
         when(userRepository.findById(10L)).thenReturn(Optional.of(staffUser));
         when(employeeRepository.save(any(Employee.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -283,11 +247,9 @@ class EmployeeServiceTest {
 
         // Assert
         assertThat(result).isNotNull();
-        verify(employeeRepository).save(argThat(emp -> 
+        verify(employeeRepository).save(argThat(emp ->
             emp.getRemunerationType() == RemunerationType.FIXO_E_COMISSIONADO &&
-            emp.getCommissionScope() == CommissionScope.GLOBAL &&
-            emp.getRemunerationValue().compareTo(BigDecimal.valueOf(1500)) == 0 &&
-            emp.getCommissionValue().compareTo(BigDecimal.valueOf(10)) == 0
+            emp.getRemunerationValue().compareTo(BigDecimal.valueOf(1500)) == 0
         ));
     }
 
@@ -296,7 +258,7 @@ class EmployeeServiceTest {
     @Test
     void update_whenNotFound_shouldThrowResourceNotFoundException() {
         // Arrange
-        EmployeeRequest request = new EmployeeRequest(10L, null, null, null, null, null);
+        EmployeeRequest request = new EmployeeRequest(10L, null, null);
         when(employeeRepository.findById(99L)).thenReturn(Optional.empty());
 
         // Act & Assert
@@ -308,7 +270,7 @@ class EmployeeServiceTest {
     @Test
     void update_whenUserIdChangedAndAlreadyInUse_shouldThrowBadRequestException() {
         // Arrange
-        EmployeeRequest request = new EmployeeRequest(12L, null, null, null, null, null); // changing from 10L to 12L
+        EmployeeRequest request = new EmployeeRequest(12L, null, null); // changing from 10L to 12L
         when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
         when(employeeRepository.findByUserId(12L)).thenReturn(Optional.of(new Employee()));
 
@@ -321,7 +283,7 @@ class EmployeeServiceTest {
     @Test
     void update_whenUserIdChangedAndUserNotFound_shouldThrowResourceNotFoundException() {
         // Arrange
-        EmployeeRequest request = new EmployeeRequest(99L, null, null, null, null, null);
+        EmployeeRequest request = new EmployeeRequest(99L, null, null);
         when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
         when(employeeRepository.findByUserId(99L)).thenReturn(Optional.empty());
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
@@ -340,7 +302,7 @@ class EmployeeServiceTest {
         newUser.setName("Clara");
         newUser.setRole(new Role(1L, "FUNCIONARIA", null));
 
-        EmployeeRequest request = new EmployeeRequest(12L, RemunerationType.SALARIO_FIXO, null, BigDecimal.valueOf(2000), null, null);
+        EmployeeRequest request = new EmployeeRequest(12L, RemunerationType.SALARIO_FIXO, BigDecimal.valueOf(2000));
         
         when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
         when(employeeRepository.findByUserId(12L)).thenReturn(Optional.empty());

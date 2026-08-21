@@ -3,7 +3,6 @@ package com.cristiane.salon.models.appointment.repository;
 import com.cristiane.salon.models.appointment.entity.Appointment;
 import com.cristiane.salon.models.appointment.entity.AppointmentServiceItem;
 import com.cristiane.salon.models.appointment.enums.AppointmentStatus;
-import com.cristiane.salon.models.employee.entity.CommissionScope;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.entity.RemunerationType;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
@@ -99,9 +98,7 @@ class AppointmentRepositoryTest {
         employee = new Employee();
         employee.setUser(employeeUser);
         employee.setRemunerationType(RemunerationType.COMISSIONADO);
-        employee.setCommissionScope(CommissionScope.INDIVIDUAL);
         employee.setRemunerationValue(BigDecimal.ZERO);
-        employee.setCommissionValue(BigDecimal.TEN);
         employee = employeeRepository.save(employee);
 
         salonService = new SalonService();

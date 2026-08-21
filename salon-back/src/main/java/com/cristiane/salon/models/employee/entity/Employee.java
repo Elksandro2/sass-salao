@@ -27,23 +27,15 @@ public class Employee {
     @Column(name = "remuneration_type")
     private RemunerationType remunerationType;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "commission_scope")
-    private CommissionScope commissionScope;
-
+    /**
+     * Salário base — só tem sentido para SALARIO_FIXO e FIXO_E_COMISSIONADO. Para COMISSIONADO
+     * fica null: a comissão dela não é mais um % fixo por funcionária, vem do
+     * {@code SalonService.commissionPercent} de cada serviço que ela realizar (e da comissão
+     * única de produto em {@code SalonBusinessSettings}, que vale pra qualquer tipo de
+     * remuneração — inclusive Salário Fixo, como incentivo de venda).
+     */
     @Column(name = "remuneration_value", precision = 10, scale = 2)
     private java.math.BigDecimal remunerationValue;
-
-    @Column(name = "commission_value", precision = 10, scale = 2)
-    private java.math.BigDecimal commissionValue;
-
-    /**
-     * Comissão única (%) sobre produtos vendidos em atendimentos, independente da comissão de
-     * serviços acima — só faz sentido para COMISSIONADO/FIXO_E_COMISSIONADO, usa o mesmo
-     * {@link #commissionScope} (individual/global).
-     */
-    @Column(name = "product_commission_value", precision = 10, scale = 2)
-    private java.math.BigDecimal productCommissionValue;
 
     /**
      * Separa "recebe remuneração via Employee" de "pode ser escalado num agendamento".

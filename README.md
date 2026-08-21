@@ -6,9 +6,9 @@ Sistema para gerenciamento de salão de beleza. Abrange operações administrati
 
 ---
 
-## 🚀 Status da Entrega 1 (Requisitos Acadêmicos)
+## 🚀 Destaques Técnicos
 
-O sistema cumpre todos os requisitos exigidos utilizando padrões modernos de desenvolvimento:
+O sistema foi construído utilizando padrões modernos de desenvolvimento:
 
 - **Log de Auditoria:**
   - **Backend:** Interceptação de requisições usando a anotação `@Auditable` e filtro HTTP. Captura IP real, User-Agent e mascara dados sensíveis (senhas, cartões) antes de salvar no banco.
@@ -25,9 +25,9 @@ O sistema cumpre todos os requisitos exigidos utilizando padrões modernos de de
 
 ---
 
-## 🎬 Entrega Final — Vídeo de Demonstração
+## 🎬 Vídeo de Demonstração
 
-Como parte da entrega final da disciplina, gravamos um vídeo demonstrando o sistema em funcionamento — fluxos de agendamento, painel administrativo, integrações e demais funcionalidades descritas neste README.
+Gravamos um vídeo demonstrando o sistema em funcionamento — fluxos de agendamento, painel administrativo, integrações e demais funcionalidades descritas neste README.
 
 📺 **Assista aqui:** [Apresentando sistema para salão de beleza](https://youtu.be/dAna434OWtg)
 
@@ -171,19 +171,19 @@ O sistema integra IA em duas frentes, construídas sobre a mesma configuração 
 - **Motor de recomendações:** analisa dados agregados do salão (financeiro/ocupação e retenção de clientes) e devolve sugestões acionáveis numa tela do painel admin (`/admin/recommendations`). Cada geração é cacheada, contabilizada num orçamento diário de chamadas e registrada em log de auditoria próprio.
 - **Servidor MCP (Model Context Protocol):** expõe esse mesmo motor como *tools* que um assistente de IA externo (Claude Desktop, Cursor, etc.) pode chamar diretamente fora da aplicação, autenticado por token próprio gerenciável no painel sysadmin.
 
-Toda chamada passa por um proxy **LiteLLM** (compatível com a API da OpenAI) hospedado pelo professor — o projeto não fala com nenhum provedor de LLM diretamente, apenas com esse proxy.
+Toda chamada passa por um proxy **LiteLLM** (compatível com a API da OpenAI) — o projeto não fala com nenhum provedor de LLM diretamente, apenas com esse proxy.
 
 Dois controles independentes decidem se a feature está disponível:
 - **Feature flag `ENABLE_AI_RECOMMENDATIONS`** (nasce desligada): controla se a página/menu existe, ligada/desligada como qualquer outra feature flag do sistema.
 - **Toggle operacional da Central de IA (`AiConfig.enabled`):** liga/desliga só a chamada ao provedor (ex. para pausar custos ou trocar de chave), sem esconder a tela — os botões de gerar/atualizar somem quando desligado, evitando erro ao clicar.
 
-Documentação completa (mapa de arquivos, migrations, parâmetros, decisões de design) em [`USO-DE-IA.md`](./USO-DE-IA.md); tutoriais de configuração do MCP em [`MCP-TUTORIAL.md`](./MCP-TUTORIAL.md) e [`MCP-IDEIA.md`](./MCP-IDEIA.md).
+Documentação de arquitetura e diretrizes de desenvolvimento em [`docs/`](./docs/).
 
 ---
 
 ## 📈 Observabilidade com OpenTelemetry
 
-O backend é instrumentado com **OpenTelemetry**, cobrindo os três sinais de telemetria (traces, métricas e logs), enviados via OTLP para uma stack **Grafana LGTM** (Loki + Grafana + Tempo + Prometheus/Mimir) — local via `docker-compose.yml` em desenvolvimento, e para o servidor central da disciplina (`https://otel.dsc.rodrigor.com`) em produção.
+O backend é instrumentado com **OpenTelemetry**, cobrindo os três sinais de telemetria (traces, métricas e logs), enviados via OTLP para uma stack **Grafana LGTM** (Loki + Grafana + Tempo + Prometheus/Mimir) — local via `docker-compose.yml` em desenvolvimento, e para um servidor central em produção.
 
 - **Instrumentação automática (zero-code):** um agente Java (`-javaagent`, versão fixada no `Dockerfile`) captura HTTP, JDBC e métricas da JVM em toda a aplicação, sem alterar código.
 - **Instrumentação manual (spans de negócio):** spans explícitos (`@WithSpan`) adicionados seletivamente na geração do relatório financeiro (`ReportService.java`), a rota mais lenta identificada via telemetria automática — permitiu isolar o gargalo em consultas ao banco (ver detalhes no relatório).
@@ -316,7 +316,7 @@ docker run --rm -i --network projeto-eq03_salon-network \
   -e REPORT_PATH=loadtest/report-fase1-bracket.md -e RESULT_PATH=loadtest/resultado-fase1-bracket.json \
   grafana/k6 run loadtest/carga.js
 
-# limpar banco (ver loadtest/README.md do professor para o compose local),
+# limpar banco (ver loadtest/README.md para o compose local),
 # depois Fase 2 — busca fina na faixa de transição encontrada na fase 1 (~5 min)
 docker run --rm -i --network projeto-eq03_salon-network \
   -v "${PWD}:/app" -w /app --env-file .env -e BASE_URL=http://salon-app:8080 \

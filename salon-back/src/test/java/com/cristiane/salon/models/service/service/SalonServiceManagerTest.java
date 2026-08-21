@@ -53,8 +53,8 @@ class SalonServiceManagerTest {
     @Test
     void findAll_shouldReturnPageFromRepository() {
         // Arrange
-        SalonService s1 = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true);
-        SalonService s2 = new SalonService(2L, "Barba", "Desc", new BigDecimal("30.0"), false);
+        SalonService s1 = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true, null);
+        SalonService s2 = new SalonService(2L, "Barba", "Desc", new BigDecimal("30.0"), false, null);
         Pageable pageable = PageRequest.of(0, 10);
         Page<SalonService> page = new PageImpl<>(Arrays.asList(s1, s2));
         when(salonServiceRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
@@ -73,7 +73,7 @@ class SalonServiceManagerTest {
     void findById_shouldReturnService_whenServiceExists() {
         // Arrange
         Long id = 1L;
-        SalonService s = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true);
+        SalonService s = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true, null);
         when(salonServiceRepository.findById(id)).thenReturn(Optional.of(s));
 
         // Act
@@ -99,7 +99,7 @@ class SalonServiceManagerTest {
     @Test
     void create_shouldThrowBadRequestException_whenPriceIsNegative() {
         // Arrange
-        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("-10.0"), true, null);
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("-10.0"), true, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> salonServiceManager.create(request))
@@ -110,8 +110,8 @@ class SalonServiceManagerTest {
     @Test
     void create_shouldSaveService_whenValid() {
         // Arrange
-        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), null, null);
-        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true);
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), null, null, null);
+        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true, null);
         when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
 
         // Act
@@ -130,8 +130,8 @@ class SalonServiceManagerTest {
     @Test
     void create_shouldRespectActiveFlag_whenFalse() {
         // Arrange
-        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), false, null);
-        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), false);
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), false, null, null);
+        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), false, null);
         when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
 
         // Act
@@ -154,11 +154,11 @@ class SalonServiceManagerTest {
         when(productRepository.findById(30L)).thenReturn(Optional.of(shampoo));
         when(serviceProductUsageRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true);
+        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true, null);
         when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
 
         var usageRequest = new ServiceProductUsageRequest(30L, new BigDecimal("30"));
-        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, List.of(usageRequest));
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, List.of(usageRequest), null);
 
         SalonServiceResponse result = salonServiceManager.create(request);
 
@@ -171,11 +171,11 @@ class SalonServiceManagerTest {
     @Test
     void create_withProductUsageForUnknownProduct_shouldThrowResourceNotFoundException() {
         when(productRepository.findById(99L)).thenReturn(Optional.empty());
-        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true);
+        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true, null);
         when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
 
         var usageRequest = new ServiceProductUsageRequest(99L, new BigDecimal("10"));
-        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, List.of(usageRequest));
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, List.of(usageRequest), null);
 
         assertThatThrownBy(() -> salonServiceManager.create(request))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -185,12 +185,12 @@ class SalonServiceManagerTest {
     @Test
     void update_whenProductUsagesIsNull_shouldNotTouchExistingRecipe() {
         Long id = 1L;
-        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true);
-        SalonService saved = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true);
+        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true, null);
+        SalonService saved = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true, null);
         when(salonServiceRepository.findById(id)).thenReturn(Optional.of(service));
         when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
 
-        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, null);
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, null, null);
 
         salonServiceManager.update(id, request);
 
@@ -201,7 +201,7 @@ class SalonServiceManagerTest {
     void update_shouldThrowResourceNotFoundException_whenServiceDoesNotExist() {
         // Arrange
         Long id = 1L;
-        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, null);
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, null, null);
         when(salonServiceRepository.findById(id)).thenReturn(Optional.empty());
 
         // Act & Assert
@@ -213,8 +213,8 @@ class SalonServiceManagerTest {
     void update_shouldThrowBadRequestException_whenNewPriceIsNegative() {
         // Arrange
         Long id = 1L;
-        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true);
-        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("-5.0"), true, null);
+        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true, null);
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("-5.0"), true, null, null);
 
         when(salonServiceRepository.findById(id)).thenReturn(Optional.of(service));
 
@@ -228,10 +228,10 @@ class SalonServiceManagerTest {
     void update_shouldUpdateFieldsAndSave_whenValid() {
         // Arrange
         Long id = 1L;
-        SalonService service = new SalonService(id, "Old Corte", "Old Desc", new BigDecimal("40.0"), true);
-        SalonServiceRequest request = new SalonServiceRequest("New Corte", "New Desc", new BigDecimal("50.0"), false, null);
+        SalonService service = new SalonService(id, "Old Corte", "Old Desc", new BigDecimal("40.0"), true, null);
+        SalonServiceRequest request = new SalonServiceRequest("New Corte", "New Desc", new BigDecimal("50.0"), false, null, null);
 
-        SalonService saved = new SalonService(id, "New Corte", "New Desc", new BigDecimal("50.0"), false);
+        SalonService saved = new SalonService(id, "New Corte", "New Desc", new BigDecimal("50.0"), false, null);
         when(salonServiceRepository.findById(id)).thenReturn(Optional.of(service));
         when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
 
@@ -257,7 +257,7 @@ class SalonServiceManagerTest {
     void delete_shouldMarkServiceAsInactive() {
         // Arrange
         Long id = 1L;
-        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true);
+        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true, null);
         when(salonServiceRepository.findById(id)).thenReturn(Optional.of(service));
 
         // Act
@@ -283,8 +283,8 @@ class SalonServiceManagerTest {
     void reactivate_shouldMarkServiceAsActive() {
         // Arrange
         Long id = 1L;
-        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), false);
-        SalonService saved = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true);
+        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), false, null);
+        SalonService saved = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true, null);
 
         when(salonServiceRepository.findById(id)).thenReturn(Optional.of(service));
         when(salonServiceRepository.save(service)).thenReturn(saved);

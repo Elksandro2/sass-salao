@@ -8,7 +8,6 @@ import com.cristiane.salon.models.employee.dto.EmployeeRequest;
 import com.cristiane.salon.models.employee.dto.EmployeeResponse;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.entity.RemunerationType;
-import com.cristiane.salon.models.employee.entity.CommissionScope;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
 import com.cristiane.salon.models.employee.specification.EmployeeSpecifications;
 import com.cristiane.salon.models.user.entity.User;
@@ -92,6 +91,12 @@ public class EmployeeService {
         return EmployeeResponse.fromEntity(employeeRepository.save(employee));
     }
 
+    /**
+     * COMISSIONADO não tem mais % própria — a comissão dela vem do {@code SalonService} de cada
+     * serviço que realizar, então {@code remunerationValue} fica null (e é ignorado se vier
+     * preenchido). SALARIO_FIXO e FIXO_E_COMISSIONADO usam {@code remunerationValue} como
+     * salário base, obrigatório.
+     */
     private void validateAndMapRemuneration(Employee employee, EmployeeRequest request, String roleName) {
         if (request.remunerationType() != null) {
             if ("GERENTE_DE_ATENDIMENTO".equals(roleName) && request.remunerationType() != RemunerationType.SALARIO_FIXO) {
@@ -101,67 +106,21 @@ public class EmployeeService {
 
             employee.setRemunerationType(request.remunerationType());
 
-            if (request.remunerationType() == RemunerationType.COMISSIONADO 
-                    || request.remunerationType() == RemunerationType.FIXO_E_COMISSIONADO) {
-                if (request.commissionScope() == null) {
-                    throw new BadRequestException("O escopo da comissão é obrigatório para funcionários comissionados ou mistos");
-                }
-                employee.setCommissionScope(request.commissionScope());
+            if (request.remunerationType() == RemunerationType.COMISSIONADO) {
+                employee.setRemunerationValue(null);
             } else {
-                employee.setCommissionScope(null);
-            }
-            
-            if (request.remunerationValue() != null) {
-                if (request.remunerationValue().compareTo(java.math.BigDecimal.ZERO) < 0) {
-                    throw new BadRequestException("O valor de remuneração não pode ser negativo");
-                }
-                if (request.remunerationType() == RemunerationType.COMISSIONADO 
-                        && request.remunerationValue().compareTo(new java.math.BigDecimal("100")) > 0) {
-                    throw new BadRequestException("A porcentagem de comissão não pode exceder 100%");
-                }
-                employee.setRemunerationValue(request.remunerationValue());
-            } else {
-                employee.setRemunerationValue(java.math.BigDecimal.ZERO);
-            }
-
-            if (request.remunerationType() == RemunerationType.FIXO_E_COMISSIONADO) {
-                if (request.commissionValue() != null) {
-                    if (request.commissionValue().compareTo(java.math.BigDecimal.ZERO) < 0) {
-                        throw new BadRequestException("O valor da comissão não pode ser negativo");
+                if (request.remunerationValue() != null) {
+                    if (request.remunerationValue().compareTo(java.math.BigDecimal.ZERO) < 0) {
+                        throw new BadRequestException("O valor de remuneração não pode ser negativo");
                     }
-                    if (request.commissionValue().compareTo(new java.math.BigDecimal("100")) > 0) {
-                        throw new BadRequestException("A porcentagem de comissão não pode exceder 100%");
-                    }
-                    employee.setCommissionValue(request.commissionValue());
+                    employee.setRemunerationValue(request.remunerationValue());
                 } else {
-                    employee.setCommissionValue(java.math.BigDecimal.ZERO);
+                    employee.setRemunerationValue(java.math.BigDecimal.ZERO);
                 }
-            } else {
-                employee.setCommissionValue(null);
-            }
-
-            if (request.remunerationType() == RemunerationType.COMISSIONADO
-                    || request.remunerationType() == RemunerationType.FIXO_E_COMISSIONADO) {
-                if (request.productCommissionValue() != null) {
-                    if (request.productCommissionValue().compareTo(java.math.BigDecimal.ZERO) < 0) {
-                        throw new BadRequestException("A comissão sobre produtos não pode ser negativa");
-                    }
-                    if (request.productCommissionValue().compareTo(new java.math.BigDecimal("100")) > 0) {
-                        throw new BadRequestException("A comissão sobre produtos não pode exceder 100%");
-                    }
-                    employee.setProductCommissionValue(request.productCommissionValue());
-                } else {
-                    employee.setProductCommissionValue(null);
-                }
-            } else {
-                employee.setProductCommissionValue(null);
             }
         } else {
             employee.setRemunerationType(null);
-            employee.setCommissionScope(null);
             employee.setRemunerationValue(null);
-            employee.setCommissionValue(null);
-            employee.setProductCommissionValue(null);
         }
     }
 

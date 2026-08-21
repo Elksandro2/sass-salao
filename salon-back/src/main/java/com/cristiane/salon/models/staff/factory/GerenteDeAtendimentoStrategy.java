@@ -32,10 +32,6 @@ public class GerenteDeAtendimentoStrategy implements StaffRoleStrategy {
             throw new BadRequestException(
                     "Gerente de atendimento só pode ter remuneração do tipo Salário Fixo — não presta serviço, então não há comissão");
         }
-        if (request.commissionScope() != null || request.commissionValue() != null) {
-            throw new BadRequestException(
-                    "Dados de comissão não se aplicam ao papel de gerente de atendimento");
-        }
         if (request.remunerationType() == RemunerationType.SALARIO_FIXO && request.remunerationValue() == null) {
             throw new BadRequestException("O valor do salário fixo é obrigatório");
         }

@@ -1,7 +1,6 @@
 package com.cristiane.salon.models.employee.dto;
 
 import com.cristiane.salon.models.employee.entity.RemunerationType;
-import com.cristiane.salon.models.employee.entity.CommissionScope;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
@@ -11,12 +10,6 @@ public record EmployeeRequest(
 
         RemunerationType remunerationType,
 
-        CommissionScope commissionScope,
-
-        BigDecimal remunerationValue,
-
-        BigDecimal commissionValue,
-
-        /** Comissão única (%) sobre produtos vendidos — independente da comissão de serviços acima. */
-        BigDecimal productCommissionValue
+        /** Salário base — só usado para SALARIO_FIXO/FIXO_E_COMISSIONADO. */
+        BigDecimal remunerationValue
 ) {}

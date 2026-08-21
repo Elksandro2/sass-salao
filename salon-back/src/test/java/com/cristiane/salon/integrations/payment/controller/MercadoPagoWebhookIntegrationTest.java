@@ -12,7 +12,6 @@ import com.cristiane.salon.models.cashflow.entity.CashFlow;
 import com.cristiane.salon.models.cashflow.enums.CashFlowType;
 import com.cristiane.salon.models.cashflow.repository.CashFlowRepository;
 import com.cristiane.salon.integrations.email.service.EmailService;
-import com.cristiane.salon.models.employee.entity.CommissionScope;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.entity.RemunerationType;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
@@ -139,9 +138,7 @@ class MercadoPagoWebhookIntegrationTest {
         Employee employee = new Employee();
         employee.setUser(employeeUser);
         employee.setRemunerationType(RemunerationType.COMISSIONADO);
-        employee.setCommissionScope(CommissionScope.INDIVIDUAL);
         employee.setRemunerationValue(BigDecimal.ZERO);
-        employee.setCommissionValue(BigDecimal.valueOf(10.0));
         employee = employeeRepository.save(employee);
 
         // Criar serviço

@@ -74,7 +74,7 @@ class StaffProfileServiceTest {
                 "50000-000", "Rua A", "10", null, "Boa Vista", "Recife", BrazilianState.PE,
                 PixKeyType.EMAIL, "maria@example.com",
                 LocalDate.now(), "observações",
-                RemunerationType.SALARIO_FIXO, null, new BigDecimal("2000"), null
+                RemunerationType.SALARIO_FIXO, new BigDecimal("2000")
         );
     }
 
@@ -169,7 +169,7 @@ class StaffProfileServiceTest {
                 "81999998888", null, null,
                 "50000-000", "Rua A", "10", null, "Boa Vista", "Recife", BrazilianState.PE,
                 null, null, LocalDate.now(), null,
-                null, null, null, null
+                null, null
         );
         when(strategyFactory.resolve("ADMIN")).thenThrow(new BadRequestException("papel não suportado"));
 

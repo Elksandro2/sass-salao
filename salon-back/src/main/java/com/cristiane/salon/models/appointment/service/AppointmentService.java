@@ -603,7 +603,7 @@ public class AppointmentService {
         String payerEmail = appointment.getClient().getEmail();
         String payerName = appointment.getClient().getName();
 
-        var splitInfo = splitPaymentResolver.resolve(amount, appointment.getEmployee());
+        var splitInfo = splitPaymentResolver.resolve(appointment, appointment.getEmployee());
         Payment payment = mercadoPagoPaymentService.createPixPayment(
                 amount, description, payerEmail, payerName, clientCpf, appointment.getId(), splitInfo);
 
