@@ -16,6 +16,7 @@ import { salonServicesApi } from '../../services/services/services';
 import type { SalonServiceData } from '../../services/services/services';
 import { employeesApi } from '../employees/services/employees';
 import type { EmployeeData } from '../employees/services/employees';
+import { businessSettingsService } from '../../../services/businessSettings';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import { useAlert } from '../../../hooks/useAlert';
 
@@ -58,6 +59,8 @@ export const CashFlow = () => {
 
   const [employees, setEmployees] = useState<EmployeeData[]>([]);
   const [sellerEmployeeId, setSellerEmployeeId] = useState('');
+  /** Comissão única (%) sobre produtos vendidos, válida pro salão inteiro — não é mais por funcionária. */
+  const [productCommissionPercent, setProductCommissionPercent] = useState<number | null>(null);
 
   const loadCashFlows = async () => {
     setIsLoading(true);
@@ -90,6 +93,13 @@ export const CashFlow = () => {
       setEmployees(empsData.content);
     } catch (err) {
       console.error('Erro ao carregar produtos/serviços/funcionárias para sugestão', err);
+    }
+
+    try {
+      const settings = await businessSettingsService.get();
+      setProductCommissionPercent(settings.productCommissionPercent);
+    } catch (err) {
+      console.error('Erro ao carregar comissão de produtos do salão', err);
     }
   };
 
@@ -563,19 +573,19 @@ export const CashFlow = () => {
                     </select>
                     {sellerEmployeeId &&
                       (() => {
-                        const seller = employees.find((e) => String(e.id) === sellerEmployeeId);
-                        const pct = seller?.productCommissionValue;
-                        if (pct == null) {
+                        // Comissão de produto é única do salão — vale pra qualquer funcionária
+                        // que vender, inclusive Salário Fixo (incentivo de venda).
+                        if (productCommissionPercent == null) {
                           return (
                             <p className="text-xs text-gray-400 mt-1">
-                              Essa funcionária não tem comissão sobre produtos configurada.
+                              Nenhuma comissão sobre produtos configurada no Perfil do Salão.
                             </p>
                           );
                         }
-                        const commission = (cartTotal * pct) / 100;
+                        const commission = (cartTotal * productCommissionPercent) / 100;
                         return (
                           <p className="text-xs text-[#be8a83] font-semibold mt-1">
-                            Comissão estimada ({pct}%): R$ {commission.toFixed(2)}
+                            Comissão estimada ({productCommissionPercent}%): R$ {commission.toFixed(2)}
                           </p>
                         );
                       })()}

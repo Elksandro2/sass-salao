@@ -92,8 +92,6 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
 
   useEffect(() => {
     clearErrors('remunerationValue');
-    clearErrors('commissionValue');
-    clearErrors('commissionScope');
   }, [remunerationType, clearErrors]);
 
   const handleOpenDetails = (employee: EmployeeData) => {
@@ -120,18 +118,9 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
       setSelectedUserLabel(label);
       setSelectedRole(employee.roleName);
       setValue('remunerationType', employee.remunerationType ?? '');
-      setValue('commissionScope', employee.commissionScope ?? '');
       setValue(
         'remunerationValue',
         employee.remunerationValue != null ? String(employee.remunerationValue) : undefined
-      );
-      setValue(
-        'commissionValue',
-        employee.commissionValue != null ? String(employee.commissionValue) : undefined
-      );
-      setValue(
-        'productCommissionValue',
-        employee.productCommissionValue != null ? String(employee.productCommissionValue) : undefined
       );
     } else {
       setEditingEmployee(null);
@@ -142,36 +131,14 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
   };
 
   const onSubmit = async (data: EmployeeFormValues) => {
+    const needsSalary =
+      data.remunerationType === 'SALARIO_FIXO' || data.remunerationType === 'FIXO_E_COMISSIONADO';
+
     const payload: EmployeeData = {
       userId: Number(data.userId),
       remunerationType: data.remunerationType || undefined,
+      remunerationValue: needsSalary ? Number(data.remunerationValue) : undefined,
     };
-
-    if (data.remunerationType === 'SALARIO_FIXO') {
-      payload.remunerationValue = Number(data.remunerationValue);
-      payload.commissionScope = undefined;
-      payload.commissionValue = undefined;
-      payload.productCommissionValue = undefined;
-    } else if (data.remunerationType === 'COMISSIONADO') {
-      payload.remunerationValue = Number(data.remunerationValue);
-      payload.commissionScope = data.commissionScope || undefined;
-      payload.commissionValue = undefined;
-      payload.productCommissionValue = data.productCommissionValue
-        ? Number(data.productCommissionValue)
-        : undefined;
-    } else if (data.remunerationType === 'FIXO_E_COMISSIONADO') {
-      payload.remunerationValue = Number(data.remunerationValue);
-      payload.commissionScope = data.commissionScope || undefined;
-      payload.commissionValue = Number(data.commissionValue);
-      payload.productCommissionValue = data.productCommissionValue
-        ? Number(data.productCommissionValue)
-        : undefined;
-    } else {
-      payload.remunerationValue = undefined;
-      payload.commissionScope = undefined;
-      payload.commissionValue = undefined;
-      payload.productCommissionValue = undefined;
-    }
 
     try {
       if (editingEmployee?.id) {
@@ -230,16 +197,11 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
       key: 'remunerationValue',
       label: 'Valor',
       render: (item: EmployeeData) => {
-        if (item.remunerationType === 'SALARIO_FIXO') {
+        if (item.remunerationType === 'SALARIO_FIXO' || item.remunerationType === 'FIXO_E_COMISSIONADO') {
           return `R$ ${(item.remunerationValue ?? 0).toFixed(2)}`;
         }
         if (item.remunerationType === 'COMISSIONADO') {
-          const scope = item.commissionScope === 'GLOBAL' ? 'Global' : 'Individual';
-          return `${item.remunerationValue ?? 0}% (${scope})`;
-        }
-        if (item.remunerationType === 'FIXO_E_COMISSIONADO') {
-          const scope = item.commissionScope === 'GLOBAL' ? 'Global' : 'Individual';
-          return `R$ ${(item.remunerationValue ?? 0).toFixed(2)} + ${(item.commissionValue ?? 0).toFixed(0)}% (${scope})`;
+          return 'Comissão por serviço';
         }
         return '-';
       },
@@ -251,8 +213,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
         <MercadoPagoConnectionCell
           employeeId={item.id!}
           splitApplicable={
-            (item.remunerationType === 'COMISSIONADO' || item.remunerationType === 'FIXO_E_COMISSIONADO') &&
-            item.commissionScope === 'INDIVIDUAL'
+            item.remunerationType === 'COMISSIONADO' || item.remunerationType === 'FIXO_E_COMISSIONADO'
           }
         />
       ),
@@ -408,37 +369,9 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
                 </select>
               </div>
 
-              {!isManager && (remunerationType === 'COMISSIONADO' ||
-                remunerationType === 'FIXO_E_COMISSIONADO') && (
+              {(remunerationType === 'SALARIO_FIXO' || remunerationType === 'FIXO_E_COMISSIONADO') && (
                 <div>
-                  <label className={labelCls}>Escopo da Comissão *</label>
-                  <select
-                    className={`${inputCls} ${errors.commissionScope ? 'border-rose-300' : ''}`}
-                    {...register('commissionScope')}
-                  >
-                    <option value="">Selecione o escopo...</option>
-                    <option value="INDIVIDUAL">
-                      Comissão Individual (sobre serviços executados)
-                    </option>
-                    <option value="GLOBAL">Comissão Global (sobre total do salão)</option>
-                  </select>
-                  {errors.commissionScope && (
-                    <span className="text-xs text-rose-500 font-semibold">
-                      {errors.commissionScope.message}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {(remunerationType === 'SALARIO_FIXO' ||
-                remunerationType === 'COMISSIONADO' ||
-                remunerationType === 'FIXO_E_COMISSIONADO') && (
-                <div>
-                  <label className={labelCls}>
-                    {remunerationType === 'COMISSIONADO'
-                      ? 'Porcentagem da Comissão (%) *'
-                      : 'Valor do Salário Fixo (R$) *'}
-                  </label>
+                  <label className={labelCls}>Valor do Salário Fixo (R$) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -453,43 +386,13 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
                 </div>
               )}
 
-              {remunerationType === 'FIXO_E_COMISSIONADO' && (
-                <div>
-                  <label className={labelCls}>Porcentagem da Comissão (%) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className={`${inputCls} ${errors.commissionValue ? 'border-rose-300' : ''}`}
-                    {...register('commissionValue')}
-                  />
-                  {errors.commissionValue && (
-                    <span className="text-xs text-rose-500 font-semibold">
-                      {errors.commissionValue.message}
-                    </span>
-                  )}
-                </div>
-              )}
-
               {!isManager && (remunerationType === 'COMISSIONADO' ||
                 remunerationType === 'FIXO_E_COMISSIONADO') && (
-                <div>
-                  <label className={labelCls}>Comissão sobre Produtos (%)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className={`${inputCls} ${errors.productCommissionValue ? 'border-rose-300' : ''}`}
-                    {...register('productCommissionValue')}
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Opcional. Comissão única sobre produtos vendidos em atendimentos, separada da
-                    comissão de serviços acima. Deixe em branco se ela não vende produtos.
-                  </p>
-                  {errors.productCommissionValue && (
-                    <span className="text-xs text-rose-500 font-semibold">
-                      {errors.productCommissionValue.message}
-                    </span>
-                  )}
-                </div>
+                <p className="text-xs text-gray-400">
+                  A comissão de serviço não é cadastrada aqui — é o % configurado em cada
+                  serviço do catálogo (tela de Serviços). A comissão de produtos vendidos usa a
+                  porcentagem única do salão (Perfil do Salão).
+                </p>
               )}
             </div>
           </div>
@@ -578,69 +481,23 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
                       </div>
                     )}
 
-                    {selectedEmployee.remunerationType === 'COMISSIONADO' && (
+                    {(selectedEmployee.remunerationType === 'COMISSIONADO' ||
+                      selectedEmployee.remunerationType === 'FIXO_E_COMISSIONADO') && (
                       <>
-                        <div>
-                          <span className="font-semibold text-xs text-[#3b3036]/70">Comissão:</span>{' '}
-                          <span className="text-sm font-semibold text-[#8b6d68]">
-                            {selectedEmployee.remunerationValue ?? 0}%
-                          </span>
-                        </div>
-                        <div>
-                          <span className="font-semibold text-xs text-[#3b3036]/70">Escopo:</span>{' '}
-                          <span className="text-xs font-semibold px-2 py-0.5 bg-[#eae1e1] rounded-md uppercase">
-                            {selectedEmployee.commissionScope === 'GLOBAL'
-                              ? 'Global'
-                              : 'Individual'}
-                          </span>
-                        </div>
-                        {selectedEmployee.productCommissionValue != null && (
+                        {selectedEmployee.remunerationType === 'FIXO_E_COMISSIONADO' && (
                           <div>
                             <span className="font-semibold text-xs text-[#3b3036]/70">
-                              Comissão sobre Produtos:
+                              Salário Fixo Base:
                             </span>{' '}
                             <span className="text-sm font-semibold text-[#8b6d68]">
-                              {selectedEmployee.productCommissionValue}%
+                              R$ {(selectedEmployee.remunerationValue ?? 0).toFixed(2)}
                             </span>
                           </div>
                         )}
-                      </>
-                    )}
-
-                    {selectedEmployee.remunerationType === 'FIXO_E_COMISSIONADO' && (
-                      <>
-                        <div>
-                          <span className="font-semibold text-xs text-[#3b3036]/70">
-                            Salário Fixo Base:
-                          </span>{' '}
-                          <span className="text-sm font-semibold text-[#8b6d68]">
-                            R$ {(selectedEmployee.remunerationValue ?? 0).toFixed(2)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="font-semibold text-xs text-[#3b3036]/70">Comissão:</span>{' '}
-                          <span className="text-sm font-semibold text-[#8b6d68]">
-                            {selectedEmployee.commissionValue ?? 0}%
-                          </span>
-                        </div>
-                        <div>
-                          <span className="font-semibold text-xs text-[#3b3036]/70">Escopo:</span>{' '}
-                          <span className="text-xs font-semibold px-2 py-0.5 bg-[#eae1e1] rounded-md uppercase">
-                            {selectedEmployee.commissionScope === 'GLOBAL'
-                              ? 'Global'
-                              : 'Individual'}
-                          </span>
-                        </div>
-                        {selectedEmployee.productCommissionValue != null && (
-                          <div>
-                            <span className="font-semibold text-xs text-[#3b3036]/70">
-                              Comissão sobre Produtos:
-                            </span>{' '}
-                            <span className="text-sm font-semibold text-[#8b6d68]">
-                              {selectedEmployee.productCommissionValue}%
-                            </span>
-                          </div>
-                        )}
+                        <p className="text-xs text-[#3b3036]/60">
+                          Comissão de serviço definida por serviço realizado (tela de Serviços) e
+                          comissão de produtos pela % única do salão (Perfil do Salão).
+                        </p>
                       </>
                     )}
                   </div>

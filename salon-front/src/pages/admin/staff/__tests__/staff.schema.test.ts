@@ -75,26 +75,13 @@ describe('staffFormSchema', () => {
     }
   });
 
-  it('rejects COMISSIONADO without commissionScope', () => {
+  it('accepts COMISSIONADO without a remunerationValue (commission now comes from the service, not here)', () => {
     const result = staffFormSchema.safeParse({
       ...validBase,
       remunerationType: 'COMISSIONADO',
-      remunerationValue: '10',
+      remunerationValue: undefined,
     });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues.some((i) => i.path.includes('commissionScope'))).toBe(true);
-    }
-  });
-
-  it('rejects commission percentage over 100', () => {
-    const result = staffFormSchema.safeParse({
-      ...validBase,
-      remunerationType: 'COMISSIONADO',
-      commissionScope: 'GLOBAL',
-      remunerationValue: '150',
-    });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('rejects GERENTE_DE_ATENDIMENTO with COMISSIONADO (não presta serviço, sem comissão)', () => {
@@ -102,21 +89,11 @@ describe('staffFormSchema', () => {
       ...validBase,
       roleName: 'GERENTE_DE_ATENDIMENTO',
       remunerationType: 'COMISSIONADO',
-      commissionScope: 'GLOBAL',
     });
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues.some((i) => i.path.includes('remunerationType'))).toBe(true);
     }
-  });
-
-  it('rejects GERENTE_DE_ATENDIMENTO with commissionScope set', () => {
-    const result = staffFormSchema.safeParse({
-      ...validBase,
-      roleName: 'GERENTE_DE_ATENDIMENTO',
-      commissionScope: 'GLOBAL',
-    });
-    expect(result.success).toBe(false);
   });
 
   it('rejects a missing UF', () => {

@@ -69,6 +69,7 @@ export const AdminServices = () => {
       setValue('description', service.description);
       setValue('price', service.price ?? undefined);
       setValue('active', service.active);
+      setValue('commissionPercent', service.commissionPercent ?? undefined);
       setUsageRows(
         ((service.productUsages as ServiceProductUsageResponse[]) ?? []).map((u) => ({
           productId: String(u.productId),
@@ -104,6 +105,7 @@ export const AdminServices = () => {
       const payload: SalonServiceData = {
         ...data,
         price: data.price ?? null,
+        commissionPercent: data.commissionPercent ?? null,
         productUsages: usageRows.map((r) => ({
           productId: Number(r.productId),
           quantityUsed: Number(r.quantityUsed),
@@ -159,6 +161,12 @@ export const AdminServices = () => {
         item.estimatedProductCost != null && item.estimatedProductCost > 0
           ? `R$ ${item.estimatedProductCost.toFixed(2)}`
           : '—',
+    },
+    {
+      key: 'commissionPercent',
+      label: 'Comissão',
+      render: (item: SalonServiceData) =>
+        item.commissionPercent != null ? `${item.commissionPercent}%` : '—',
     },
     {
       key: 'active',
@@ -285,6 +293,30 @@ export const AdminServices = () => {
             <p className="text-xs text-gray-400 mt-1">
               O preço final pode ser registrado no fluxo de caixa ao concluir o atendimento.
             </p>
+          </div>
+          <div>
+            <label className={labelCls}>Comissão (%)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              placeholder="Deixe em branco se este serviço não paga comissão"
+              className={`${inputCls} ${errors.commissionPercent ? 'border-rose-300' : ''}`}
+              {...register('commissionPercent', {
+                setValueAs: (v) =>
+                  v === '' || v === undefined || v === null ? undefined : Number(v),
+              })}
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Porcentagem paga a quem for Comissionada/Fixo+Comissionado e realizar este
+              serviço. Cada serviço tem sua própria %.
+            </p>
+            {errors.commissionPercent && (
+              <span className="text-xs text-rose-500 font-semibold">
+                {errors.commissionPercent.message}
+              </span>
+            )}
           </div>
           <div className="border-t border-[#eae1e1]/50 pt-4">
             <div className="flex items-center justify-between mb-2">

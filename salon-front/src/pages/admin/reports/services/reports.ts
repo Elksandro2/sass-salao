@@ -6,11 +6,11 @@ export interface EmployeeFinanceResponse {
   employeeId: number;
   employeeName: string;
   remunerationType?: 'SALARIO_FIXO' | 'COMISSIONADO' | 'FIXO_E_COMISSIONADO';
+  /** Salário base — só preenchido para SALARIO_FIXO/FIXO_E_COMISSIONADO. */
   remunerationValue?: number;
-  commissionScope?: 'INDIVIDUAL' | 'GLOBAL';
-  commissionValue?: number;
   doneAppointmentsCount: number;
   doneAppointmentsValue: number;
+  doneProductsValue: number;
   calculatedPayout: number;
 }
 
@@ -39,7 +39,6 @@ export interface PayrollItem {
   employeeId: number;
   employeeName: string;
   remunerationType?: 'SALARIO_FIXO' | 'COMISSIONADO' | 'FIXO_E_COMISSIONADO';
-  commissionScope?: 'INDIVIDUAL' | 'GLOBAL';
   baseAmount: number;
   calculatedPay: number;
 }

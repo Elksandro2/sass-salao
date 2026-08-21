@@ -123,12 +123,7 @@ export const StaffRegistration = () => {
         hiredAt: values.hiredAt || null,
         notes: values.notes || null,
         remunerationType: values.remunerationType || null,
-        commissionScope: values.roleName === 'FUNCIONARIA' ? values.commissionScope || null : null,
         remunerationValue: values.remunerationValue ? Number(values.remunerationValue) : null,
-        commissionValue:
-          values.roleName === 'FUNCIONARIA' && values.commissionValue
-            ? Number(values.commissionValue)
-            : null,
       } as Parameters<typeof staffApi.create>[0]);
 
       await showSuccess('Cadastro de equipe criado com sucesso');
@@ -455,36 +450,22 @@ export const StaffRegistration = () => {
                             <span className="text-xs text-rose-500 font-semibold">{errors.remunerationType.message}</span>
                           )}
                         </div>
-                        {roleName === 'FUNCIONARIA' && isCommissioned && (
+                        {(remunerationType === 'SALARIO_FIXO' || remunerationType === 'FIXO_E_COMISSIONADO') && (
                           <div>
-                            <label htmlFor="staff-commissionScope" className={labelCls}>Escopo da comissão</label>
-                            <select id="staff-commissionScope" className={inputCls} {...register('commissionScope')}>
-                              <option value="">Selecione</option>
-                              <option value="INDIVIDUAL">Individual</option>
-                              <option value="GLOBAL">Global</option>
-                            </select>
-                            {errors.commissionScope && (
-                              <span className="text-xs text-rose-500 font-semibold">{errors.commissionScope.message}</span>
+                            <label htmlFor="staff-remunerationValue" className={labelCls}>Valor do salário fixo (R$)</label>
+                            <input id="staff-remunerationValue" type="number" step="0.01" min="0" className={inputCls} {...register('remunerationValue')} />
+                            {errors.remunerationValue && (
+                              <span className="text-xs text-rose-500 font-semibold">{errors.remunerationValue.message}</span>
                             )}
                           </div>
                         )}
-                        <div>
-                          <label htmlFor="staff-remunerationValue" className={labelCls}>
-                            {remunerationType === 'COMISSIONADO' ? 'Comissão (%)' : 'Valor (R$)'}
-                          </label>
-                          <input id="staff-remunerationValue" type="number" step="0.01" min="0" className={inputCls} {...register('remunerationValue')} />
-                          {errors.remunerationValue && (
-                            <span className="text-xs text-rose-500 font-semibold">{errors.remunerationValue.message}</span>
-                          )}
-                        </div>
-                        {remunerationType === 'FIXO_E_COMISSIONADO' && (
-                          <div>
-                            <label htmlFor="staff-commissionValue" className={labelCls}>Comissão adicional (%)</label>
-                            <input id="staff-commissionValue" type="number" step="0.01" min="0" className={inputCls} {...register('commissionValue')} />
-                            {errors.commissionValue && (
-                              <span className="text-xs text-rose-500 font-semibold">{errors.commissionValue.message}</span>
-                            )}
-                          </div>
+                        {roleName === 'FUNCIONARIA' && isCommissioned && (
+                          <p className="text-xs text-gray-400 md:col-span-2">
+                            A comissão de serviço não é cadastrada aqui — é o % configurado em
+                            cada serviço do catálogo (tela de Serviços). A comissão sobre produtos
+                            vendidos usa a porcentagem única do salão (Perfil do Salão) — vale até
+                            pra Salário Fixo, como incentivo de venda.
+                          </p>
                         )}
                       </div>
                     </>

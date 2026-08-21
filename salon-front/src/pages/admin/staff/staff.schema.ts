@@ -5,7 +5,6 @@ const roleNameSchema = z.enum(['FUNCIONARIA', 'GERENTE_DE_ATENDIMENTO']);
 const genderSchema = z.enum(['', 'FEMININO', 'MASCULINO', 'NAO_BINARIO', 'OUTRO', 'PREFIRO_NAO_INFORMAR']);
 const pixKeyTypeSchema = z.enum(['', 'CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA']);
 const remunerationTypeSchema = z.enum(['', 'SALARIO_FIXO', 'COMISSIONADO', 'FIXO_E_COMISSIONADO']);
-const commissionScopeSchema = z.enum(['', 'INDIVIDUAL', 'GLOBAL']);
 
 const BRAZILIAN_STATES = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
@@ -85,11 +84,9 @@ export const staffFormSchema = z
     hiredAt: z.string().optional(),
     notes: z.string().max(2000, 'Máximo de 2000 caracteres').optional(),
 
-    // Remuneração (obrigatório só para FUNCIONARIA)
+    // Remuneração (obrigatório pra FUNCIONARIA e GERENTE_DE_ATENDIMENTO)
     remunerationType: remunerationTypeSchema.optional(),
-    commissionScope: commissionScopeSchema.optional(),
     remunerationValue: z.string().optional(),
-    commissionValue: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.confirmPassword !== data.password) {
@@ -117,23 +114,15 @@ export const staffFormSchema = z
       }
     }
 
-    // --- Remuneração: obrigatória pros dois papéis; gerente só pode ter Salário Fixo, sem
-    // comissão (não presta serviço, então não há base pra calcular comissão sobre nada) ---
-    if (data.roleName === 'GERENTE_DE_ATENDIMENTO') {
-      if (data.remunerationType && data.remunerationType !== 'SALARIO_FIXO') {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Gerente de atendimento só pode ter remuneração do tipo Salário Fixo',
-          path: ['remunerationType'],
-        });
-      }
-      if (data.commissionScope || data.commissionValue) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Dados de comissão não se aplicam ao papel de gerente de atendimento',
-          path: ['remunerationType'],
-        });
-      }
+    // --- Remuneração: obrigatória pros dois papéis; gerente só pode ter Salário Fixo (não
+    // presta serviço, então não há base pra calcular comissão sobre nada). Comissão não é
+    // cadastrada aqui — vem do % de cada serviço/produto realizado. ---
+    if (data.roleName === 'GERENTE_DE_ATENDIMENTO' && data.remunerationType && data.remunerationType !== 'SALARIO_FIXO') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Gerente de atendimento só pode ter remuneração do tipo Salário Fixo',
+        path: ['remunerationType'],
+      });
     }
 
     if (data.roleName === 'FUNCIONARIA' || data.roleName === 'GERENTE_DE_ATENDIMENTO') {
@@ -146,49 +135,18 @@ export const staffFormSchema = z
         return;
       }
 
-      const isCommissioned =
-        data.remunerationType === 'COMISSIONADO' || data.remunerationType === 'FIXO_E_COMISSIONADO';
+      const needsSalary =
+        data.remunerationType === 'SALARIO_FIXO' || data.remunerationType === 'FIXO_E_COMISSIONADO';
 
-      if (isCommissioned && !data.commissionScope) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'O escopo da comissão é obrigatório',
-          path: ['commissionScope'],
-        });
-      }
-
-      if (!data.remunerationValue) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'O valor de remuneração é obrigatório',
-          path: ['remunerationValue'],
-        });
-      } else {
-        const num = Number(data.remunerationValue);
-        if (num < 0) {
-          ctx.addIssue({ code: 'custom', message: 'Não pode ser negativo', path: ['remunerationValue'] });
-        } else if (data.remunerationType === 'COMISSIONADO' && num > 100) {
+      if (needsSalary) {
+        if (!data.remunerationValue) {
           ctx.addIssue({
             code: 'custom',
-            message: 'A porcentagem não pode exceder 100%',
+            message: 'O valor do salário é obrigatório',
             path: ['remunerationValue'],
           });
-        }
-      }
-
-      if (data.remunerationType === 'FIXO_E_COMISSIONADO') {
-        if (!data.commissionValue) {
-          ctx.addIssue({
-            code: 'custom',
-            message: 'A porcentagem de comissão é obrigatória',
-            path: ['commissionValue'],
-          });
-        } else if (Number(data.commissionValue) > 100) {
-          ctx.addIssue({
-            code: 'custom',
-            message: 'A porcentagem não pode exceder 100%',
-            path: ['commissionValue'],
-          });
+        } else if (Number(data.remunerationValue) < 0) {
+          ctx.addIssue({ code: 'custom', message: 'Não pode ser negativo', path: ['remunerationValue'] });
         }
       }
     }

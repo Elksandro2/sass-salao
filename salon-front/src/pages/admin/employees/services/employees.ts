@@ -9,11 +9,8 @@ export interface EmployeeData {
   email?: string;
   roleName?: 'FUNCIONARIA' | 'GERENTE_DE_ATENDIMENTO' | 'ADMIN';
   remunerationType?: 'SALARIO_FIXO' | 'COMISSIONADO' | 'FIXO_E_COMISSIONADO';
-  commissionScope?: 'INDIVIDUAL' | 'GLOBAL';
+  /** Salário base — só se aplica a SALARIO_FIXO/FIXO_E_COMISSIONADO. Comissão vem do serviço/produto, não daqui. */
   remunerationValue?: number;
-  commissionValue?: number;
-  /** Comissão única (%) sobre produtos vendidos — independente da comissão de serviços acima. */
-  productCommissionValue?: number;
 }
 
 export interface EmployeeFilter {

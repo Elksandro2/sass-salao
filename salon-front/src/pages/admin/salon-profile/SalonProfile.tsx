@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Store, Clock } from 'lucide-react';
+import { Store, Clock, Percent } from 'lucide-react';
 import {
   salonProfileService,
   DAY_ORDER,
@@ -9,6 +9,7 @@ import {
   type SalonProfileData,
   type SalonProfileUpdatePayload,
 } from '../../../services/salonProfile';
+import { businessSettingsService } from '../../../services/businessSettings';
 import { useAlert } from '../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import { salonProfileFormSchema } from './salonProfile.schema';
@@ -33,6 +34,10 @@ export const SalonProfile = () => {
   const [profile, setProfile] = useState<SalonProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [productCommissionPercent, setProductCommissionPercent] = useState('');
+  const [businessSettingsUpdatedAt, setBusinessSettingsUpdatedAt] = useState<string | null>(null);
+  const [isSavingCommission, setIsSavingCommission] = useState(false);
 
   const { error: showError, success: showSuccess } = useAlert();
 
@@ -79,6 +84,37 @@ export const SalonProfile = () => {
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
+
+  useEffect(() => {
+    businessSettingsService
+      .get()
+      .then((data) => {
+        setProductCommissionPercent(
+          data.productCommissionPercent != null ? String(data.productCommissionPercent) : ''
+        );
+        setBusinessSettingsUpdatedAt(data.updatedAt);
+      })
+      .catch((err) => showError(getApiErrorMessage(err, 'Erro ao carregar a comissão de produtos.')));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSaveCommission = async () => {
+    setIsSavingCommission(true);
+    try {
+      const updated = await businessSettingsService.update({
+        productCommissionPercent: productCommissionPercent ? Number(productCommissionPercent) : null,
+      });
+      setProductCommissionPercent(
+        updated.productCommissionPercent != null ? String(updated.productCommissionPercent) : ''
+      );
+      setBusinessSettingsUpdatedAt(updated.updatedAt);
+      showSuccess('Comissão sobre produtos atualizada com sucesso.');
+    } catch (err) {
+      showError(getApiErrorMessage(err, 'Erro ao salvar a comissão sobre produtos.'));
+    } finally {
+      setIsSavingCommission(false);
+    }
+  };
 
   const onSubmit = async (data: SalonProfileFormValues) => {
     setIsSaving(true);
@@ -242,6 +278,48 @@ export const SalonProfile = () => {
           {isSaving ? 'Salvando...' : 'Salvar perfil'}
         </button>
       </form>
+
+      <div className="bg-white rounded-2xl border border-[#eae1e1]/80 p-6 space-y-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Percent size={18} className="text-[#be8a83]" />
+          <span className="text-sm font-bold text-[#3b3036]">Comissão sobre produtos vendidos</span>
+        </div>
+        <p className="text-xs text-[#3b3036]/60">
+          Porcentagem única, válida pro salão inteiro — qualquer funcionária que vender qualquer
+          produto recebe essa %. É uma exceção deliberada à regra geral: vale até para quem é
+          <strong> Salário Fixo</strong>, como incentivo à venda (diferente da comissão de
+          serviços, que é configurada por serviço na tela de Serviços).
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1.5">
+            <label htmlFor="product-commission-percent" className={labelCls}>Comissão (%)</label>
+            <input
+              id="product-commission-percent"
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              placeholder="Deixe em branco para não pagar comissão sobre produtos"
+              value={productCommissionPercent}
+              onChange={(e) => setProductCommissionPercent(e.target.value)}
+              className={`${inputCls} !w-64`}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveCommission}
+            disabled={isSavingCommission}
+            className="px-6 py-2.5 bg-[#be8a83] hover:bg-[#a1706a] text-[#fcf9f9] font-semibold rounded-xl text-sm transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+          >
+            {isSavingCommission ? 'Salvando...' : 'Salvar comissão'}
+          </button>
+        </div>
+        {businessSettingsUpdatedAt && (
+          <p className="text-xs text-[#3b3036]/50">
+            Última atualização em {new Date(businessSettingsUpdatedAt).toLocaleString('pt-BR')}
+          </p>
+        )}
+      </div>
     </div>
   );
 };

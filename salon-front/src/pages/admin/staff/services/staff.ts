@@ -13,7 +13,6 @@ export type BrazilianState =
   | 'PA' | 'PB' | 'PR' | 'PE' | 'PI' | 'RJ' | 'RN' | 'RS' | 'RO' | 'RR' | 'SC' | 'SP' | 'SE' | 'TO';
 
 export type RemunerationType = 'SALARIO_FIXO' | 'COMISSIONADO' | 'FIXO_E_COMISSIONADO';
-export type CommissionScope = 'INDIVIDUAL' | 'GLOBAL';
 
 /**
  * Payload de criação. Note que `cpf` e `pixKey` só existem aqui (na ida) — a API nunca os
@@ -51,9 +50,8 @@ export interface StaffProfileCreatePayload {
   notes?: string | null;
 
   remunerationType?: RemunerationType | null;
-  commissionScope?: CommissionScope | null;
+  /** Salário base — só se aplica a SALARIO_FIXO/FIXO_E_COMISSIONADO. */
   remunerationValue?: number | null;
-  commissionValue?: number | null;
 }
 
 /** Resposta da API. Nunca contém CPF nem chave PIX em texto claro — só versões mascaradas. */

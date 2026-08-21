@@ -164,12 +164,10 @@ export const Reports = () => {
             baseStr = `R$ ${(emp.remunerationValue ?? 0).toFixed(2)}`;
           } else if (emp.remunerationType === 'COMISSIONADO') {
             typeStr = 'Comissionado';
-            const scopeStr = emp.commissionScope === 'GLOBAL' ? 'Global' : 'Individual';
-            baseStr = `${emp.remunerationValue ?? 0}% (${scopeStr})`;
+            baseStr = 'Comissão por serviço';
           } else if (emp.remunerationType === 'FIXO_E_COMISSIONADO') {
             typeStr = 'Fixo + Comissionado';
-            const scopeStr = emp.commissionScope === 'GLOBAL' ? 'Global' : 'Individual';
-            baseStr = `R$ ${(emp.remunerationValue ?? 0).toFixed(2)} + ${(emp.commissionValue ?? 0).toFixed(0)}% (${scopeStr})`;
+            baseStr = `R$ ${(emp.remunerationValue ?? 0).toFixed(2)} + comissão por serviço`;
           }
 
           return [
@@ -530,14 +528,10 @@ export const Reports = () => {
                               baseStr = formatBRL(emp.remunerationValue ?? 0);
                             } else if (emp.remunerationType === 'COMISSIONADO') {
                               typeStr = 'Comissionado';
-                              const scopeStr =
-                                emp.commissionScope === 'GLOBAL' ? 'Global' : 'Individual';
-                              baseStr = `${emp.remunerationValue ?? 0}% (${scopeStr})`;
+                              baseStr = 'Comissão por serviço';
                             } else if (emp.remunerationType === 'FIXO_E_COMISSIONADO') {
                               typeStr = 'Fixo + Comissionado';
-                              const scopeStr =
-                                emp.commissionScope === 'GLOBAL' ? 'Global' : 'Individual';
-                              baseStr = `${formatBRL(emp.remunerationValue ?? 0)} + ${(emp.commissionValue ?? 0).toFixed(0)}% (${scopeStr})`;
+                              baseStr = `${formatBRL(emp.remunerationValue ?? 0)} + comissão por serviço`;
                             }
 
                             return (
@@ -635,9 +629,6 @@ export const Reports = () => {
                         <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider">
                           Regime Contratual
                         </th>
-                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider">
-                          Escopo de Comissão
-                        </th>
                         <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-right">
                           Base de Cálculo
                         </th>
@@ -678,23 +669,6 @@ export const Reports = () => {
                                 {!item.remunerationType && <span className="text-gray-400">-</span>}
                               </td>
 
-                              {/* Commission Scope Badge */}
-                              <td className="px-6 py-4 text-sm">
-                                {item.commissionScope === 'INDIVIDUAL' && (
-                                  <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                                    Individual
-                                  </span>
-                                )}
-                                {item.commissionScope === 'GLOBAL' && (
-                                  <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-sky-50 text-sky-700 border border-sky-200">
-                                    Global
-                                  </span>
-                                )}
-                                {!item.commissionScope && (
-                                  <span className="text-gray-400 font-medium">-</span>
-                                )}
-                              </td>
-
                               {/* Base Amount */}
                               <td className="px-6 py-4 text-sm text-[#7a7074] text-right">
                                 {formatBRL(item.baseAmount)}
@@ -709,7 +683,7 @@ export const Reports = () => {
                         })
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-6 py-10 text-center text-sm text-[#7a7074]">
+                          <td colSpan={4} className="px-6 py-10 text-center text-sm text-[#7a7074]">
                             Nenhum registro de pagamento encontrado para o período selecionado.
                           </td>
                         </tr>

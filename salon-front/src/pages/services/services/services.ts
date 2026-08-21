@@ -25,6 +25,8 @@ export interface SalonServiceData {
   /** Receita: quanto de cada produto este serviço consome por execução. */
   productUsages?: ServiceProductUsageRequest[] | ServiceProductUsageResponse[] | null;
   estimatedProductCost?: number | null;
+  /** Comissão (%) paga a quem for Comissionada/Fixo+Comissionada e realizar este serviço. */
+  commissionPercent?: number | null;
 }
 
 export interface SalonServiceFilter {
