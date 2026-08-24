@@ -181,8 +181,8 @@ export const AdminLayout = () => {
 
         {!isCollapsed && (
           <div className="shrink-0 px-3 py-3 border-t border-[#eae1e1]/50 text-center">
-            <span className="text-[10px] text-[#3b3036]/35">
-              Sistema desenvolvido por <span className="text-[#be8a83]/70">Elksandro</span>
+            <span className="text-[10px] text-[#3b3036]/40">
+              Sistema desenvolvido por <span className="text-[#be8a83]">Elksandro</span>
             </span>
           </div>
         )}
