@@ -85,6 +85,8 @@ export const AdminAppointments = () => {
 
   const [products, setProducts] = useState<ProductData[]>([]);
   const [selectedClient, setSelectedClient] = useState('');
+  const [clientSearch, setClientSearch] = useState('');
+  const [employeeSearch, setEmployeeSearch] = useState('');
   const [selectedServiceIds, setSelectedServiceIds] = useState<number[]>([]);
   const [serviceSearch, setServiceSearch] = useState('');
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
@@ -793,6 +795,15 @@ export const AdminAppointments = () => {
                       <UserIcon size={14} className="inline mr-1" />
                       Cliente
                     </label>
+                    {clients.length > 6 && (
+                      <input
+                        type="text"
+                        value={clientSearch}
+                        onChange={(e) => setClientSearch(e.target.value)}
+                        placeholder="Buscar cliente por nome..."
+                        className={`${selectCls} mb-2`}
+                      />
+                    )}
                     <select
                       value={selectedClient}
                       onChange={(e) => setSelectedClient(e.target.value)}
@@ -800,11 +811,17 @@ export const AdminAppointments = () => {
                       className={selectCls}
                     >
                       <option value="">Selecione o cliente</option>
-                      {clients.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
+                      {clients
+                        .filter(
+                          (c) =>
+                            String(c.id) === selectedClient ||
+                            c.name.toLowerCase().includes(clientSearch.trim().toLowerCase())
+                        )
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
                     </select>
                   </div>
                   <div>
@@ -812,6 +829,15 @@ export const AdminAppointments = () => {
                       <UserIcon size={14} className="inline mr-1" />
                       Profissional
                     </label>
+                    {!isFuncionaria && employees.length > 6 && (
+                      <input
+                        type="text"
+                        value={employeeSearch}
+                        onChange={(e) => setEmployeeSearch(e.target.value)}
+                        placeholder="Buscar profissional por nome..."
+                        className={`${selectCls} mb-2`}
+                      />
+                    )}
                     <select
                       value={selectedEmployee}
                       onChange={(e) => setSelectedEmployee(e.target.value)}
@@ -820,11 +846,17 @@ export const AdminAppointments = () => {
                       className={`${selectCls} ${isFuncionaria ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
                       <option value="">Selecione a profissional</option>
-                      {employees.map((e) => (
-                        <option key={e.id} value={e.id}>
-                          {e.name}
-                        </option>
-                      ))}
+                      {employees
+                        .filter(
+                          (e) =>
+                            String(e.id) === selectedEmployee ||
+                            (e.name ?? '').toLowerCase().includes(employeeSearch.trim().toLowerCase())
+                        )
+                        .map((e) => (
+                          <option key={e.id} value={e.id}>
+                            {e.name}
+                          </option>
+                        ))}
                     </select>
                     {isFuncionaria && (
                       <p className="text-xs text-gray-400 mt-1">

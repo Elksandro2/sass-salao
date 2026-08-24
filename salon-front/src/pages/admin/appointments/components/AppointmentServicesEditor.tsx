@@ -28,6 +28,7 @@ interface AppointmentServicesEditorProps {
 
 export const AppointmentServicesEditor = ({ appointment, onSaved }: AppointmentServicesEditorProps) => {
   const [catalog, setCatalog] = useState<SalonServiceData[]>([]);
+  const [serviceSearch, setServiceSearch] = useState('');
   const [rows, setRows] = useState<ServiceRow[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const { error: showError, success: showSuccess } = useAlert();
@@ -116,6 +117,15 @@ export const AppointmentServicesEditor = ({ appointment, onSaved }: AppointmentS
             A cliente decidiu fazer mais alguma coisa? Adicione aqui, mesmo com o agendamento já
             confirmado.
           </p>
+          {catalog.length > 6 && (
+            <input
+              type="text"
+              value={serviceSearch}
+              onChange={(e) => setServiceSearch(e.target.value)}
+              placeholder="Buscar serviço por nome..."
+              className={`${inputCls} mb-2`}
+            />
+          )}
           <div className="space-y-2">
             {rows.map((row, index) => (
               <div key={index} className="flex items-center gap-2">
@@ -125,12 +135,18 @@ export const AppointmentServicesEditor = ({ appointment, onSaved }: AppointmentS
                   onChange={(e) => updateRow(index, { serviceId: e.target.value })}
                 >
                   <option value="">Selecione o serviço...</option>
-                  {catalog.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                      {s.price != null ? ` — R$ ${s.price.toFixed(2)}` : ''}
-                    </option>
-                  ))}
+                  {catalog
+                    .filter(
+                      (s) =>
+                        String(s.id) === row.serviceId ||
+                        s.name.toLowerCase().includes(serviceSearch.trim().toLowerCase())
+                    )
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                        {s.price != null ? ` — R$ ${s.price.toFixed(2)}` : ''}
+                      </option>
+                    ))}
                 </select>
                 <input
                   type="number"

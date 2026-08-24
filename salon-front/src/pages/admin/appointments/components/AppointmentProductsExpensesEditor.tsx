@@ -41,6 +41,7 @@ export const AppointmentProductsExpensesEditor = ({
   onSaved,
 }: AppointmentProductsExpensesEditorProps) => {
   const [catalog, setCatalog] = useState<ProductData[]>([]);
+  const [productSearch, setProductSearch] = useState('');
   const [productRows, setProductRows] = useState<ProductRow[]>([]);
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>([]);
   const [isSavingProducts, setIsSavingProducts] = useState(false);
@@ -206,6 +207,15 @@ export const AppointmentProductsExpensesEditor = ({
               {productRows.length === 0 && (
                 <p className="text-xs text-gray-400">Nenhum produto adicionado.</p>
               )}
+              {catalog.length > 6 && (
+                <input
+                  type="text"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Buscar produto por nome..."
+                  className={`${inputCls} mb-1`}
+                />
+              )}
               {productRows.map((row, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <select
@@ -214,11 +224,17 @@ export const AppointmentProductsExpensesEditor = ({
                     onChange={(e) => updateProductRow(index, { productId: e.target.value })}
                   >
                     <option value="">Selecione o produto...</option>
-                    {catalog.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} — R$ {p.price.toFixed(2)}
-                      </option>
-                    ))}
+                    {catalog
+                      .filter(
+                        (p) =>
+                          String(p.id) === row.productId ||
+                          p.name.toLowerCase().includes(productSearch.trim().toLowerCase())
+                      )
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} — R$ {p.price.toFixed(2)}
+                        </option>
+                      ))}
                   </select>
                   <input
                     type="number"
