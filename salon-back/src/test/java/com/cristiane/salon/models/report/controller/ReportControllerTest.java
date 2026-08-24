@@ -41,7 +41,7 @@ class ReportControllerTest extends BaseControllerTest {
     void findByPeriodReturns200_whenAuthorized() throws Exception {
         FinancialReportResponse response = new FinancialReportResponse(
                 BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.TEN, List.of(), "Period"
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.TEN, List.of(), "Period"
         );
         when(reportService.generateFinancialReport(any(), any())).thenReturn(response);
 

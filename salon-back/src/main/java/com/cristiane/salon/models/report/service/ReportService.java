@@ -256,6 +256,10 @@ public class ReportService {
                 .map(CashFlow::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        // Gastos fixos (aluguel, água, luz, etc.) são lançados numa tela dedicada, separada do
+        // Fluxo de Caixa — mas ainda assim são gasto real do salão, então entram no lucro líquido.
+        BigDecimal totalFixedExpenses = fixedExpenseRepository.sumAmountByDateBetween(from, to);
+
         List<Appointment> doneAppointments = findAppointmentsInPeriod(from, to).stream()
                 .filter(a -> a.getStatus() == AppointmentStatus.DONE)
                 .collect(Collectors.toList());
@@ -295,7 +299,8 @@ public class ReportService {
             ));
         }
 
-        BigDecimal netProfit = income.subtract(expense).subtract(totalSalaryPaid).subtract(totalCommissionPaid);
+        BigDecimal netProfit = income.subtract(expense).subtract(totalSalaryPaid)
+                .subtract(totalCommissionPaid).subtract(totalFixedExpenses);
         String period = from + " a " + to;
 
         Span.current().setAttribute("relatorio.lucro_liquido", netProfit.doubleValue());
@@ -313,7 +318,8 @@ public class ReportService {
             MDC.remove("relatorio.lucro_liquido");
         }
 
-        return new FinancialReportResponse(income, expense, totalSalaryPaid, totalCommissionPaid, netProfit, employeeFinanceDetails, period);
+        return new FinancialReportResponse(income, expense, totalSalaryPaid, totalCommissionPaid,
+                totalFixedExpenses, netProfit, employeeFinanceDetails, period);
     }
 
     /**

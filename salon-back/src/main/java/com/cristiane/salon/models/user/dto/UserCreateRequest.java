@@ -28,7 +28,8 @@ public record UserCreateRequest(
         @Size(max = 20, message = "O telefone não pode exceder 20 caracteres")
         String phone,
 
-        @Pattern(regexp = "^\\d{11}$", message = "O CPF deve conter exatamente 11 dígitos numéricos")
+        /** Opcional no cadastro — só passa a ser exigido/validado na hora de gerar um PIX. */
+        @Pattern(regexp = "^$|^\\d{11}$", message = "O CPF deve conter exatamente 11 dígitos numéricos")
         String cpf,
 
         Boolean active,

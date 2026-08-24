@@ -101,7 +101,11 @@ public class UserService {
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(rawPassword));
         user.setPhone(request.phone());
-        user.setCpf(request.cpf());
+        // Opcional no cadastro — só é exigido/validado de fato na hora de gerar um PIX
+        // (ver AppointmentService), não aqui.
+        if (request.cpf() != null && !request.cpf().isBlank()) {
+            user.setCpf(request.cpf().replaceAll("\\D", ""));
+        }
         user.setRole(role);
 
         if (request.active() != null) {

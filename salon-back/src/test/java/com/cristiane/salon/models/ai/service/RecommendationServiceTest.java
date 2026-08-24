@@ -142,7 +142,7 @@ class RecommendationServiceTest {
         when(aiConfigService.getDecryptedApiKey(config)).thenReturn("sk-test");
         when(callLogRepository.countSuccessfulSince(any())).thenReturn(0L);
         when(reportService.generateFinancialReport(any(), any())).thenReturn(
-                new FinancialReportResponse(BigDecimal.TEN, BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.TEN, List.of(), "mock")
+                new FinancialReportResponse(BigDecimal.TEN, BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.TEN, List.of(), "mock")
         );
         when(reportService.generateAppointmentReport(any(), any())).thenReturn(
                 new AppointmentReportResponse(10, 2, 3, 4, 1, Map.of(), Map.of(), "mock")

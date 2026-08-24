@@ -70,6 +70,8 @@ class ReportServiceTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(fixedExpenseRepository.sumAmountByDateBetween(any(), any()))
+                .thenReturn(BigDecimal.ZERO);
     }
 
     private void withService(Appointment appointment, SalonService svc) {
