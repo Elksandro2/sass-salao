@@ -399,13 +399,13 @@ describe('AdminAppointments Component', () => {
     expect(screen.getByLabelText(/Serviço 3/i)).toBeInTheDocument();
   });
 
-  it('does not show a search box when there are 6 or fewer services', async () => {
+  it('shows the search box even with 6 or fewer services', async () => {
     await act(async () => {
       renderAdminAppointments();
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Novo Agendamento/i }));
 
-    expect(screen.queryByPlaceholderText('Buscar serviço por nome...')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Buscar serviço por nome...')).toBeInTheDocument();
   });
 });

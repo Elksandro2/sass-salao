@@ -4,7 +4,9 @@ export const usePermission = (method: string, endpoint: string) => {
   const { user } = useAuth();
 
   if (!user) return false;
-  if (user.role === 'ADMIN') return true;
+  // Espelha o bypass do backend (VerifyUserPermissions) — SYSADMIN e ADMIN têm acesso a tudo,
+  // inclusive endpoints sem nenhuma linha de permissão explícita (ver migrations V34/V36/V42).
+  if (user.role === 'ADMIN' || user.role === 'SYSADMIN') return true;
 
   const requestAuthority = `${method.toUpperCase()}:${endpoint}`;
 

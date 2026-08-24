@@ -232,14 +232,14 @@ export const StaffRegistration = () => {
             </div>
 
             {step === 1 && (
-              <div className="p-6 space-y-4 overflow-y-auto">
+              <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                 <RoleSelector value={roleName ?? null} onChange={chooseRole} />
               </div>
             )}
 
             {step === 2 && (
-              <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col overflow-hidden">
-                <div className="p-6 space-y-5 overflow-y-auto">
+              <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col overflow-hidden flex-1 min-h-0">
+                <div className="p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
                   <div className="p-3.5 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700 flex items-start gap-2">
                     <ShieldCheck size={16} className="shrink-0 mt-0.5" />
                     <span>
@@ -530,7 +530,7 @@ export const StaffRegistration = () => {
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6 space-y-4 text-sm overflow-y-auto">
+            <div className="p-6 space-y-4 text-sm overflow-y-auto flex-1 min-h-0">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <span className={labelCls}>Papel</span>

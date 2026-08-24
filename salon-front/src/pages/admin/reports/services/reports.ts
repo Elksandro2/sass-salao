@@ -16,9 +16,12 @@ export interface EmployeeFinanceResponse {
 
 export interface FinancialReportResponse {
   totalIncome: number;
+  /** Saídas lançadas no Fluxo de Caixa (livre) — não inclui os Gastos Fixos, contados à parte. */
   totalExpense: number;
   totalSalaryPaid: number;
   totalCommissionPaid: number;
+  /** Aluguel, água, luz, etc. — tela dedicada de Gastos Fixos. */
+  totalFixedExpenses: number;
   netProfit: number;
   employeeFinanceDetails: EmployeeFinanceResponse[];
   period: string;

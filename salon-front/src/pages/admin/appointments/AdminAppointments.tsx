@@ -88,6 +88,7 @@ export const AdminAppointments = () => {
   const [selectedServiceIds, setSelectedServiceIds] = useState<number[]>([]);
   const [serviceSearch, setServiceSearch] = useState('');
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
+  const [productSearch, setProductSearch] = useState('');
   const [productQuantities, setProductQuantities] = useState<Record<number, string>>({});
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [selectedDateTime, setSelectedDateTime] = useState('');
@@ -774,8 +775,8 @@ export const AdminAppointments = () => {
       {/* Create Appointment Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#261f23]/40 backdrop-blur-md">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl border border-[#eae1e1]/85 overflow-hidden animate-scale-up">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#eae1e1] bg-[#fcf9f9]/50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl border border-[#eae1e1]/85 overflow-hidden animate-scale-up max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#eae1e1] bg-[#fcf9f9]/50 shrink-0">
               <h3 className="font-heading text-lg font-bold text-[#3b3036]">Novo Agendamento</h3>
               <button
                 onClick={() => setShowModal(false)}
@@ -784,8 +785,8 @@ export const AdminAppointments = () => {
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleCreateAppointment}>
-              <div className="p-6 space-y-4">
+            <form onSubmit={handleCreateAppointment} className="flex flex-col overflow-hidden flex-1 min-h-0">
+              <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className={labelCls}>
@@ -855,16 +856,18 @@ export const AdminAppointments = () => {
                     <Clock size={14} className="inline mr-1" />
                     Serviços
                   </label>
-                  {services.length > 6 && (
-                    <input
-                      type="text"
-                      value={serviceSearch}
-                      onChange={(e) => setServiceSearch(e.target.value)}
-                      placeholder="Buscar serviço por nome..."
-                      className={`${selectCls} mb-2`}
-                    />
-                  )}
+                  <input
+                    type="text"
+                    value={serviceSearch}
+                    onChange={(e) => setServiceSearch(e.target.value)}
+                    placeholder="Buscar serviço por nome..."
+                    className={`${selectCls} mb-2`}
+                  />
                   <div className="border border-[#eae1e1] rounded-xl max-h-40 overflow-y-auto divide-y divide-[#eae1e1]/70">
+                    {services.filter((s) => s.name.toLowerCase().includes(serviceSearch.trim().toLowerCase()))
+                      .length === 0 && (
+                      <p className="px-3.5 py-2.5 text-xs text-gray-400">Nenhum serviço encontrado.</p>
+                    )}
                     {services
                       .filter((s) => s.name.toLowerCase().includes(serviceSearch.trim().toLowerCase()))
                       .map((s) => (
@@ -905,8 +908,21 @@ export const AdminAppointments = () => {
                 {products.length > 0 && (
                   <div>
                     <label className={labelCls}>Produtos vendidos (opcional)</label>
+                    <input
+                      type="text"
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      placeholder="Buscar produto por nome..."
+                      className={`${selectCls} mb-2`}
+                    />
                     <div className="border border-[#eae1e1] rounded-xl max-h-40 overflow-y-auto divide-y divide-[#eae1e1]/70">
-                      {products.map((p) => (
+                      {products.filter((p) => p.name.toLowerCase().includes(productSearch.trim().toLowerCase()))
+                        .length === 0 && (
+                        <p className="px-3.5 py-2.5 text-xs text-gray-400">Nenhum produto encontrado.</p>
+                      )}
+                      {products
+                        .filter((p) => p.name.toLowerCase().includes(productSearch.trim().toLowerCase()))
+                        .map((p) => (
                         <div
                           key={p.id}
                           className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-[#3b3036] hover:bg-[#fdf6f5] transition-all"
@@ -942,7 +958,7 @@ export const AdminAppointments = () => {
                   <strong>solicitação</strong> para você aceitar e marcar o horário.
                 </div>
               </div>
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-[#eae1e1] bg-[#fcf9f9]/50">
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-[#eae1e1] bg-[#fcf9f9]/50 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}

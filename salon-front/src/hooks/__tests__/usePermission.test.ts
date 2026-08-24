@@ -40,6 +40,25 @@ describe('usePermission', () => {
     expect(result).toBe(true);
   });
 
+  it('should return true if user role is SYSADMIN', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: {
+        email: 'sysadmin@salao.com',
+        role: 'SYSADMIN',
+        userId: 1,
+        permissions: [],
+      },
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      updateUserCpf: vi.fn(),
+      isLoading: false,
+    });
+
+    const result = usePermission('POST', '/v1/salon/profile');
+    expect(result).toBe(true);
+  });
+
   it('should return true if requestAuthority matches exactly', () => {
     vi.mocked(useAuth).mockReturnValue({
       user: {

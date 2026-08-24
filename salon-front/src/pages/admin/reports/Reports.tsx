@@ -127,7 +127,7 @@ export const Reports = () => {
       autoTable(doc, {
         startY: currentY,
         head: [
-          ['Receitas', 'Despesas Gerais', 'Gastos Salários', 'Gastos Comissões', 'Lucro Líquido'],
+          ['Receitas', 'Despesas Gerais', 'Gastos Salários', 'Gastos Comissões', 'Gastos Fixos', 'Lucro Líquido'],
         ],
         body: [
           [
@@ -135,6 +135,7 @@ export const Reports = () => {
             `R$ ${(financial?.totalExpense ?? 0).toFixed(2)}`,
             `R$ ${(financial?.totalSalaryPaid ?? 0).toFixed(2)}`,
             `R$ ${(financial?.totalCommissionPaid ?? 0).toFixed(2)}`,
+            `R$ ${(financial?.totalFixedExpenses ?? 0).toFixed(2)}`,
             `R$ ${(financial?.netProfit ?? 0).toFixed(2)}`,
           ],
         ],
@@ -436,7 +437,7 @@ export const Reports = () => {
                   Resumo Financeiro{' '}
                   <span className="text-sm font-normal text-[#7a7074]">({financial?.period})</span>
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                   <div className="bg-white rounded-2xl border border-[#eae1e1]/80 p-5 shadow-sm transition-all duration-300 relative overflow-hidden group">
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-emerald-500" />
                     <p className="text-[10px] font-bold text-[#7a7074] uppercase tracking-wider mb-1">
@@ -471,6 +472,15 @@ export const Reports = () => {
                     </p>
                     <p className="text-xl font-extrabold text-amber-600">
                       {formatBRL(financial?.totalCommissionPaid ?? 0)}
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-[#eae1e1]/80 p-5 shadow-sm transition-all duration-300 relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 to-orange-500" />
+                    <p className="text-[10px] font-bold text-[#7a7074] uppercase tracking-wider mb-1">
+                      Gastos Fixos
+                    </p>
+                    <p className="text-xl font-extrabold text-orange-600">
+                      {formatBRL(financial?.totalFixedExpenses ?? 0)}
                     </p>
                   </div>
                   <div className="bg-white rounded-2xl border border-[#eae1e1]/80 p-5 shadow-sm transition-all duration-300 relative overflow-hidden group">

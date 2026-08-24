@@ -417,7 +417,7 @@ export const AuditLog = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-6">
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0">
               {/* Structured Metadata Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="bg-gray-50/60 p-3 rounded-xl border border-gray-100">

@@ -48,31 +48,15 @@ export const Users = () => {
       setValue('email', user.email ?? '');
       setValue('phone', user.phone);
       setValue('active', user.active);
-      setValue('roleId', getRoleIdByName(user.role));
     } else {
       setEditingUser(null);
       setValue('_isEdit', false);
       setValue('active', true);
-      // Criação de FUNCIONARIA/GERENTE agora é feita pelo cadastro completo (aba Equipe →
-      // Funcionárias(os) & Gerentes) — esta tela só cria conta administrativa daqui em diante.
-      setValue('roleId', 1);
     }
+    // Esta tela é exclusiva de contas Administrador — Funcionária/Gerente têm seu próprio
+    // mundo em Equipe → Funcionárias(os) & Gerentes, sem sobreposição com esta aqui.
+    setValue('roleId', 1);
     setShowForm(true);
-  };
-
-  const getRoleIdByName = (roleName: string) => {
-    switch (roleName) {
-      case 'ADMIN':
-        return 1;
-      case 'GERENTE_DE_ATENDIMENTO':
-        return 2;
-      case 'FUNCIONARIA':
-        return 3;
-      case 'SYSADMIN':
-        return 5;
-      default:
-        return 3;
-    }
   };
 
   const onSubmit = async (data: UserFormValues) => {
@@ -144,26 +128,6 @@ export const Users = () => {
   const columns = [
     { key: 'name', label: 'Nome' },
     { key: 'email', label: 'Email' },
-    {
-      key: 'role',
-      label: 'Cargo',
-      render: (item: UserData) => {
-        switch (item.role) {
-          case 'ADMIN':
-            return 'Administrador(a)';
-          case 'GERENTE_DE_ATENDIMENTO':
-            return 'Gerente';
-          case 'FUNCIONARIA':
-            return 'Funcionário(a)';
-          case 'SYSADMIN':
-            return 'Sysadmin';
-          case 'CLIENTE':
-            return 'Cliente';
-          default:
-            return item.role.replace(/_/g, ' ');
-        }
-      },
-    },
     { key: 'phone', label: 'Telefone', render: (item: UserData) => item.phone || 'Não informado' },
     {
       key: 'active',
@@ -235,7 +199,9 @@ export const Users = () => {
   };
 
   const fetchUsersData = async (filter: UserFilter, page: number, size: number) => {
-    return usersApi.findAll(filter, page, size);
+    // Exclusivo de contas Administrador — Funcionária/Gerente vivem só em Equipe, sem
+    // sobreposição com esta tela.
+    return usersApi.findAll({ ...filter, roleId: 1 }, page, size);
   };
 
   return (
@@ -246,12 +212,13 @@ export const Users = () => {
             Contas Administrativas
           </h2>
           <p className="text-xs text-[#3b3036]/60 dark:text-gray-400 mt-1">
-            Login, senha e status de acesso de qualquer conta da equipe.
+            Login, senha e status de acesso das contas de Administrador(a). Funcionária(o) e
+            Gerente têm seu próprio cadastro em Equipe.
           </p>
         </div>
         <PermissionGate method="POST" endpoint="/v1/users">
           <button onClick={() => handleOpenForm()} className="btn-premium font-semibold">
-            <Plus size={18} /> Nova Conta Administrativa
+            <Plus size={18} /> Novo(a) Administrador(a)
           </button>
         </PermissionGate>
       </div>
@@ -268,7 +235,7 @@ export const Users = () => {
       <ModalForm
         show={showForm}
         onHide={() => setShowForm(false)}
-        title={editingUser ? 'Editar Conta da Equipe' : 'Nova Conta da Equipe'}
+        title={editingUser ? 'Editar Administrador(a)' : 'Novo(a) Administrador(a)'}
         onSubmit={handleSubmit(onSubmit)}
         isSubmitting={isSubmitting}
       >
@@ -295,33 +262,6 @@ export const Users = () => {
             />
             {errors.email && (
               <span className="text-xs text-rose-500 font-semibold">{errors.email.message}</span>
-            )}
-          </div>
-          <div>
-            <label className={labelCls}>Cargo (Papel) *</label>
-            <select
-              className={`input-premium ${errors.roleId ? 'border-rose-300 focus:border-rose-500' : ''}`}
-              {...register('roleId', { setValueAs: (v) => Number(v) })}
-            >
-              <option value="1">Administrador(a)</option>
-              {/* Funcionária/Gerente só se editava aqui por herança do cadastro simples antigo —
-                  a criação foi centralizada em Equipe → Funcionárias(os) & Gerentes. Mantemos as
-                  opções na edição para não travar contas que já existiam com esses papéis. */}
-              {editingUser && (
-                <>
-                  <option value="2">Gerente</option>
-                  <option value="3">Funcionário(a)</option>
-                </>
-              )}
-            </select>
-            {!editingUser && (
-              <p className="text-xs text-gray-400 mt-1">
-                Para cadastrar funcionária(o) ou gerente, use Equipe → Funcionárias(os) & Gerentes —
-                o cadastro completo com dados pessoais, endereço e remuneração.
-              </p>
-            )}
-            {errors.roleId && (
-              <span className="text-xs text-rose-500 font-semibold">{errors.roleId.message}</span>
             )}
           </div>
           <div>
@@ -396,8 +336,8 @@ export const Users = () => {
         title={confirmAction === 'delete' ? 'Desativar Conta' : 'Reativar Conta'}
         message={
           confirmAction === 'delete'
-            ? 'Tem certeza que deseja desativar esta conta da equipe? O acesso será bloqueado.'
-            : 'Tem certeza que deseja reativar esta conta da equipe? O acesso será restaurado.'
+            ? 'Tem certeza que deseja desativar esta conta de administrador(a)? O acesso será bloqueado.'
+            : 'Tem certeza que deseja reativar esta conta de administrador(a)? O acesso será restaurado.'
         }
         confirmLabel={confirmAction === 'delete' ? 'Desativar' : 'Reativar'}
         variant={confirmAction === 'delete' ? 'danger' : 'primary'}
