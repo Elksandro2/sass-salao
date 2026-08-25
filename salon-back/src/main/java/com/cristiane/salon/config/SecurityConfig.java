@@ -2,6 +2,7 @@ package com.cristiane.salon.config;
 
 import com.cristiane.salon.mcp.security.McpAuthenticationFilter;
 import com.cristiane.salon.security.AuditRequestFilter;
+import com.cristiane.salon.security.JwtAuthenticationEntryPoint;
 import com.cristiane.salon.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -24,6 +25,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final McpAuthenticationFilter mcpAuthFilter;
     private final AuditRequestFilter auditRequestFilter;
     private final AuthenticationProvider authenticationProvider;
@@ -89,6 +91,7 @@ public class SecurityConfig {
                 .anyRequest().permitAll()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(jwtAuthenticationEntryPoint))
             .authenticationProvider(authenticationProvider)
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(mcpAuthFilter, UsernamePasswordAuthenticationFilter.class)
