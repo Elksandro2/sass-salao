@@ -543,6 +543,10 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponse generatePixPayment(Long id, GeneratePixRequest request) {
+        if (!featureFlagService.isEnabled("ENABLE_MERCADO_PAGO")) {
+            throw new BadRequestException("Pagamento via PIX está temporariamente desativado.");
+        }
+
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
 

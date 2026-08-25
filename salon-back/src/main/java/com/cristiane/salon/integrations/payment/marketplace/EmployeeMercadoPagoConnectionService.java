@@ -7,6 +7,7 @@ import com.cristiane.salon.integrations.payment.marketplace.dto.MercadoPagoConne
 import com.cristiane.salon.integrations.payment.marketplace.dto.MercadoPagoStatusResponse;
 import com.cristiane.salon.integrations.payment.marketplace.entity.EmployeeMercadoPagoAccount;
 import com.cristiane.salon.integrations.payment.marketplace.repository.EmployeeMercadoPagoAccountRepository;
+import com.cristiane.salon.models.featureflag.service.FeatureFlagService;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
 import com.cristiane.salon.models.user.entity.User;
@@ -43,6 +44,7 @@ public class EmployeeMercadoPagoConnectionService {
     private final MercadoPagoOAuthGateway oAuthGateway;
     private final MercadoPagoSplitProperties splitProperties;
     private final UserRepository userRepository;
+    private final FeatureFlagService featureFlagService;
 
     private final Map<String, PendingState> pendingStates = new ConcurrentHashMap<>();
 
@@ -56,6 +58,9 @@ public class EmployeeMercadoPagoConnectionService {
     public record CallbackResult(Long employeeId, String redirectTarget) {}
 
     private void assertSplitConfigured() {
+        if (!featureFlagService.isEnabled("ENABLE_MERCADO_PAGO")) {
+            throw new BadRequestException("A integração com o Mercado Pago está temporariamente desativada.");
+        }
         if (!splitProperties.isConfigured()) {
             throw new BadRequestException(
                     "Split de pagamento não está configurado neste ambiente ainda (faltam credenciais de Aplicação do Mercado Pago)");

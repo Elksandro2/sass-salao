@@ -9,6 +9,7 @@ import com.cristiane.salon.integrations.payment.marketplace.repository.EmployeeM
 import com.cristiane.salon.exception.UnauthorizedException;
 import com.cristiane.salon.models.employee.entity.Employee;
 import com.cristiane.salon.models.employee.repository.EmployeeRepository;
+import com.cristiane.salon.models.featureflag.service.FeatureFlagService;
 import com.cristiane.salon.models.user.entity.User;
 import com.cristiane.salon.models.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +43,9 @@ class EmployeeMercadoPagoConnectionServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private FeatureFlagService featureFlagService;
+
     private MercadoPagoSplitProperties splitProperties;
     private EmployeeMercadoPagoConnectionService service;
 
@@ -54,8 +58,10 @@ class EmployeeMercadoPagoConnectionServiceTest {
         splitProperties.setClientSecret("client-secret");
         splitProperties.setOauthRedirectUri("https://example.com/callback");
 
+        lenient().when(featureFlagService.isEnabled("ENABLE_MERCADO_PAGO")).thenReturn(true);
+
         service = new EmployeeMercadoPagoConnectionService(
-                employeeRepository, mpAccountRepository, oAuthGateway, splitProperties, userRepository);
+                employeeRepository, mpAccountRepository, oAuthGateway, splitProperties, userRepository, featureFlagService);
 
         employee = new Employee();
         employee.setId(5L);
@@ -68,6 +74,16 @@ class EmployeeMercadoPagoConnectionServiceTest {
         var secCtx = SecurityContextHolder.createEmptyContext();
         secCtx.setAuthentication(auth);
         SecurityContextHolder.setContext(secCtx);
+    }
+
+    @Test
+    void generateAuthorizationUrl_whenFeatureFlagDisabled_shouldThrowBadRequestException() {
+        when(featureFlagService.isEnabled("ENABLE_MERCADO_PAGO")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.generateAuthorizationUrl(5L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("temporariamente desativada");
+        verifyNoInteractions(employeeRepository);
     }
 
     @Test
