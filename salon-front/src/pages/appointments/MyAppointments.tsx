@@ -7,8 +7,10 @@ import { useAlert } from '../../hooks/useAlert';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { CalendarX } from 'lucide-react';
 import { canCancel, canGeneratePix } from '../../utils/appointmentRules';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 
 export const MyAppointments = () => {
+  const { enabled: mercadoPagoEnabled } = useFeatureFlag('ENABLE_MERCADO_PAGO');
   const [appointments, setAppointments] = useState<AppointmentResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -289,9 +291,9 @@ export const MyAppointments = () => {
                   </span>
                 </div>
 
-                {canGeneratePix(apt) || canCancel(apt) ? (
+                {(mercadoPagoEnabled && canGeneratePix(apt)) || canCancel(apt) ? (
                   <div className="mt-3 pt-3 border-t border-dashed border-gray-100 flex flex-col gap-2">
-                    {canGeneratePix(apt) && (
+                    {mercadoPagoEnabled && canGeneratePix(apt) && (
                       <>
                         {apt.pixQrCode ? (
                           <button

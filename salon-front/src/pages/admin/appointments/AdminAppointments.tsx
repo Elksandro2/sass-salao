@@ -32,6 +32,7 @@ import type { EmployeeData } from '../employees/services/employees';
 import type { UserData } from '../users/services/users';
 import { clientsApi } from '../clients/services/clients';
 import { usePermission } from '../../../hooks/usePermission';
+import { useFeatureFlag } from '../../../hooks/useFeatureFlag';
 import { useAuth } from '../../../hooks/useAuth';
 import { useAlert } from '../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../utils/apiError';
@@ -126,6 +127,7 @@ export const AdminAppointments = () => {
 
   const { error: showError, confirm } = useAlert();
   const canCreateAppointment = usePermission('POST', '/v1/appointments');
+  const { enabled: mercadoPagoEnabled } = useFeatureFlag('ENABLE_MERCADO_PAGO');
   const { user } = useAuth();
   const isFuncionaria = user?.role === 'FUNCIONARIA';
   // FUNCIONARIA só pode criar agendamento pra si mesma (imposto no backend também) — trava o
@@ -708,7 +710,7 @@ export const AdminAppointments = () => {
               </button>
             </PermissionGate>
 
-            {canGeneratePix(item) && (
+            {mercadoPagoEnabled && canGeneratePix(item) && (
               <>
                 {item.pixQrCode ? (
                   <button

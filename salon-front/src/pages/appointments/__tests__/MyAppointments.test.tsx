@@ -32,6 +32,11 @@ vi.mock('../../../hooks/useAlert', () => ({
   }),
 }));
 
+const mockUseFeatureFlag = vi.fn(() => ({ enabled: true, isLoading: false }));
+vi.mock('../../../hooks/useFeatureFlag', () => ({
+  useFeatureFlag: () => mockUseFeatureFlag(),
+}));
+
 function buildServiceItem(serviceId: number, serviceName: string) {
   return {
     serviceId,
@@ -113,6 +118,7 @@ const renderMyAppointments = () => {
 describe('MyAppointments Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseFeatureFlag.mockReturnValue({ enabled: true, isLoading: false });
     vi.mocked(appointmentsApi.getMyAppointments).mockResolvedValue(mockAppointments);
     vi.mocked(appointmentsApi.findById).mockResolvedValue({ id: 1, paymentStatus: 'PENDING' } as any);
     vi.mocked(appointmentsApi.generatePix).mockResolvedValue({
@@ -176,6 +182,17 @@ describe('MyAppointments Component', () => {
     // Check if the PIX Payment Modal opens with the generated code
     expect(screen.getByText('Pagamento via PIX')).toBeInTheDocument();
     expect(screen.getAllByText('Corte de Cabelo')).toHaveLength(2);
+  });
+
+  it('hides Pagar com PIX when the ENABLE_MERCADO_PAGO feature flag is disabled', async () => {
+    mockUseFeatureFlag.mockReturnValue({ enabled: false, isLoading: false });
+
+    await act(async () => {
+      renderMyAppointments();
+    });
+
+    expect(screen.queryByRole('button', { name: 'Pagar com PIX' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ver QR Code PIX' })).not.toBeInTheDocument();
   });
 
   it('opens modal immediately without generating new PIX if pixQrCode is already present', async () => {

@@ -15,6 +15,7 @@ import type { UserData } from '../users/services/users';
 import { employeeFormSchema } from './employee.schema';
 import type { EmployeeFormValues } from './employee.schema';
 import { useAlert } from '../../../hooks/useAlert';
+import { useFeatureFlag } from '../../../hooks/useFeatureFlag';
 import { getApiErrorMessage } from '../../../utils/apiError';
 
 const inputCls = 'input-premium';
@@ -28,6 +29,7 @@ interface EmployeesProps {
 }
 
 export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
+  const { enabled: mercadoPagoEnabled } = useFeatureFlag('ENABLE_MERCADO_PAGO');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const [showForm, setShowForm] = useState(false);
@@ -206,18 +208,22 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
         return '-';
       },
     },
-    {
-      key: 'mercadoPago',
-      label: 'Mercado Pago',
-      render: (item: EmployeeData) => (
-        <MercadoPagoConnectionCell
-          employeeId={item.id!}
-          splitApplicable={
-            item.remunerationType === 'COMISSIONADO' || item.remunerationType === 'FIXO_E_COMISSIONADO'
-          }
-        />
-      ),
-    },
+    ...(mercadoPagoEnabled
+      ? [
+          {
+            key: 'mercadoPago',
+            label: 'Mercado Pago',
+            render: (item: EmployeeData) => (
+              <MercadoPagoConnectionCell
+                employeeId={item.id!}
+                splitApplicable={
+                  item.remunerationType === 'COMISSIONADO' || item.remunerationType === 'FIXO_E_COMISSIONADO'
+                }
+              />
+            ),
+          },
+        ]
+      : []),
     {
       key: 'actions',
       label: 'Ações',

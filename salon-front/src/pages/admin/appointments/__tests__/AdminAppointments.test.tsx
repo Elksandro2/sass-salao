@@ -69,6 +69,11 @@ vi.mock('../../../../hooks/useAlert', () => ({
   }),
 }));
 
+const mockUseFeatureFlag = vi.fn(() => ({ enabled: true, isLoading: false }));
+vi.mock('../../../../hooks/useFeatureFlag', () => ({
+  useFeatureFlag: () => mockUseFeatureFlag(),
+}));
+
 function buildServiceItem(serviceId: number, serviceName: string, price: number) {
   return {
     serviceId,
@@ -149,6 +154,7 @@ const renderAdminAppointments = () => {
 describe('AdminAppointments Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseFeatureFlag.mockReturnValue({ enabled: true, isLoading: false });
     vi.mocked(appointmentsApi.findAll).mockResolvedValue({
       content: mockAppointments,
       totalPages: 1,
@@ -273,6 +279,17 @@ describe('AdminAppointments Component', () => {
     // Check if the modal opens
     expect(screen.getByText('Pagamento via PIX')).toBeInTheDocument();
     expect(screen.getAllByText('Corte de Cabelo')).toHaveLength(2); // One in table, one in modal
+  });
+
+  it('hides Pagar com PIX when the ENABLE_MERCADO_PAGO feature flag is disabled', async () => {
+    mockUseFeatureFlag.mockReturnValue({ enabled: false, isLoading: false });
+
+    await act(async () => {
+      renderAdminAppointments();
+    });
+
+    expect(screen.queryByRole('button', { name: 'Pagar com PIX' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ver PIX' })).not.toBeInTheDocument();
   });
 
   it('opens confirmation modal and cancels appointment when cancel button is clicked', async () => {

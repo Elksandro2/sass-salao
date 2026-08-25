@@ -11,6 +11,7 @@ import { getApiErrorMessage } from '../../../utils/apiError';
 import { profileFormSchema } from '../../profile/profile.schema';
 import type { ProfileFormValues } from '../../profile/profile.schema';
 import { employeeMercadoPagoApi } from '../employees/services/mercadoPago';
+import { useFeatureFlag } from '../../../hooks/useFeatureFlag';
 
 // Aplica máscara ###.###.###-## enquanto o usuário digita
 const formatCpf = (value: string) => {
@@ -23,6 +24,7 @@ const formatCpf = (value: string) => {
 
 export const AdminProfile = () => {
   const { user } = useAuth();
+  const { enabled: mercadoPagoEnabled } = useFeatureFlag('ENABLE_MERCADO_PAGO');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -82,11 +84,12 @@ export const AdminProfile = () => {
   }, [user, setValue]);
 
   useEffect(() => {
+    if (!mercadoPagoEnabled) return;
     employeeMercadoPagoApi
       .statusMe()
       .then((status) => setMpConnected(status.connected))
       .catch(() => setMpConnected(null)); // sem cadastro de funcionária vinculado — some a seção
-  }, []);
+  }, [mercadoPagoEnabled]);
 
   const onSubmit = async (data: ProfileFormValues) => {
     if (!user?.userId) return;
@@ -301,7 +304,7 @@ export const AdminProfile = () => {
         </form>
       </div>
 
-      {mpConnected !== null && (
+      {mercadoPagoEnabled && mpConnected !== null && (
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs space-y-4">
           <div>
             <h4 className="font-semibold text-[#3b3036] text-lg">Mercado Pago</h4>
