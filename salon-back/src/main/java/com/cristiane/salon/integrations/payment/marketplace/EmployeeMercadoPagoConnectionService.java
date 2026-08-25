@@ -58,7 +58,7 @@ public class EmployeeMercadoPagoConnectionService {
     public record CallbackResult(Long employeeId, String redirectTarget) {}
 
     private void assertSplitConfigured() {
-        if (!featureFlagService.isEnabled("ENABLE_MERCADO_PAGO")) {
+        if (!featureFlagService.isEnabled("MERCADO_PAGO_ATIVO")) {
             throw new BadRequestException("A integração com o Mercado Pago está temporariamente desativada.");
         }
         if (!splitProperties.isConfigured()) {

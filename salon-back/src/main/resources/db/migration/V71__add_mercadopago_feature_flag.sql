@@ -3,4 +3,4 @@
 -- API do Mercado Pago, monta o código localmente a partir da chave PIX cadastrada de cada uma.
 -- Nasce desligada: a Cristiane ainda não tem a conta MP configurada.
 INSERT INTO tb_feature_flag (name, enabled, description) VALUES
-    ('ENABLE_MERCADO_PAGO', FALSE, 'Habilita pagamento via PIX (Mercado Pago) em agendamentos e a conexão de split das funcionárias');
+    ('MERCADO_PAGO_ATIVO', FALSE, 'Habilita pagamento via PIX (Mercado Pago) em agendamentos e a conexão de split das funcionárias');

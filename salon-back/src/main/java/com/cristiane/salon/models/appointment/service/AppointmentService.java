@@ -543,7 +543,7 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponse generatePixPayment(Long id, GeneratePixRequest request) {
-        if (!featureFlagService.isEnabled("ENABLE_MERCADO_PAGO")) {
+        if (!featureFlagService.isEnabled("MERCADO_PAGO_ATIVO")) {
             throw new BadRequestException("Pagamento via PIX está temporariamente desativado.");
         }
 

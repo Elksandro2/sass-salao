@@ -117,7 +117,7 @@ class AppointmentServiceTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(featureFlagService.isEnabled("ENABLE_MERCADO_PAGO")).thenReturn(true);
+        lenient().when(featureFlagService.isEnabled("MERCADO_PAGO_ATIVO")).thenReturn(true);
 
         clientUser = new User();
         clientUser.setId(10L);
@@ -1499,7 +1499,7 @@ class AppointmentServiceTest {
 
     @Test
     void generatePixPayment_whenFeatureFlagDisabled_shouldThrowBadRequestException() {
-        when(featureFlagService.isEnabled("ENABLE_MERCADO_PAGO")).thenReturn(false);
+        when(featureFlagService.isEnabled("MERCADO_PAGO_ATIVO")).thenReturn(false);
 
         assertThatThrownBy(() -> appointmentService.generatePixPayment(1L, new GeneratePixRequest(true, null)))
                 .isInstanceOf(BadRequestException.class)

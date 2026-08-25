@@ -10,7 +10,7 @@ import { canCancel, canGeneratePix } from '../../utils/appointmentRules';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 
 export const MyAppointments = () => {
-  const { enabled: mercadoPagoEnabled } = useFeatureFlag('ENABLE_MERCADO_PAGO');
+  const { enabled: mercadoPagoEnabled } = useFeatureFlag('MERCADO_PAGO_ATIVO');
   const [appointments, setAppointments] = useState<AppointmentResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 

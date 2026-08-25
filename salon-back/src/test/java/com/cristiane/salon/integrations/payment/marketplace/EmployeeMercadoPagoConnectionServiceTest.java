@@ -58,7 +58,7 @@ class EmployeeMercadoPagoConnectionServiceTest {
         splitProperties.setClientSecret("client-secret");
         splitProperties.setOauthRedirectUri("https://example.com/callback");
 
-        lenient().when(featureFlagService.isEnabled("ENABLE_MERCADO_PAGO")).thenReturn(true);
+        lenient().when(featureFlagService.isEnabled("MERCADO_PAGO_ATIVO")).thenReturn(true);
 
         service = new EmployeeMercadoPagoConnectionService(
                 employeeRepository, mpAccountRepository, oAuthGateway, splitProperties, userRepository, featureFlagService);
@@ -78,7 +78,7 @@ class EmployeeMercadoPagoConnectionServiceTest {
 
     @Test
     void generateAuthorizationUrl_whenFeatureFlagDisabled_shouldThrowBadRequestException() {
-        when(featureFlagService.isEnabled("ENABLE_MERCADO_PAGO")).thenReturn(false);
+        when(featureFlagService.isEnabled("MERCADO_PAGO_ATIVO")).thenReturn(false);
 
         assertThatThrownBy(() -> service.generateAuthorizationUrl(5L))
                 .isInstanceOf(BadRequestException.class)

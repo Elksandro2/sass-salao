@@ -24,7 +24,7 @@ const formatCpf = (value: string) => {
 
 export const AdminProfile = () => {
   const { user } = useAuth();
-  const { enabled: mercadoPagoEnabled } = useFeatureFlag('ENABLE_MERCADO_PAGO');
+  const { enabled: mercadoPagoEnabled } = useFeatureFlag('MERCADO_PAGO_ATIVO');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);

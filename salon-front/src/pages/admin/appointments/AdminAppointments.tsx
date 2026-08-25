@@ -127,7 +127,7 @@ export const AdminAppointments = () => {
 
   const { error: showError, confirm } = useAlert();
   const canCreateAppointment = usePermission('POST', '/v1/appointments');
-  const { enabled: mercadoPagoEnabled } = useFeatureFlag('ENABLE_MERCADO_PAGO');
+  const { enabled: mercadoPagoEnabled } = useFeatureFlag('MERCADO_PAGO_ATIVO');
   const { user } = useAuth();
   const isFuncionaria = user?.role === 'FUNCIONARIA';
   // FUNCIONARIA só pode criar agendamento pra si mesma (imposto no backend também) — trava o

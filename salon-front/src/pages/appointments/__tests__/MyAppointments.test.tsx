@@ -184,7 +184,7 @@ describe('MyAppointments Component', () => {
     expect(screen.getAllByText('Corte de Cabelo')).toHaveLength(2);
   });
 
-  it('hides Pagar com PIX when the ENABLE_MERCADO_PAGO feature flag is disabled', async () => {
+  it('hides Pagar com PIX when the MERCADO_PAGO_ATIVO feature flag is disabled', async () => {
     mockUseFeatureFlag.mockReturnValue({ enabled: false, isLoading: false });
 
     await act(async () => {

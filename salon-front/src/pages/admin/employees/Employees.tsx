@@ -29,7 +29,7 @@ interface EmployeesProps {
 }
 
 export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
-  const { enabled: mercadoPagoEnabled } = useFeatureFlag('ENABLE_MERCADO_PAGO');
+  const { enabled: mercadoPagoEnabled } = useFeatureFlag('MERCADO_PAGO_ATIVO');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const [showForm, setShowForm] = useState(false);
