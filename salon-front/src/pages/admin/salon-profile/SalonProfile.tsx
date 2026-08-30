@@ -165,7 +165,7 @@ export const SalonProfile = () => {
             Perfil do Salão
           </h2>
           <p className="text-sm text-[#3b3036]/60 mt-1">
-            Essas informações aparecem na página inicial pública, sem precisar de novo deploy.
+            Essas informações aparecem na página inicial pública.
           </p>
         </div>
       </div>

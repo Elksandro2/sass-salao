@@ -13,6 +13,7 @@ import { productFormSchema } from './product.schema';
 import type { ProductFormValues } from './product.schema';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import { useAlert } from '../../../hooks/useAlert';
+import { PRODUCT_UNITS } from '../../../utils/productUnit';
 
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
@@ -113,6 +114,7 @@ export const Products = () => {
 
   const columns = [
     { key: 'name', label: 'Nome do Produto' },
+    { key: 'brand', label: 'Marca', render: (item: ProductData) => item.brand?.trim() || '—' },
     { key: 'price', label: 'Preço', render: (item: ProductData) => `R$ ${item.price.toFixed(2)}` },
     {
       key: 'active',
@@ -280,11 +282,11 @@ export const Products = () => {
                 <label className={labelCls}>Unidade</label>
                 <select className={inputCls} {...register('unit')}>
                   <option value="">Não informado</option>
-                  <option value="ML">Mililitros (ml)</option>
-                  <option value="L">Litros (L)</option>
-                  <option value="G">Gramas (g)</option>
-                  <option value="KG">Quilos (kg)</option>
-                  <option value="UNIDADE">Unidade</option>
+                  {PRODUCT_UNITS.map((u) => (
+                    <option key={u.value} value={u.value}>
+                      {u.label}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

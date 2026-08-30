@@ -190,7 +190,9 @@ export const AdminAppointments = () => {
       setClients(clientsResponse.content);
       setServices(servicesData.filter((s) => s.active));
       setAllServices(servicesData);
-      setProducts(productsResponse.content);
+      // Só produtos marcados como "disponível para venda" entram no seletor do agendamento —
+      // itens de uso interno (só receita de serviço) não devem aparecer aqui.
+      setProducts(productsResponse.content.filter((p) => p.availableForSale !== false));
     } catch (err) {
       await showError('Erro ao carregar dados do formulário');
     }
