@@ -2,6 +2,8 @@ package com.cristiane.salon.models.employee.service;
 
 import com.cristiane.salon.exception.BadRequestException;
 import com.cristiane.salon.exception.ResourceNotFoundException;
+import com.cristiane.salon.exception.UnauthorizedException;
+import com.cristiane.salon.models.employee.dto.EmployeeActingResponse;
 import com.cristiane.salon.models.employee.dto.EmployeeBookingResponse;
 import com.cristiane.salon.models.employee.dto.EmployeeFilter;
 import com.cristiane.salon.models.employee.dto.EmployeeRequest;
@@ -15,6 +17,7 @@ import com.cristiane.salon.models.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -130,5 +133,62 @@ public class EmployeeService {
             throw new ResourceNotFoundException("Funcionária não encontrada");
         }
         employeeRepository.deleteById(id);
+    }
+
+    // --- Atuação como profissional do usuário logado (Meu Perfil do admin) --------------------
+
+    /**
+     * Estado atual da atuação em agendamentos do usuário autenticado. Para quem ainda não tem
+     * cadastro de {@link Employee}, devolve {@link EmployeeActingResponse#notActing()}.
+     */
+    @Transactional(readOnly = true)
+    public EmployeeActingResponse getMyActingProfile() {
+        User user = currentUser();
+        return employeeRepository.findByUserId(user.getId())
+                .map(EmployeeActingResponse::fromEntity)
+                .orElseGet(EmployeeActingResponse::notActing);
+    }
+
+    /**
+     * Liga/desliga a atuação do admin logado como profissional nos agendamentos.
+     *
+     * <p>Ao ligar pela primeira vez, cria um cadastro de {@link Employee} agendável com
+     * remuneração <b>Comissionado</b> por padrão — editável depois em Admin → Equipe. Ao
+     * desligar, o cadastro é mantido (histórico/folha continuam válidos), só sai do seletor de
+     * profissional ({@code bookable = false}).
+     */
+    @Transactional
+    public EmployeeActingResponse setMyActing(boolean acting) {
+        User user = currentUser();
+        if (!"ADMIN".equals(user.getRoleName())) {
+            throw new BadRequestException(
+                    "Apenas contas de administrador ativam a atuação em agendamentos por aqui. "
+                            + "Funcionárias já atuam por padrão e gerentes de atendimento não prestam serviço.");
+        }
+
+        Employee employee = employeeRepository.findByUserId(user.getId()).orElse(null);
+
+        if (!acting) {
+            if (employee == null) {
+                return EmployeeActingResponse.notActing();
+            }
+            employee.setBookable(false);
+            return EmployeeActingResponse.fromEntity(employeeRepository.save(employee));
+        }
+
+        if (employee == null) {
+            employee = new Employee();
+            employee.setUser(user);
+            employee.setRemunerationType(RemunerationType.COMISSIONADO);
+            employee.setRemunerationValue(null);
+        }
+        employee.setBookable(true);
+        return EmployeeActingResponse.fromEntity(employeeRepository.save(employee));
+    }
+
+    private User currentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new UnauthorizedException("Usuário não autenticado"));
     }
 }

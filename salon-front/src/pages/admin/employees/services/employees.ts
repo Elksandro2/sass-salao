@@ -18,6 +18,16 @@ export interface EmployeeFilter {
   active?: boolean;
 }
 
+/** Estado da "atuação como profissional" do usuário logado (Meu Perfil do admin). */
+export interface EmployeeActingState {
+  /** Já existe um cadastro de colaborador vinculado ao usuário. */
+  hasProfile: boolean;
+  /** Esse cadastro está agendável — aparece no seletor de profissional dos agendamentos. */
+  acting: boolean;
+  remunerationType: 'SALARIO_FIXO' | 'COMISSIONADO' | 'FIXO_E_COMISSIONADO' | null;
+  remunerationValue: number | null;
+}
+
 export const employeesApi = {
   findAll: async (filter: EmployeeFilter = {}, page = 0, size = 10) => {
     const { data } = await api.get<SpringPageResponse<EmployeeData>>('/employees', {
@@ -34,6 +44,17 @@ export const employeesApi = {
 
   findById: async (id: number) => {
     const { data } = await api.get<EmployeeData>(`/employees/${id}`);
+    return data;
+  },
+
+  /** Atuação do admin logado como profissional em agendamentos. */
+  getMyActing: async () => {
+    const { data } = await api.get<EmployeeActingState>('/employees/me/acting');
+    return data;
+  },
+
+  setMyActing: async (acting: boolean) => {
+    const { data } = await api.put<EmployeeActingState>('/employees/me/acting', { acting });
     return data;
   },
 
