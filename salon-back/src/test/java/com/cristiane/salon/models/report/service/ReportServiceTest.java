@@ -29,9 +29,12 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -60,6 +63,9 @@ class ReportServiceTest {
     @Mock
     private SalonBusinessSettingsService businessSettingsService;
 
+    @Mock
+    private com.cristiane.salon.models.report.repository.DiaristaWorkedDaysOverrideRepository workedDaysOverrideRepository;
+
     // SalonClock real, não mock: os testes dependem do "hoje"/"agora" de verdade no fuso
     // do salão, e um mock devolveria null silenciosamente.
     @Spy
@@ -72,6 +78,9 @@ class ReportServiceTest {
     void setUp() {
         org.mockito.Mockito.lenient().when(fixedExpenseRepository.sumAmountByDateBetween(any(), any()))
                 .thenReturn(BigDecimal.ZERO);
+        org.mockito.Mockito.lenient()
+                .when(workedDaysOverrideRepository.findByPeriodStartAndPeriodEnd(any(), any()))
+                .thenReturn(java.util.List.of());
     }
 
     private void withService(Appointment appointment, SalonService svc) {
@@ -332,7 +341,7 @@ class ReportServiceTest {
         when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of(aptBob, aptAlice, aptDave));
 
         // When
-        PayrollReportResponse response = reportService.generatePayrollReport(salonClock.today(), salonClock.today(), java.util.Map.of());
+        PayrollReportResponse response = reportService.generatePayrollReport(salonClock.today(), salonClock.today());
 
         // Then
         assertEquals(3, response.items().size());
@@ -353,8 +362,17 @@ class ReportServiceTest {
         assertEquals(new BigDecimal("320.00"), itemDave.calculatedPay());
     }
 
+    private Appointment doneAptOn(Employee emp, SalonService svc, java.time.LocalDateTime when) {
+        Appointment apt = new Appointment();
+        apt.setStatus(AppointmentStatus.DONE);
+        apt.setEmployee(emp);
+        withService(apt, svc);
+        apt.setScheduledAt(when);
+        return apt;
+    }
+
     @Test
-    void payroll_diarista_paysDailyRateTimesDaysWorked() {
+    void payroll_diarista_autoCountsDistinctAppointmentDays() {
         User user = new User();
         user.setName("Ella");
         Employee emp = new Employee();
@@ -368,21 +386,55 @@ class ReportServiceTest {
         SalonService svc = new SalonService();
         svc.setPrice(new BigDecimal("200.00"));
         svc.setCommissionPercent(new BigDecimal("10")); // ignorado: DIARISTA não recebe comissão de serviço
-        Appointment apt = new Appointment();
-        apt.setStatus(AppointmentStatus.DONE);
-        apt.setEmployee(emp);
-        withService(apt, svc);
-        apt.setScheduledAt(salonClock.now());
-        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of(apt));
 
-        PayrollReportResponse response = reportService.generatePayrollReport(
-                salonClock.today(), salonClock.today(), java.util.Map.of(7L, 18));
+        // 3 atendimentos, mas em 2 dias distintos -> 2 diárias
+        var d1a = doneAptOn(emp, svc, salonClock.now().withHour(9));
+        var d1b = doneAptOn(emp, svc, salonClock.now().withHour(15));
+        var d2 = doneAptOn(emp, svc, salonClock.now().minusDays(1).withHour(10));
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(d1a, d1b, d2));
+
+        PayrollReportResponse response = reportService.generatePayrollReport(salonClock.today(), salonClock.today());
 
         PayrollReportResponse.PayrollItem item = response.items().get(0);
         assertEquals(new BigDecimal("120.00"), item.dailyRate());
+        assertEquals(2, item.daysWorked());
+        assertEquals(2, item.daysWorkedAuto());
+        assertEquals(Boolean.FALSE, item.daysWorkedIsOverride());
+        assertEquals(0, new BigDecimal("240.00").compareTo(item.calculatedPay())); // 120 × 2
+    }
+
+    @Test
+    void payroll_diarista_manualOverrideWinsOverAutoCount() {
+        User user = new User();
+        user.setName("Ella");
+        Employee emp = new Employee();
+        emp.setId(7L);
+        emp.setUser(user);
+        emp.setRemunerationType(RemunerationType.DIARISTA);
+        emp.setRemunerationValue(new BigDecimal("120.00"));
+
+        when(employeeRepository.findAll()).thenReturn(List.of(emp));
+
+        SalonService svc = new SalonService();
+        svc.setPrice(new BigDecimal("200.00"));
+        List<Appointment> apts = List.of(doneAptOn(emp, svc, salonClock.now())); // auto = 1
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any()))
+                .thenReturn(apts);
+
+        var override = new com.cristiane.salon.models.report.entity.DiaristaWorkedDaysOverride();
+        override.setEmployeeId(7L);
+        override.setDaysWorked(18);
+        when(workedDaysOverrideRepository.findByPeriodStartAndPeriodEnd(any(), any()))
+                .thenReturn(List.of(override));
+
+        PayrollReportResponse response = reportService.generatePayrollReport(salonClock.today(), salonClock.today());
+
+        PayrollReportResponse.PayrollItem item = response.items().get(0);
         assertEquals(18, item.daysWorked());
-        // 120 × 18 = 2160, sem comissão de serviço
-        assertEquals(0, new BigDecimal("2160.00").compareTo(item.calculatedPay()));
+        assertEquals(1, item.daysWorkedAuto());
+        assertEquals(Boolean.TRUE, item.daysWorkedIsOverride());
+        assertEquals(0, new BigDecimal("2160.00").compareTo(item.calculatedPay())); // 120 × 18
     }
 
     @Test
@@ -400,23 +452,19 @@ class ReportServiceTest {
         SalonService svc = new SalonService();
         svc.setPrice(new BigDecimal("200.00"));
         svc.setCommissionPercent(new BigDecimal("10"));
-        Appointment apt = new Appointment();
-        apt.setStatus(AppointmentStatus.DONE);
-        apt.setEmployee(emp);
-        withService(apt, svc);
-        apt.setScheduledAt(salonClock.now());
-        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of(apt));
+        List<Appointment> apts = List.of(doneAptOn(emp, svc, salonClock.now())); // 1 dia
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any()))
+                .thenReturn(apts);
 
-        PayrollReportResponse response = reportService.generatePayrollReport(
-                salonClock.today(), salonClock.today(), java.util.Map.of(8L, 5));
+        PayrollReportResponse response = reportService.generatePayrollReport(salonClock.today(), salonClock.today());
 
         PayrollReportResponse.PayrollItem item = response.items().get(0);
-        // 100 × 5 diária + 10% de 200 comissão = 500 + 20 = 520
-        assertEquals(0, new BigDecimal("520.00").compareTo(item.calculatedPay()));
+        // 100 × 1 diária + 10% de 200 comissão = 100 + 20 = 120
+        assertEquals(0, new BigDecimal("120.00").compareTo(item.calculatedPay()));
     }
 
     @Test
-    void payroll_diarista_withoutDaysWorked_paysZeroDailyPart() {
+    void payroll_diarista_withoutAppointments_paysZero() {
         User user = new User();
         user.setName("Gi");
         Employee emp = new Employee();
@@ -428,12 +476,82 @@ class ReportServiceTest {
         when(employeeRepository.findAll()).thenReturn(List.of(emp));
         when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of());
 
-        PayrollReportResponse response = reportService.generatePayrollReport(
-                salonClock.today(), salonClock.today(), java.util.Map.of());
+        PayrollReportResponse response = reportService.generatePayrollReport(salonClock.today(), salonClock.today());
 
         PayrollReportResponse.PayrollItem item = response.items().get(0);
         assertEquals(0, item.daysWorked());
         assertEquals(0, BigDecimal.ZERO.compareTo(item.calculatedPay()));
+    }
+
+    @Test
+    void financialReport_includesDiaristaPayInNetProfit() {
+        CashFlow income = new CashFlow();
+        income.setType(CashFlowType.INCOME);
+        income.setAmount(new BigDecimal("1000.00"));
+        when(cashFlowRepository.findByDateBetween(any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of(income));
+
+        User user = new User();
+        user.setName("Ella");
+        Employee emp = new Employee();
+        emp.setId(7L);
+        emp.setUser(user);
+        emp.setRemunerationType(RemunerationType.DIARISTA);
+        emp.setRemunerationValue(new BigDecimal("100.00"));
+        when(employeeRepository.findAll()).thenReturn(List.of(emp));
+
+        SalonService svc = new SalonService();
+        svc.setPrice(new BigDecimal("200.00"));
+        List<Appointment> apts = List.of(
+                doneAptOn(emp, svc, salonClock.now()),
+                doneAptOn(emp, svc, salonClock.now().minusDays(1))); // 2 dias
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any()))
+                .thenReturn(apts);
+
+        FinancialReportResponse report =
+                reportService.generateFinancialReport(salonClock.today(), salonClock.today());
+
+        // diária 100 × 2 = 200 entra como salário pago e sai do lucro: 1000 - 200 = 800
+        assertEquals(0, new BigDecimal("200.00").compareTo(report.totalSalaryPaid()));
+        assertEquals(0, new BigDecimal("800.00").compareTo(report.netProfit()));
+        assertEquals(2, report.employeeFinanceDetails().get(0).daysWorked());
+    }
+
+    @Test
+    void saveWorkedDaysOverride_rejectsNonDiarista() {
+        User user = new User();
+        user.setName("Bea");
+        Employee emp = new Employee();
+        emp.setId(3L);
+        emp.setUser(user);
+        emp.setRemunerationType(RemunerationType.COMISSIONADO);
+        when(employeeRepository.findById(3L)).thenReturn(java.util.Optional.of(emp));
+
+        assertThatThrownBy(() -> reportService.saveWorkedDaysOverride(
+                3L, salonClock.today(), salonClock.today(), 10))
+                .isInstanceOf(com.cristiane.salon.exception.BadRequestException.class);
+        verify(workedDaysOverrideRepository, never()).save(any());
+    }
+
+    @Test
+    void saveWorkedDaysOverride_upsertsForDiarista() {
+        User user = new User();
+        user.setName("Ella");
+        Employee emp = new Employee();
+        emp.setId(7L);
+        emp.setUser(user);
+        emp.setRemunerationType(RemunerationType.DIARIA_E_COMISSIONADO);
+        when(employeeRepository.findById(7L)).thenReturn(java.util.Optional.of(emp));
+        when(workedDaysOverrideRepository.findByEmployeeIdAndPeriodStartAndPeriodEnd(eq(7L), any(), any()))
+                .thenReturn(java.util.Optional.empty());
+
+        reportService.saveWorkedDaysOverride(7L, salonClock.today().minusDays(30), salonClock.today(), 22);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(
+                com.cristiane.salon.models.report.entity.DiaristaWorkedDaysOverride.class);
+        verify(workedDaysOverrideRepository).save(captor.capture());
+        assertEquals(22, captor.getValue().getDaysWorked());
+        assertEquals(7L, captor.getValue().getEmployeeId());
     }
 
     @Test
@@ -665,7 +783,7 @@ class ReportServiceTest {
         when(employeeRepository.findAll()).thenReturn(List.of(emp));
         when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of(apt));
 
-        PayrollReportResponse response = reportService.generatePayrollReport(salonClock.today(), salonClock.today(), java.util.Map.of());
+        PayrollReportResponse response = reportService.generatePayrollReport(salonClock.today(), salonClock.today());
 
         PayrollReportResponse.PayrollItem item = response.items().get(0);
         assertEquals(new BigDecimal("30.00"), item.calculatedPay());

@@ -48,20 +48,13 @@ export const Reports = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  // Dias trabalhados por diarista no período — editável na aba Folha de Pagamento.
-  // Chave = employeeId, valor = string do <input> (pode estar vazia).
-  const [daysWorked, setDaysWorked] = useState<Record<number, string>>({});
+  // Edições em andamento do campo "dias trabalhados" da diarista (chave = employeeId).
+  // O valor efetivo/salvo vem do backend (payroll.items[].daysWorked); isto é só o rascunho
+  // do <input> até a pessoa clicar em Salvar.
+  const [dayEdits, setDayEdits] = useState<Record<number, string>>({});
+  const [savingDaysFor, setSavingDaysFor] = useState<number | null>(null);
 
-  const { error: showError } = useAlert();
-
-  const daysWorkedPayload = (): Record<number, number> => {
-    const out: Record<number, number> = {};
-    for (const [id, raw] of Object.entries(daysWorked)) {
-      const n = Number(raw);
-      if (raw !== '' && Number.isFinite(n) && n >= 0) out[Number(id)] = Math.floor(n);
-    }
-    return out;
-  };
+  const { error: showError, success: showSuccess } = useAlert();
 
   const loadReports = async () => {
     setIsLoading(true);
@@ -70,24 +63,14 @@ export const Reports = () => {
         reportsApi.getFinancialReport(dateFrom || undefined, dateTo || undefined),
         reportsApi.getAppointmentReport(dateFrom || undefined, dateTo || undefined),
         cashFlowApi.findByPeriod(dateFrom || undefined, dateTo || undefined, 0, 1000),
-        reportsApi.getPayrollReport(dateFrom || undefined, dateTo || undefined, daysWorkedPayload()),
+        reportsApi.getPayrollReport(dateFrom || undefined, dateTo || undefined),
         reportsApi.getServicePricingAnalysis(dateFrom || undefined, dateTo || undefined),
       ]);
       setFinancial(finData);
       setAppointments(aptData);
       setCashFlows(cfData.content);
       setPayroll(payData);
-      // Semeia os inputs de "dias trabalhados" com o que o backend usou, sem sobrescrever o
-      // que o usuário já digitou nesta sessão.
-      setDaysWorked((prev) => {
-        const next = { ...prev };
-        for (const item of payData.items) {
-          if (item.daysWorked != null && next[item.employeeId] === undefined) {
-            next[item.employeeId] = String(item.daysWorked);
-          }
-        }
-        return next;
-      });
+      setDayEdits({}); // rascunhos são descartados quando os dados recarregam
       setServicePricing(pricingData);
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Erro ao carregar relatórios');
@@ -101,13 +84,59 @@ export const Reports = () => {
     loadReports();
   }, [dateFrom, dateTo]);
 
+  // Datas concretas do período da folha (o backend resolve os defaults e devolve em periodStart/End).
+  const payrollPeriod = (): { periodStart: string; periodEnd: string } | null => {
+    const start = payroll?.periodStart ?? (dateFrom || null);
+    const end = payroll?.periodEnd ?? (dateTo || null);
+    return start && end ? { periodStart: start, periodEnd: end } : null;
+  };
+
+  const saveDaysWorked = async (employeeId: number) => {
+    const period = payrollPeriod();
+    if (!period) {
+      await showError('Escolha um período (data inicial e final) para ajustar os dias.');
+      return;
+    }
+    const raw = dayEdits[employeeId];
+    const days = Number(raw);
+    if (raw === undefined || raw === '' || !Number.isFinite(days) || days < 0) {
+      await showError('Informe um número de dias válido (0 ou mais).');
+      return;
+    }
+    setSavingDaysFor(employeeId);
+    try {
+      await reportsApi.saveWorkedDays({ employeeId, ...period, daysWorked: Math.floor(days) });
+      await showSuccess('Dias trabalhados ajustados.');
+      await loadReports();
+    } catch (err) {
+      await showError(getApiErrorMessage(err, 'Erro ao salvar os dias trabalhados.'));
+    } finally {
+      setSavingDaysFor(null);
+    }
+  };
+
+  const resetDaysWorked = async (employeeId: number) => {
+    const period = payrollPeriod();
+    if (!period) return;
+    setSavingDaysFor(employeeId);
+    try {
+      await reportsApi.resetWorkedDays({ employeeId, ...period });
+      await showSuccess('Voltou a contar os dias automaticamente.');
+      await loadReports();
+    } catch (err) {
+      await showError(getApiErrorMessage(err, 'Erro ao voltar para a contagem automática.'));
+    } finally {
+      setSavingDaysFor(null);
+    }
+  };
+
   const generatePDF = async () => {
     setIsGeneratingPDF(true);
     try {
       // Fetch fresh cash flow and payroll data before drawing the PDF (user requirement)
       const [cfPage, payData] = await Promise.all([
         cashFlowApi.findByPeriod(dateFrom || undefined, dateTo || undefined, 0, 1000),
-        reportsApi.getPayrollReport(dateFrom || undefined, dateTo || undefined, daysWorkedPayload()),
+        reportsApi.getPayrollReport(dateFrom || undefined, dateTo || undefined),
       ]);
       const cfData = cfPage.content;
 
@@ -193,10 +222,10 @@ export const Reports = () => {
             baseStr = 'Comissão por serviço';
           } else if (emp.remunerationType === 'FIXO_E_COMISSIONADO') {
             baseStr = `R$ ${(emp.remunerationValue ?? 0).toFixed(2)} + comissão por serviço`;
-          } else if (emp.remunerationType === 'DIARISTA') {
-            baseStr = `R$ ${(emp.remunerationValue ?? 0).toFixed(2)} / dia`;
-          } else if (emp.remunerationType === 'DIARIA_E_COMISSIONADO') {
-            baseStr = `R$ ${(emp.remunerationValue ?? 0).toFixed(2)} / dia + comissão`;
+          } else if (daily) {
+            const dias = emp.daysWorked ?? 0;
+            baseStr = `R$ ${(emp.remunerationValue ?? 0).toFixed(2)}/dia × ${dias}`;
+            if (emp.remunerationType === 'DIARIA_E_COMISSIONADO') baseStr += ' + comissão';
           }
 
           return [
@@ -205,7 +234,7 @@ export const Reports = () => {
             baseStr,
             emp.doneAppointmentsCount.toString(),
             `R$ ${(emp.doneAppointmentsValue ?? 0).toFixed(2)}`,
-            daily ? 'ver Folha de Pagamento' : `R$ ${(emp.calculatedPayout ?? 0).toFixed(2)}`,
+            `R$ ${(emp.calculatedPayout ?? 0).toFixed(2)}`,
           ];
         });
 
@@ -561,16 +590,18 @@ export const Reports = () => {
                             const typeStr = remunerationLabel(emp.remunerationType);
                             let baseStr = '-';
 
+                            const isDaily = remunerationIsDaily(emp.remunerationType);
                             if (emp.remunerationType === 'SALARIO_FIXO') {
                               baseStr = formatBRL(emp.remunerationValue ?? 0);
                             } else if (emp.remunerationType === 'COMISSIONADO') {
                               baseStr = 'Comissão por serviço';
                             } else if (emp.remunerationType === 'FIXO_E_COMISSIONADO') {
                               baseStr = `${formatBRL(emp.remunerationValue ?? 0)} + comissão por serviço`;
-                            } else if (emp.remunerationType === 'DIARISTA') {
-                              baseStr = `${formatBRL(emp.remunerationValue ?? 0)} / dia`;
-                            } else if (emp.remunerationType === 'DIARIA_E_COMISSIONADO') {
-                              baseStr = `${formatBRL(emp.remunerationValue ?? 0)} / dia + comissão por serviço`;
+                            } else if (isDaily) {
+                              baseStr = `${formatBRL(emp.remunerationValue ?? 0)}/dia × ${emp.daysWorked ?? 0} dia(s)`;
+                              if (emp.remunerationType === 'DIARIA_E_COMISSIONADO') {
+                                baseStr += ' + comissão por serviço';
+                              }
                             }
 
                             return (
@@ -590,13 +621,11 @@ export const Reports = () => {
                                   {formatBRL(emp.doneAppointmentsValue ?? 0)}
                                 </td>
                                 <td className="px-6 py-4 text-sm font-bold text-[#be8a83] text-right">
-                                  {emp.remunerationType === 'DIARISTA' ||
-                                  emp.remunerationType === 'DIARIA_E_COMISSIONADO' ? (
-                                    <span className="text-xs font-semibold text-[#7a7074]">
-                                      ver aba Folha de Pagamento
+                                  {formatBRL(emp.calculatedPayout ?? 0)}
+                                  {isDaily && (
+                                    <span className="block text-[10px] font-normal text-[#7a7074]">
+                                      dias ajustáveis na aba Folha
                                     </span>
-                                  ) : (
-                                    formatBRL(emp.calculatedPayout ?? 0)
                                   )}
                                 </td>
                               </tr>
@@ -666,15 +695,11 @@ export const Reports = () => {
               </div>
 
               {payroll?.items?.some((i) => remunerationIsDaily(i.remunerationType)) && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={loadReports}
-                    disabled={isLoading}
-                    className="btn-premium disabled:opacity-50"
-                  >
-                    Recalcular folha
-                  </button>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                  Os dias trabalhados de diaristas são contados automaticamente pelos dias com
+                  atendimento concluído no período. <strong>Confira</strong> e ajuste se ela trabalhou
+                  algum dia sem cliente (preparação, faxina) ou faltou — o valor ajustado fica salvo
+                  para este período e entra também no lucro do relatório Financeiro.
                 </div>
               )}
 
@@ -726,20 +751,53 @@ export const Reports = () => {
                               {/* Dias trabalhados — editável só para diaristas */}
                               <td className="px-6 py-4 text-sm text-center">
                                 {daily ? (
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    step="1"
-                                    value={daysWorked[item.employeeId] ?? ''}
-                                    onChange={(e) =>
-                                      setDaysWorked((prev) => ({
-                                        ...prev,
-                                        [item.employeeId]: e.target.value,
-                                      }))
-                                    }
-                                    placeholder="0"
-                                    className="w-20 px-2 py-1 text-sm text-center border border-[#eae1e1] rounded-lg focus:outline-none focus:border-[#be8a83]"
-                                  />
+                                  (() => {
+                                    const draft = dayEdits[item.employeeId];
+                                    const current = String(item.daysWorked ?? 0);
+                                    const value = draft ?? current;
+                                    const dirty = draft !== undefined && draft !== current;
+                                    const busy = savingDaysFor === item.employeeId;
+                                    return (
+                                      <div className="flex flex-col items-center gap-1.5">
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            value={value}
+                                            disabled={busy}
+                                            onChange={(e) =>
+                                              setDayEdits((prev) => ({
+                                                ...prev,
+                                                [item.employeeId]: e.target.value,
+                                              }))
+                                            }
+                                            className="w-16 px-2 py-1 text-sm text-center border border-[#eae1e1] rounded-lg focus:outline-none focus:border-[#be8a83]"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => saveDaysWorked(item.employeeId)}
+                                            disabled={!dirty || busy}
+                                            className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-[#be8a83]/40 text-[#be8a83] hover:bg-[#be8a83]/5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                          >
+                                            {busy ? '...' : 'Salvar'}
+                                          </button>
+                                        </div>
+                                        {item.daysWorkedIsOverride ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => resetDaysWorked(item.employeeId)}
+                                            disabled={busy}
+                                            className="text-[10px] text-[#7a7074] underline hover:text-[#3b3036] cursor-pointer"
+                                          >
+                                            ajustado — voltar ao automático ({item.daysWorkedAuto ?? 0})
+                                          </button>
+                                        ) : (
+                                          <span className="text-[10px] text-emerald-600">automático</span>
+                                        )}
+                                      </div>
+                                    );
+                                  })()
                                 ) : (
                                   <span className="text-gray-400">—</span>
                                 )}

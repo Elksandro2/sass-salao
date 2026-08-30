@@ -23,6 +23,8 @@ import com.cristiane.salon.models.report.dto.EmployeeFinanceResponse;
 import com.cristiane.salon.models.report.dto.PayrollReportResponse;
 import com.cristiane.salon.models.report.dto.ServicePricingAnalysisResponse;
 import com.cristiane.salon.models.report.dto.ServicePricingItemResponse;
+import com.cristiane.salon.models.report.entity.DiaristaWorkedDaysOverride;
+import com.cristiane.salon.models.report.repository.DiaristaWorkedDaysOverrideRepository;
 import com.cristiane.salon.models.service.entity.SalonService;
 import com.cristiane.salon.models.service.entity.SalonServiceProductUsage;
 import com.cristiane.salon.models.service.repository.SalonServiceProductUsageRepository;
@@ -62,6 +64,7 @@ public class ReportService {
     private final SalonServiceProductUsageRepository serviceProductUsageRepository;
     private final FixedExpenseRepository fixedExpenseRepository;
     private final SalonBusinessSettingsService businessSettingsService;
+    private final DiaristaWorkedDaysOverrideRepository workedDaysOverrideRepository;
     private final SalonClock salonClock;
 
     @Transactional(readOnly = true)
@@ -275,6 +278,7 @@ public class ReportService {
                 .filter(a -> a.getStatus() == AppointmentStatus.DONE)
                 .collect(Collectors.toList());
 
+        Map<Long, Integer> workedDaysOverrides = loadWorkedDaysOverrides(from, to);
         List<Employee> employees = employeeRepository.findAll();
         List<EmployeeFinanceResponse> employeeFinanceDetails = new ArrayList<>();
 
@@ -294,21 +298,26 @@ public class ReportService {
                     .map(Appointment::getTotalProductsPrice)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            // O relatório financeiro não coleta "dias trabalhados", então a parte de diária de
-            // quem é Diarista fica de fora aqui — esse cálculo vive na tela de Folha de Pagamento.
-            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneAppointments, 0);
+            RemunerationType empType = employee.getRemunerationType();
+            boolean empDaily = empType != null && empType.isDaily();
+            WorkedDays worked = empDaily
+                    ? resolveWorkedDays(employee.getId(), empDoneAppointments, workedDaysOverrides)
+                    : new WorkedDays(0, 0, false);
+
+            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneAppointments, worked.days());
             totalSalaryPaid = totalSalaryPaid.add(breakdown.salaryPart()).add(breakdown.dailyPart());
             totalCommissionPaid = totalCommissionPaid.add(breakdown.commissionPart());
 
             employeeFinanceDetails.add(new EmployeeFinanceResponse(
                     employee.getId(),
                     employee.getUser().getName(),
-                    employee.getRemunerationType() != null ? employee.getRemunerationType().name() : null,
+                    empType != null ? empType.name() : null,
                     employee.getRemunerationValue(),
                     doneCount,
                     empDoneValue,
                     empDoneProductsValue,
-                    breakdown.totalPayout()
+                    breakdown.totalPayout(),
+                    empDaily ? worked.days() : null
             ));
         }
 
@@ -382,6 +391,41 @@ public class ReportService {
     private record PayoutBreakdown(BigDecimal salaryPart, BigDecimal dailyPart, BigDecimal commissionPart,
                                    BigDecimal totalPayout) {}
 
+    /** Dias trabalhados de uma diarista num período: o valor efetivo, a contagem automática e
+     *  se o efetivo veio de um ajuste manual salvo. */
+    private record WorkedDays(int days, int auto, boolean isOverride) {}
+
+    /**
+     * Dias trabalhados de uma diarista no período: por padrão, os dias distintos em que ela foi
+     * a profissional de um atendimento concluído; se houver ajuste manual salvo para exatamente
+     * este período, ele vence.
+     */
+    private WorkedDays resolveWorkedDays(Long employeeId, List<Appointment> empDoneAppointments,
+                                         Map<Long, Integer> overrides) {
+        int auto = (int) empDoneAppointments.stream()
+                .map(this::appointmentDate)
+                .distinct()
+                .count();
+        Integer override = overrides.get(employeeId);
+        return override != null
+                ? new WorkedDays(Math.max(0, override), auto, true)
+                : new WorkedDays(auto, auto, false);
+    }
+
+    /** Mesma cadeia de fallback dos relatórios: scheduledAt > preferredDate > createdAt. */
+    private LocalDate appointmentDate(Appointment a) {
+        if (a.getScheduledAt() != null) return a.getScheduledAt().toLocalDate();
+        if (a.getPreferredDate() != null) return a.getPreferredDate();
+        return a.getCreatedAt().atZone(salonClock.zone()).toLocalDate();
+    }
+
+    /** Ajustes manuais de dias trabalhados salvos para exatamente [from, to], por employeeId. */
+    private Map<Long, Integer> loadWorkedDaysOverrides(LocalDate from, LocalDate to) {
+        return workedDaysOverrideRepository.findByPeriodStartAndPeriodEnd(from, to).stream()
+                .collect(Collectors.toMap(DiaristaWorkedDaysOverride::getEmployeeId,
+                        DiaristaWorkedDaysOverride::getDaysWorked, (a, b) -> b));
+    }
+
     @Transactional(readOnly = true)
     public AppointmentReportResponse generateAppointmentReport(LocalDate from, LocalDate to) {
         DateRangeValidator.validate(from, to);
@@ -419,17 +463,16 @@ public class ReportService {
     }
 
     @Transactional(readOnly = true)
-    public PayrollReportResponse generatePayrollReport(LocalDate from, LocalDate to,
-                                                      Map<Long, Integer> daysWorkedByEmployee) {
+    public PayrollReportResponse generatePayrollReport(LocalDate from, LocalDate to) {
         DateRangeValidator.validate(from, to);
         if (from == null) from = salonClock.today().withDayOfMonth(1);
         if (to == null) to = salonClock.today().plusDays(30);
-        Map<Long, Integer> daysWorked = daysWorkedByEmployee != null ? daysWorkedByEmployee : Map.of();
 
         List<Appointment> doneAppointments = findAppointmentsInPeriod(from, to).stream()
                 .filter(a -> a.getStatus() == AppointmentStatus.DONE)
                 .collect(Collectors.toList());
 
+        Map<Long, Integer> overrides = loadWorkedDaysOverrides(from, to);
         List<Employee> employees = employeeRepository.findAll();
         List<PayrollReportResponse.PayrollItem> items = new ArrayList<>();
 
@@ -444,9 +487,11 @@ public class ReportService {
 
             RemunerationType type = employee.getRemunerationType();
             boolean daily = type != null && type.isDaily();
-            int days = daily ? Math.max(0, daysWorked.getOrDefault(employee.getId(), 0)) : 0;
+            WorkedDays worked = daily
+                    ? resolveWorkedDays(employee.getId(), empDoneAppointments, overrides)
+                    : new WorkedDays(0, 0, false);
 
-            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneAppointments, days);
+            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneAppointments, worked.days());
 
             items.add(new PayrollReportResponse.PayrollItem(
                     employee.getId(),
@@ -455,12 +500,48 @@ public class ReportService {
                     empDoneValue,
                     breakdown.totalPayout(),
                     daily ? employee.getRemunerationValue() : null,
-                    daily ? days : null
+                    daily ? worked.days() : null,
+                    daily ? worked.auto() : null,
+                    daily ? worked.isOverride() : null
             ));
         }
 
         String period = from + " a " + to;
-        return new PayrollReportResponse(items, period);
+        return new PayrollReportResponse(items, period, from, to);
+    }
+
+    // --- Ajuste manual de dias trabalhados de diarista -----------------------------------------
+
+    @Transactional
+    public void saveWorkedDaysOverride(Long employeeId, LocalDate periodStart, LocalDate periodEnd, int daysWorked) {
+        if (periodStart == null || periodEnd == null || periodStart.isAfter(periodEnd)) {
+            throw new com.cristiane.salon.exception.BadRequestException("Período inválido");
+        }
+        if (daysWorked < 0) {
+            throw new com.cristiane.salon.exception.BadRequestException("Os dias trabalhados não podem ser negativos");
+        }
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Diarista não encontrada"));
+        if (employee.getRemunerationType() == null || !employee.getRemunerationType().isDaily()) {
+            throw new com.cristiane.salon.exception.BadRequestException(
+                    "Só faz sentido ajustar dias trabalhados de quem é Diarista ou Diarista + comissão");
+        }
+        DiaristaWorkedDaysOverride row = workedDaysOverrideRepository
+                .findByEmployeeIdAndPeriodStartAndPeriodEnd(employeeId, periodStart, periodEnd)
+                .orElseGet(DiaristaWorkedDaysOverride::new);
+        row.setEmployeeId(employeeId);
+        row.setPeriodStart(periodStart);
+        row.setPeriodEnd(periodEnd);
+        row.setDaysWorked(daysWorked);
+        workedDaysOverrideRepository.save(row);
+    }
+
+    /** Remove o ajuste manual — o período volta a usar a contagem automática. */
+    @Transactional
+    public void clearWorkedDaysOverride(Long employeeId, LocalDate periodStart, LocalDate periodEnd) {
+        workedDaysOverrideRepository
+                .findByEmployeeIdAndPeriodStartAndPeriodEnd(employeeId, periodStart, periodEnd)
+                .ifPresent(workedDaysOverrideRepository::delete);
     }
 
     /**

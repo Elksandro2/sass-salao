@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -54,8 +56,8 @@ class ReportControllerTest extends BaseControllerTest {
     @Test
     @WithMockUser(roles = { "ADMIN" })
     void getPayrollReportReturns200() throws Exception {
-        PayrollReportResponse response = new PayrollReportResponse(List.of(), "Period");
-        when(reportService.generatePayrollReport(any(LocalDate.class), any(LocalDate.class), any()))
+        PayrollReportResponse response = new PayrollReportResponse(List.of(), "Period", null, null);
+        when(reportService.generatePayrollReport(any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(response);
 
         mvc.perform(get("/v1/reports/payroll?from=2026-05-01&to=2026-05-16")
@@ -93,16 +95,29 @@ class ReportControllerTest extends BaseControllerTest {
     }
 
     @Test
-    void parseDaysWorked_parsesPairsAndIgnoresGarbage() {
-        Map<Long, Integer> parsed = ReportController.parseDaysWorked("5:20, 7:18 ,bad,9:-3,x:y");
-        org.junit.jupiter.api.Assertions.assertEquals(2, parsed.size());
-        org.junit.jupiter.api.Assertions.assertEquals(20, parsed.get(5L));
-        org.junit.jupiter.api.Assertions.assertEquals(18, parsed.get(7L));
+    @WithMockUser(roles = { "ADMIN" })
+    void saveWorkedDaysReturns204AndDelegates() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .put("/v1/reports/payroll/worked-days")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"employeeId\":7,\"periodStart\":\"2026-05-01\",\"periodEnd\":\"2026-05-31\",\"daysWorked\":22}"))
+                .andExpect(status().isNoContent());
+
+        verify(reportService).saveWorkedDaysOverride(eq(7L),
+                eq(LocalDate.parse("2026-05-01")), eq(LocalDate.parse("2026-05-31")), eq(22));
     }
 
     @Test
-    void parseDaysWorked_nullOrBlank_returnsEmptyMap() {
-        org.junit.jupiter.api.Assertions.assertTrue(ReportController.parseDaysWorked(null).isEmpty());
-        org.junit.jupiter.api.Assertions.assertTrue(ReportController.parseDaysWorked("  ").isEmpty());
+    @WithMockUser(roles = { "ADMIN" })
+    void clearWorkedDaysReturns204AndDelegates() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .delete("/v1/reports/payroll/worked-days")
+                .param("employeeId", "7")
+                .param("periodStart", "2026-05-01")
+                .param("periodEnd", "2026-05-31"))
+                .andExpect(status().isNoContent());
+
+        verify(reportService).clearWorkedDaysOverride(eq(7L),
+                eq(LocalDate.parse("2026-05-01")), eq(LocalDate.parse("2026-05-31")));
     }
 }

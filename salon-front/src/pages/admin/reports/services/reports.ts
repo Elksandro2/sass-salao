@@ -13,6 +13,8 @@ export interface EmployeeFinanceResponse {
   doneAppointmentsValue: number;
   doneProductsValue: number;
   calculatedPayout: number;
+  /** Dias trabalhados no período — só para Diarista/Diária+Comissão. */
+  daysWorked?: number | null;
 }
 
 export interface FinancialReportResponse {
@@ -49,11 +51,18 @@ export interface PayrollItem {
   dailyRate?: number | null;
   /** Dias trabalhados usados no cálculo — só para Diarista/Diária+Comissão, senão null. */
   daysWorked?: number | null;
+  /** Contagem automática (dias com atendimento concluído) — referência. */
+  daysWorkedAuto?: number | null;
+  /** true = o número veio de um ajuste manual salvo; false = veio do automático. */
+  daysWorkedIsOverride?: boolean | null;
 }
 
 export interface PayrollReportResponse {
   items: PayrollItem[];
   period: string;
+  /** Período já resolvido (defaults aplicados) — usar ao salvar ajuste de dias da diarista. */
+  periodStart?: string | null;
+  periodEnd?: string | null;
 }
 
 export interface AppointmentProfitResponse {
@@ -114,23 +123,27 @@ export const reportsApi = {
     return data;
   },
 
-  /**
-   * @param daysWorked mapa employeeId -> dias trabalhados no período (só usado para diaristas).
-   *   Enviado ao backend como "5:20,7:18".
-   */
-  getPayrollReport: async (from?: string, to?: string, daysWorked?: Record<number, number>) => {
+  getPayrollReport: async (from?: string, to?: string) => {
     const params: Record<string, string> = {};
     if (from) params.from = from;
     if (to) params.to = to;
-    if (daysWorked) {
-      const serialized = Object.entries(daysWorked)
-        .filter(([, days]) => Number.isFinite(days) && days >= 0)
-        .map(([id, days]) => `${id}:${days}`)
-        .join(',');
-      if (serialized) params.daysWorked = serialized;
-    }
     const { data } = await api.get<PayrollReportResponse>('/reports/payroll', { params });
     return data;
+  },
+
+  /** Ajuste manual dos dias trabalhados de uma diarista para exatamente [periodStart, periodEnd]. */
+  saveWorkedDays: async (input: {
+    employeeId: number;
+    periodStart: string;
+    periodEnd: string;
+    daysWorked: number;
+  }) => {
+    await api.put('/reports/payroll/worked-days', input);
+  },
+
+  /** Remove o ajuste manual — o período volta a contar os dias automaticamente. */
+  resetWorkedDays: async (input: { employeeId: number; periodStart: string; periodEnd: string }) => {
+    await api.delete('/reports/payroll/worked-days', { params: input });
   },
 
   getServicePricingAnalysis: async (from?: string, to?: string) => {

@@ -6,10 +6,11 @@ import com.cristiane.salon.models.report.dto.AppointmentReportResponse;
 import com.cristiane.salon.models.report.dto.FinancialReportResponse;
 import com.cristiane.salon.models.report.dto.PayrollReportResponse;
 import com.cristiane.salon.models.report.dto.ServicePricingAnalysisResponse;
+import com.cristiane.salon.models.report.dto.WorkedDaysOverrideRequest;
 import com.cristiane.salon.models.report.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,15 +19,16 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/reports")
@@ -59,33 +61,28 @@ public class ReportController {
     @Operation(summary = "Gera folha de pagamento e cálculo de comissões por funcionária (Admin)")
     public ResponseEntity<PayrollReportResponse> getPayrollReport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false)
-            @Parameter(description = "Dias trabalhados por diarista no período, formato \"employeeId:dias,employeeId:dias\"")
-            String daysWorked) {
-        return ResponseEntity.ok(reportService.generatePayrollReport(from, to, parseDaysWorked(daysWorked)));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(reportService.generatePayrollReport(from, to));
     }
 
-    /** Converte "5:20,7:18" em {5->20, 7->18}. Entradas malformadas são ignoradas. */
-    static Map<Long, Integer> parseDaysWorked(String raw) {
-        Map<Long, Integer> result = new HashMap<>();
-        if (raw == null || raw.isBlank()) {
-            return result;
-        }
-        for (String pair : raw.split(",")) {
-            String[] parts = pair.split(":");
-            if (parts.length != 2) continue;
-            try {
-                long employeeId = Long.parseLong(parts[0].trim());
-                int days = Integer.parseInt(parts[1].trim());
-                if (days >= 0) {
-                    result.put(employeeId, days);
-                }
-            } catch (NumberFormatException ignored) {
-                // par malformado — ignora em vez de derrubar o relatório inteiro
-            }
-        }
-        return result;
+    @PutMapping("/payroll/worked-days")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Operation(summary = "Ajusta manualmente os dias trabalhados de uma diarista num período (Admin)")
+    public ResponseEntity<Void> saveWorkedDays(@Valid @RequestBody WorkedDaysOverrideRequest request) {
+        reportService.saveWorkedDaysOverride(
+                request.employeeId(), request.periodStart(), request.periodEnd(), request.daysWorked());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/payroll/worked-days")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Operation(summary = "Remove o ajuste manual — o período volta a contar dias automaticamente (Admin)")
+    public ResponseEntity<Void> clearWorkedDays(
+            @RequestParam Long employeeId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodStart,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodEnd) {
+        reportService.clearWorkedDaysOverride(employeeId, periodStart, periodEnd);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/appointments/{id}/profit")

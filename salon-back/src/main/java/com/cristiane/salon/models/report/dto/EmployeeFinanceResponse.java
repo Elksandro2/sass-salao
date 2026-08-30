@@ -6,10 +6,12 @@ public record EmployeeFinanceResponse(
         Long employeeId,
         String employeeName,
         String remunerationType,
-        /** Salário base — só preenchido para SALARIO_FIXO/FIXO_E_COMISSIONADO. */
+        /** Salário base (fixo) ou valor da diária (diarista). Não se aplica a COMISSIONADO. */
         BigDecimal remunerationValue,
         long doneAppointmentsCount,
         BigDecimal doneAppointmentsValue,
         BigDecimal doneProductsValue,
-        BigDecimal calculatedPayout
+        BigDecimal calculatedPayout,
+        /** Dias trabalhados no período — só para Diarista/Diária+Comissão, senão null. */
+        Integer daysWorked
 ) {}
