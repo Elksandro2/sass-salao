@@ -153,7 +153,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
     } catch (err) {
       const msg = getApiErrorMessage(
         err,
-        'Erro ao salvar funcionário(a). Verifique se o ID de usuário está correto.'
+        'Erro ao salvar colaborador(a). Verifique se o ID de usuário está correto.'
       );
       await showError(msg);
     }
@@ -166,7 +166,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
       setShowConfirm(false);
       setRefreshTrigger((prev) => prev + 1);
     } catch (err) {
-      const msg = getApiErrorMessage(err, 'Erro ao desvincular funcionário(a).');
+      const msg = getApiErrorMessage(err, 'Erro ao desvincular colaborador(a).');
       await showError(msg);
     }
   };
@@ -284,10 +284,10 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
         </div>
       ) : (
         <div className="flex justify-between items-center">
-          <h2 className="font-heading text-2xl font-bold text-[#3b3036]">Gerenciar Funcionários(as)</h2>
+          <h2 className="font-heading text-2xl font-bold text-[#3b3036]">Gerenciar Colaboradores(as)</h2>
           <PermissionGate method="POST" endpoint="/v1/employees">
             <button onClick={() => handleOpenForm()} className="btn-premium">
-              <Plus size={18} /> Vincular Funcionário(a)
+              <Plus size={18} /> Adicionar Colaborador(a)
             </button>
           </PermissionGate>
         </div>
@@ -305,7 +305,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
       <ModalForm
         show={showForm}
         onHide={() => setShowForm(false)}
-        title={editingEmployee ? 'Editar Funcionário(a)' : 'Novo(a) Funcionário(a)'}
+        title={editingEmployee ? 'Editar Colaborador(a)' : 'Novo(a) Colaborador(a)'}
         onSubmit={handleSubmit(onSubmit)}
       >
         <div className="space-y-4">
@@ -344,7 +344,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
               </ul>
             )}
             <p className="text-xs text-gray-400 mt-1">
-              Busque pelo nome e selecione o usuário que será vinculado como funcionário(a).
+              Busque pelo nome e selecione o usuário que será vinculado como colaborador(a).
             </p>
             {errors.userId && (
               <span className="text-xs text-rose-500 font-semibold">{errors.userId.message}</span>
@@ -409,8 +409,8 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
         show={showConfirm}
         onHide={() => setShowConfirm(false)}
         onConfirm={confirmDelete}
-        title="Desvincular Funcionário(a)"
-        message="Tem certeza que deseja remover este(a) funcionário(a)? O usuário continuará existindo, apenas perderá o vínculo de funcionário(a)."
+        title="Desvincular Colaborador(a)"
+        message="Tem certeza que deseja remover este(a) colaborador(a)? O usuário continuará existindo, apenas perderá o vínculo de colaborador(a)."
       />
 
       {showDetails && selectedEmployee && (
@@ -424,7 +424,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
               {/* Header */}
               <div className="flex items-center justify-between p-5 border-b border-solid border-[#eae1e1] rounded-t-2xl">
                 <h3 className="text-lg font-semibold font-heading text-[#3b3036]">
-                  Detalhes do(a) Funcionário(a)
+                  Detalhes do(a) Colaborador(a)
                 </h3>
                 <button
                   onClick={() => setShowDetails(false)}

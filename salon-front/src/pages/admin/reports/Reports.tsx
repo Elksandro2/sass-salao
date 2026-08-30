@@ -154,7 +154,7 @@ export const Reports = () => {
           doc.addPage();
           currentY = 20;
         }
-        currentY = drawSectionHeader('2. Detalhamento de Remunerações por Funcionário(a)', currentY);
+        currentY = drawSectionHeader('2. Detalhamento de Remunerações por Colaborador(a)', currentY);
 
         const employeeRows = financial.employeeFinanceDetails.map((emp) => {
           let typeStr = 'Não definido';
@@ -501,7 +501,7 @@ export const Reports = () => {
               {financial?.employeeFinanceDetails && financial.employeeFinanceDetails.length > 0 && (
                 <div className="space-y-4">
                   <h4 className="font-heading font-bold text-lg text-[#3b3036]">
-                    Detalhamento de Remunerações por Funcionário(a)
+                    Detalhamento de Remunerações por Colaborador(a)
                   </h4>
                   <div className="bg-white rounded-2xl border border-[#eae1e1]/80 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">

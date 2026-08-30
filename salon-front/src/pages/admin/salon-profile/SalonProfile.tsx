@@ -285,7 +285,7 @@ export const SalonProfile = () => {
           <span className="text-sm font-bold text-[#3b3036]">Comissão sobre produtos vendidos</span>
         </div>
         <p className="text-xs text-[#3b3036]/60">
-          Porcentagem única, válida pro salão inteiro — qualquer funcionária que vender qualquer
+          Porcentagem única, válida pro salão inteiro — qualquer colaboradora que vender qualquer
           produto recebe essa %. É uma exceção deliberada à regra geral: vale até para quem é
           <strong> Salário Fixo</strong>, como incentivo à venda (diferente da comissão de
           serviços, que é configurada por serviço na tela de Serviços).

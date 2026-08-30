@@ -69,9 +69,9 @@ describe('AdminLayout', () => {
     expect(screen.queryByText('Produtos')).not.toBeInTheDocument();
   });
 
-  it('shows the "Funcionária" role label in the header for a FUNCIONARIA user', () => {
+  it('shows the "Colaboradora" role label in the header for a FUNCIONARIA user', () => {
     renderAdminLayout({ email: 'func@x.com', role: 'FUNCIONARIA', userId: 2, permissions: [] });
-    expect(screen.getByText('Funcionária')).toBeInTheDocument();
+    expect(screen.getByText('Colaboradora')).toBeInTheDocument();
   });
 
   it('shows the full menu for ADMIN, including Produtos and Fluxo de Caixa', () => {

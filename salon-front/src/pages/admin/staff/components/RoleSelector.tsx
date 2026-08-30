@@ -9,7 +9,7 @@ interface RoleSelectorProps {
 const ROLES: { value: StaffRoleName; label: string; description: string; icon: typeof UsersIcon }[] = [
   {
     value: 'FUNCIONARIA',
-    label: 'Funcionária',
+    label: 'Colaboradora',
     description: 'Atende clientes. Precisa de dados de remuneração/comissão.',
     icon: UsersIcon,
   },

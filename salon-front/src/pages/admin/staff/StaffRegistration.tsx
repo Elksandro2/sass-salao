@@ -30,7 +30,7 @@ const labelCls = 'label-premium';
 const sectionTitleCls = 'flex items-center gap-2 font-heading text-sm font-bold text-[#3b3036] mt-2';
 
 const ROLE_LABELS: Record<string, string> = {
-  FUNCIONARIA: 'Funcionária',
+  FUNCIONARIA: 'Colaboradora',
   GERENTE_DE_ATENDIMENTO: 'Gerente de Atendimento',
 };
 
@@ -196,7 +196,7 @@ export const StaffRegistration = () => {
           <div>
             <h2 className="font-heading text-2xl font-bold text-[#3b3036]">Cadastro de Equipe</h2>
             <p className="text-xs text-[#3b3036]/60 mt-1">
-              Cadastro completo de funcionárias e gerentes de atendimento — restrito a
+              Cadastro completo de colaboradoras e gerentes de atendimento — restrito a
               administradores.
             </p>
           </div>
