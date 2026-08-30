@@ -14,6 +14,10 @@ public record PayrollReportResponse(
             RemunerationType remunerationType,
             /** Receita total dos atendimentos concluídos dela no período — contexto, não é mais literalmente "valor × %" (cada serviço tem seu próprio %). */
             BigDecimal baseAmount,
-            BigDecimal calculatedPay
+            BigDecimal calculatedPay,
+            /** Valor da diária — preenchido só para Diarista/Diária+Comissão, senão null. */
+            BigDecimal dailyRate,
+            /** Dias trabalhados usados no cálculo — só para Diarista/Diária+Comissão, senão null. */
+            Integer daysWorked
     ) {}
 }

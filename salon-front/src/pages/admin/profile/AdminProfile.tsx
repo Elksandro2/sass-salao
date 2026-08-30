@@ -23,12 +23,7 @@ import { employeeMercadoPagoApi } from '../employees/services/mercadoPago';
 import { employeesApi } from '../employees/services/employees';
 import type { EmployeeActingState } from '../employees/services/employees';
 import { useFeatureFlag } from '../../../hooks/useFeatureFlag';
-
-const REMUNERATION_LABELS: Record<string, string> = {
-  SALARIO_FIXO: 'Salário fixo',
-  COMISSIONADO: 'Comissionado',
-  FIXO_E_COMISSIONADO: 'Salário fixo + comissionado',
-};
+import { remunerationLabel } from '../../../utils/remuneration';
 
 // Aplica máscara ###.###.###-## enquanto o usuário digita
 const formatCpf = (value: string) => {
@@ -381,7 +376,7 @@ export const AdminProfile = () => {
             )}
             {acting.acting && acting.remunerationType && (
               <span className="text-xs text-[#3b3036]/60">
-                Remuneração atual: {REMUNERATION_LABELS[acting.remunerationType] ?? acting.remunerationType}
+                Remuneração atual: {remunerationLabel(acting.remunerationType)}
               </span>
             )}
             <button

@@ -123,8 +123,7 @@ public class ReportService {
      */
     private BigDecimal computeServiceCommission(Employee employee, List<AppointmentServiceItem> items) {
         if (employee == null || employee.getRemunerationType() == null
-                || (employee.getRemunerationType() != RemunerationType.COMISSIONADO
-                        && employee.getRemunerationType() != RemunerationType.FIXO_E_COMISSIONADO)) {
+                || !employee.getRemunerationType().paysServiceCommission()) {
             return BigDecimal.ZERO;
         }
 
@@ -283,8 +282,10 @@ public class ReportService {
                     .map(Appointment::getTotalProductsPrice)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneAppointments);
-            totalSalaryPaid = totalSalaryPaid.add(breakdown.salaryPart());
+            // O relatório financeiro não coleta "dias trabalhados", então a parte de diária de
+            // quem é Diarista fica de fora aqui — esse cálculo vive na tela de Folha de Pagamento.
+            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneAppointments, 0);
+            totalSalaryPaid = totalSalaryPaid.add(breakdown.salaryPart()).add(breakdown.dailyPart());
             totalCommissionPaid = totalCommissionPaid.add(breakdown.commissionPart());
 
             employeeFinanceDetails.add(new EmployeeFinanceResponse(
@@ -329,17 +330,30 @@ public class ReportService {
      * qualquer tipo — inclusive Salário Fixo). Span manual: fica aninhado dentro de
      * "gerar-relatorio-financeiro" no trace, um span por funcionária.
      */
+    /**
+     * @param daysWorked dias trabalhados no período — só entra na conta para Diarista/Diária+Comissão.
+     *                   O relatório financeiro passa 0 (não coleta esse dado); a folha de
+     *                   pagamento passa o valor informado na tela.
+     */
     @WithSpan("calcular-pagamento-funcionaria")
-    private PayoutBreakdown calcularPagamentoFuncionaria(Employee employee, List<Appointment> empDoneAppointments) {
+    private PayoutBreakdown calcularPagamentoFuncionaria(Employee employee, List<Appointment> empDoneAppointments,
+                                                        int daysWorked) {
         Span span = Span.current();
         span.setAttribute("funcionaria.id", employee.getId());
-        span.setAttribute("funcionaria.tipo_remuneracao",
-                employee.getRemunerationType() != null ? employee.getRemunerationType().name() : "N/A");
+        RemunerationType type = employee.getRemunerationType();
+        span.setAttribute("funcionaria.tipo_remuneracao", type != null ? type.name() : "N/A");
+
+        BigDecimal value = employee.getRemunerationValue() != null
+                ? employee.getRemunerationValue() : BigDecimal.ZERO;
 
         BigDecimal salaryPart = BigDecimal.ZERO;
-        if (employee.getRemunerationType() == RemunerationType.SALARIO_FIXO
-                || employee.getRemunerationType() == RemunerationType.FIXO_E_COMISSIONADO) {
-            salaryPart = employee.getRemunerationValue() != null ? employee.getRemunerationValue() : BigDecimal.ZERO;
+        if (type != null && type.hasFixedSalary()) {
+            salaryPart = value;
+        }
+
+        BigDecimal dailyPart = BigDecimal.ZERO;
+        if (type != null && type.isDaily() && daysWorked > 0) {
+            dailyPart = value.multiply(BigDecimal.valueOf(daysWorked));
         }
 
         BigDecimal commissionPart = BigDecimal.ZERO;
@@ -348,12 +362,13 @@ public class ReportService {
             commissionPart = commissionPart.add(computeProductCommission(appointment.getProducts()));
         }
 
-        BigDecimal payout = salaryPart.add(commissionPart);
+        BigDecimal payout = salaryPart.add(dailyPart).add(commissionPart);
         span.setAttribute("funcionaria.pagamento_calculado", payout.doubleValue());
-        return new PayoutBreakdown(salaryPart, commissionPart, payout);
+        return new PayoutBreakdown(salaryPart, dailyPart, commissionPart, payout);
     }
 
-    private record PayoutBreakdown(BigDecimal salaryPart, BigDecimal commissionPart, BigDecimal totalPayout) {}
+    private record PayoutBreakdown(BigDecimal salaryPart, BigDecimal dailyPart, BigDecimal commissionPart,
+                                   BigDecimal totalPayout) {}
 
     @Transactional(readOnly = true)
     public AppointmentReportResponse generateAppointmentReport(LocalDate from, LocalDate to) {
@@ -392,10 +407,12 @@ public class ReportService {
     }
 
     @Transactional(readOnly = true)
-    public PayrollReportResponse generatePayrollReport(LocalDate from, LocalDate to) {
+    public PayrollReportResponse generatePayrollReport(LocalDate from, LocalDate to,
+                                                      Map<Long, Integer> daysWorkedByEmployee) {
         DateRangeValidator.validate(from, to);
         if (from == null) from = salonClock.today().withDayOfMonth(1);
         if (to == null) to = salonClock.today().plusDays(30);
+        Map<Long, Integer> daysWorked = daysWorkedByEmployee != null ? daysWorkedByEmployee : Map.of();
 
         List<Appointment> doneAppointments = findAppointmentsInPeriod(from, to).stream()
                 .filter(a -> a.getStatus() == AppointmentStatus.DONE)
@@ -413,14 +430,20 @@ public class ReportService {
                     .map(a -> a.getTotalEffectivePrice() != null ? a.getTotalEffectivePrice() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneAppointments);
+            RemunerationType type = employee.getRemunerationType();
+            boolean daily = type != null && type.isDaily();
+            int days = daily ? Math.max(0, daysWorked.getOrDefault(employee.getId(), 0)) : 0;
+
+            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneAppointments, days);
 
             items.add(new PayrollReportResponse.PayrollItem(
                     employee.getId(),
                     employee.getUser().getName(),
-                    employee.getRemunerationType(),
+                    type,
                     empDoneValue,
-                    breakdown.totalPayout()
+                    breakdown.totalPayout(),
+                    daily ? employee.getRemunerationValue() : null,
+                    daily ? days : null
             ));
         }
 

@@ -33,19 +33,19 @@ public class FuncionariaStrategy implements StaffRoleStrategy {
             throw new BadRequestException("O tipo de remuneração é obrigatório para funcionárias");
         }
 
-        boolean needsSalary = type == RemunerationType.SALARIO_FIXO
-                || type == RemunerationType.FIXO_E_COMISSIONADO;
+        boolean needsSalary = type.requiresValue();
 
         if (needsSalary && request.remunerationValue() == null) {
-            throw new BadRequestException("O valor do salário é obrigatório para este tipo de remuneração");
+            throw new BadRequestException(type.isDaily()
+                    ? "O valor da diária é obrigatório para diaristas"
+                    : "O valor do salário é obrigatório para este tipo de remuneração");
         }
     }
 
     @Override
     public void onStaffCreated(User user, StaffProfileRequest request) {
         RemunerationType type = request.remunerationType();
-        boolean needsSalary = type == RemunerationType.SALARIO_FIXO
-                || type == RemunerationType.FIXO_E_COMISSIONADO;
+        boolean needsSalary = type.requiresValue();
 
         Employee employee = new Employee();
         employee.setUser(user);

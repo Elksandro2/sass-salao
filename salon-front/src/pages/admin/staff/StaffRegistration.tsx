@@ -24,6 +24,13 @@ import type { StaffProfileResponse, StaffRoleName, StaffPixQrCodeResponse } from
 import { staffFormSchema, BRAZILIAN_STATES } from './staff.schema';
 import type { StaffFormValues } from './staff.schema';
 import { RoleSelector } from './components/RoleSelector';
+import {
+  REMUNERATION_TYPES,
+  remunerationLabel,
+  remunerationNeedsValue,
+  remunerationPaysServiceCommission,
+  remunerationValueFieldLabel,
+} from '../../../utils/remuneration';
 
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
@@ -77,7 +84,7 @@ export const StaffRegistration = () => {
 
   const roleName = watch('roleName');
   const remunerationType = watch('remunerationType');
-  const isCommissioned = remunerationType === 'COMISSIONADO' || remunerationType === 'FIXO_E_COMISSIONADO';
+  const isCommissioned = remunerationPaysServiceCommission(remunerationType);
 
   const openModal = () => {
     reset({});
@@ -433,13 +440,13 @@ export const StaffRegistration = () => {
                           <label htmlFor="staff-remunerationType" className={labelCls}>Tipo de remuneração</label>
                           <select id="staff-remunerationType" className={inputCls} {...register('remunerationType')}>
                             <option value="">Selecione</option>
-                            <option value="SALARIO_FIXO">Salário fixo</option>
-                            {roleName === 'FUNCIONARIA' && (
-                              <>
-                                <option value="COMISSIONADO">Comissionado</option>
-                                <option value="FIXO_E_COMISSIONADO">Fixo + comissão</option>
-                              </>
-                            )}
+                            {REMUNERATION_TYPES.filter(
+                              (t) => roleName === 'FUNCIONARIA' || t === 'SALARIO_FIXO'
+                            ).map((t) => (
+                              <option key={t} value={t}>
+                                {remunerationLabel(t)}
+                              </option>
+                            ))}
                           </select>
                           {roleName === 'GERENTE_DE_ATENDIMENTO' && (
                             <p className="text-xs text-gray-400 mt-1">
@@ -450,9 +457,11 @@ export const StaffRegistration = () => {
                             <span className="text-xs text-rose-500 font-semibold">{errors.remunerationType.message}</span>
                           )}
                         </div>
-                        {(remunerationType === 'SALARIO_FIXO' || remunerationType === 'FIXO_E_COMISSIONADO') && (
+                        {remunerationNeedsValue(remunerationType) && (
                           <div>
-                            <label htmlFor="staff-remunerationValue" className={labelCls}>Valor do salário fixo (R$)</label>
+                            <label htmlFor="staff-remunerationValue" className={labelCls}>
+                              {remunerationValueFieldLabel(remunerationType)}
+                            </label>
                             <input id="staff-remunerationValue" type="number" step="0.01" min="0" className={inputCls} {...register('remunerationValue')} />
                             {errors.remunerationValue && (
                               <span className="text-xs text-rose-500 font-semibold">{errors.remunerationValue.message}</span>

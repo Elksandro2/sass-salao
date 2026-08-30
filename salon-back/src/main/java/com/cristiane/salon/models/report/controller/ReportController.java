@@ -8,6 +8,7 @@ import com.cristiane.salon.models.report.dto.PayrollReportResponse;
 import com.cristiane.salon.models.report.dto.ServicePricingAnalysisResponse;
 import com.cristiane.salon.models.report.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -24,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/reports")
@@ -56,8 +59,33 @@ public class ReportController {
     @Operation(summary = "Gera folha de pagamento e cálculo de comissões por funcionária (Admin)")
     public ResponseEntity<PayrollReportResponse> getPayrollReport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ResponseEntity.ok(reportService.generatePayrollReport(from, to));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false)
+            @Parameter(description = "Dias trabalhados por diarista no período, formato \"employeeId:dias,employeeId:dias\"")
+            String daysWorked) {
+        return ResponseEntity.ok(reportService.generatePayrollReport(from, to, parseDaysWorked(daysWorked)));
+    }
+
+    /** Converte "5:20,7:18" em {5->20, 7->18}. Entradas malformadas são ignoradas. */
+    static Map<Long, Integer> parseDaysWorked(String raw) {
+        Map<Long, Integer> result = new HashMap<>();
+        if (raw == null || raw.isBlank()) {
+            return result;
+        }
+        for (String pair : raw.split(",")) {
+            String[] parts = pair.split(":");
+            if (parts.length != 2) continue;
+            try {
+                long employeeId = Long.parseLong(parts[0].trim());
+                int days = Integer.parseInt(parts[1].trim());
+                if (days >= 0) {
+                    result.put(employeeId, days);
+                }
+            } catch (NumberFormatException ignored) {
+                // par malformado — ignora em vez de derrubar o relatório inteiro
+            }
+        }
+        return result;
     }
 
     @GetMapping("/appointments/{id}/profit")

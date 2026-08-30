@@ -1,5 +1,6 @@
 import api from '../../../../services/api';
 import { normalizePage, type SpringPageResponse } from '../../../../utils/pagination';
+import type { RemunerationType } from '../../../../utils/remuneration';
 export type { PageResponse } from '../../../../utils/pagination';
 
 export interface EmployeeData {
@@ -8,8 +9,8 @@ export interface EmployeeData {
   name?: string;
   email?: string;
   roleName?: 'FUNCIONARIA' | 'GERENTE_DE_ATENDIMENTO' | 'ADMIN';
-  remunerationType?: 'SALARIO_FIXO' | 'COMISSIONADO' | 'FIXO_E_COMISSIONADO';
-  /** Salário base — só se aplica a SALARIO_FIXO/FIXO_E_COMISSIONADO. Comissão vem do serviço/produto, não daqui. */
+  remunerationType?: RemunerationType;
+  /** Salário base (fixo) ou valor da diária (diarista). Não se aplica a COMISSIONADO. */
   remunerationValue?: number;
 }
 
@@ -24,7 +25,7 @@ export interface EmployeeActingState {
   hasProfile: boolean;
   /** Esse cadastro está agendável — aparece no seletor de profissional dos agendamentos. */
   acting: boolean;
-  remunerationType: 'SALARIO_FIXO' | 'COMISSIONADO' | 'FIXO_E_COMISSIONADO' | null;
+  remunerationType: RemunerationType | null;
   remunerationValue: number | null;
 }
 

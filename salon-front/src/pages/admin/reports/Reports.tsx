@@ -7,6 +7,7 @@ import type {
   ServicePricingAnalysisResponse,
 } from './services/reports';
 import { EmployeeFinancialHistorySection } from './EmployeeFinancialHistorySection';
+import { remunerationLabel, remunerationIsDaily } from '../../../utils/remuneration';
 import { cashFlowApi } from '../cashflow/services/cashflow';
 import type { CashFlowData } from '../cashflow/services/cashflow';
 import {
@@ -47,7 +48,20 @@ export const Reports = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
+  // Dias trabalhados por diarista no período — editável na aba Folha de Pagamento.
+  // Chave = employeeId, valor = string do <input> (pode estar vazia).
+  const [daysWorked, setDaysWorked] = useState<Record<number, string>>({});
+
   const { error: showError } = useAlert();
+
+  const daysWorkedPayload = (): Record<number, number> => {
+    const out: Record<number, number> = {};
+    for (const [id, raw] of Object.entries(daysWorked)) {
+      const n = Number(raw);
+      if (raw !== '' && Number.isFinite(n) && n >= 0) out[Number(id)] = Math.floor(n);
+    }
+    return out;
+  };
 
   const loadReports = async () => {
     setIsLoading(true);
@@ -56,13 +70,24 @@ export const Reports = () => {
         reportsApi.getFinancialReport(dateFrom || undefined, dateTo || undefined),
         reportsApi.getAppointmentReport(dateFrom || undefined, dateTo || undefined),
         cashFlowApi.findByPeriod(dateFrom || undefined, dateTo || undefined, 0, 1000),
-        reportsApi.getPayrollReport(dateFrom || undefined, dateTo || undefined),
+        reportsApi.getPayrollReport(dateFrom || undefined, dateTo || undefined, daysWorkedPayload()),
         reportsApi.getServicePricingAnalysis(dateFrom || undefined, dateTo || undefined),
       ]);
       setFinancial(finData);
       setAppointments(aptData);
       setCashFlows(cfData.content);
       setPayroll(payData);
+      // Semeia os inputs de "dias trabalhados" com o que o backend usou, sem sobrescrever o
+      // que o usuário já digitou nesta sessão.
+      setDaysWorked((prev) => {
+        const next = { ...prev };
+        for (const item of payData.items) {
+          if (item.daysWorked != null && next[item.employeeId] === undefined) {
+            next[item.employeeId] = String(item.daysWorked);
+          }
+        }
+        return next;
+      });
       setServicePricing(pricingData);
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Erro ao carregar relatórios');
@@ -82,7 +107,7 @@ export const Reports = () => {
       // Fetch fresh cash flow and payroll data before drawing the PDF (user requirement)
       const [cfPage, payData] = await Promise.all([
         cashFlowApi.findByPeriod(dateFrom || undefined, dateTo || undefined, 0, 1000),
-        reportsApi.getPayrollReport(dateFrom || undefined, dateTo || undefined),
+        reportsApi.getPayrollReport(dateFrom || undefined, dateTo || undefined, daysWorkedPayload()),
       ]);
       const cfData = cfPage.content;
 
@@ -157,18 +182,21 @@ export const Reports = () => {
         currentY = drawSectionHeader('2. Detalhamento de Remunerações por Colaborador(a)', currentY);
 
         const employeeRows = financial.employeeFinanceDetails.map((emp) => {
-          let typeStr = 'Não definido';
-          let baseStr = 'R$ 0,00';
+          const typeStr = remunerationLabel(emp.remunerationType);
+          let baseStr = '-';
+          const daily =
+            emp.remunerationType === 'DIARISTA' || emp.remunerationType === 'DIARIA_E_COMISSIONADO';
 
           if (emp.remunerationType === 'SALARIO_FIXO') {
-            typeStr = 'Salário Fixo';
             baseStr = `R$ ${(emp.remunerationValue ?? 0).toFixed(2)}`;
           } else if (emp.remunerationType === 'COMISSIONADO') {
-            typeStr = 'Comissionado';
             baseStr = 'Comissão por serviço';
           } else if (emp.remunerationType === 'FIXO_E_COMISSIONADO') {
-            typeStr = 'Fixo + Comissionado';
             baseStr = `R$ ${(emp.remunerationValue ?? 0).toFixed(2)} + comissão por serviço`;
+          } else if (emp.remunerationType === 'DIARISTA') {
+            baseStr = `R$ ${(emp.remunerationValue ?? 0).toFixed(2)} / dia`;
+          } else if (emp.remunerationType === 'DIARIA_E_COMISSIONADO') {
+            baseStr = `R$ ${(emp.remunerationValue ?? 0).toFixed(2)} / dia + comissão`;
           }
 
           return [
@@ -177,7 +205,7 @@ export const Reports = () => {
             baseStr,
             emp.doneAppointmentsCount.toString(),
             `R$ ${(emp.doneAppointmentsValue ?? 0).toFixed(2)}`,
-            `R$ ${(emp.calculatedPayout ?? 0).toFixed(2)}`,
+            daily ? 'ver Folha de Pagamento' : `R$ ${(emp.calculatedPayout ?? 0).toFixed(2)}`,
           ];
         });
 
@@ -230,14 +258,14 @@ export const Reports = () => {
         currentY = drawSectionHeader('4. Folha de Pagamento', currentY);
 
         const payrollRows = payData.items.map((item) => {
-          let typeStr = 'Não definido';
-          if (item.remunerationType === 'SALARIO_FIXO') typeStr = 'Salário Fixo';
-          else if (item.remunerationType === 'COMISSIONADO') typeStr = 'Comissionado';
-          else if (item.remunerationType === 'FIXO_E_COMISSIONADO') typeStr = 'Misto';
-
+          const daysStr =
+            item.daysWorked != null && item.dailyRate != null
+              ? `${item.daysWorked} × R$ ${item.dailyRate.toFixed(2)}`
+              : '-';
           return [
             item.employeeName,
-            typeStr,
+            remunerationLabel(item.remunerationType),
+            daysStr,
             `R$ ${item.baseAmount.toFixed(2)}`,
             `R$ ${item.calculatedPay.toFixed(2)}`,
           ];
@@ -245,7 +273,7 @@ export const Reports = () => {
 
         autoTable(doc, {
           startY: currentY,
-          head: [['Nome', 'Tipo de Remuneração', 'Base de Cálculo', 'Total a Pagar']],
+          head: [['Nome', 'Tipo de Remuneração', 'Dias (diarista)', 'Base de Cálculo', 'Total a Pagar']],
           body: payrollRows,
           theme: 'striped',
           headStyles: { fillColor: [59, 48, 54], textColor: [255, 255, 255], fontStyle: 'bold' },
@@ -530,18 +558,19 @@ export const Reports = () => {
                         </thead>
                         <tbody className="divide-y divide-[#eae1e1]/40">
                           {financial.employeeFinanceDetails.map((emp) => {
-                            let typeStr = 'Não definido';
-                            let baseStr = 'R$ 0,00';
+                            const typeStr = remunerationLabel(emp.remunerationType);
+                            let baseStr = '-';
 
                             if (emp.remunerationType === 'SALARIO_FIXO') {
-                              typeStr = 'Salário Fixo';
                               baseStr = formatBRL(emp.remunerationValue ?? 0);
                             } else if (emp.remunerationType === 'COMISSIONADO') {
-                              typeStr = 'Comissionado';
                               baseStr = 'Comissão por serviço';
                             } else if (emp.remunerationType === 'FIXO_E_COMISSIONADO') {
-                              typeStr = 'Fixo + Comissionado';
                               baseStr = `${formatBRL(emp.remunerationValue ?? 0)} + comissão por serviço`;
+                            } else if (emp.remunerationType === 'DIARISTA') {
+                              baseStr = `${formatBRL(emp.remunerationValue ?? 0)} / dia`;
+                            } else if (emp.remunerationType === 'DIARIA_E_COMISSIONADO') {
+                              baseStr = `${formatBRL(emp.remunerationValue ?? 0)} / dia + comissão por serviço`;
                             }
 
                             return (
@@ -561,7 +590,14 @@ export const Reports = () => {
                                   {formatBRL(emp.doneAppointmentsValue ?? 0)}
                                 </td>
                                 <td className="px-6 py-4 text-sm font-bold text-[#be8a83] text-right">
-                                  {formatBRL(emp.calculatedPayout ?? 0)}
+                                  {emp.remunerationType === 'DIARISTA' ||
+                                  emp.remunerationType === 'DIARIA_E_COMISSIONADO' ? (
+                                    <span className="text-xs font-semibold text-[#7a7074]">
+                                      ver aba Folha de Pagamento
+                                    </span>
+                                  ) : (
+                                    formatBRL(emp.calculatedPayout ?? 0)
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -624,13 +660,27 @@ export const Reports = () => {
                 </h4>
                 <p className="text-xs text-[#7a7074]">
                   Cálculo dos valores finais a pagar baseados no regime de contratação e faturamento
-                  por profissional.
+                  por profissional. Para diaristas, informe os dias trabalhados no período e clique
+                  em Recalcular.
                 </p>
               </div>
 
+              {payroll?.items?.some((i) => remunerationIsDaily(i.remunerationType)) && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={loadReports}
+                    disabled={isLoading}
+                    className="btn-premium disabled:opacity-50"
+                  >
+                    Recalcular folha
+                  </button>
+                </div>
+              )}
+
               <div className="bg-white rounded-2xl border border-[#eae1e1]/80 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[700px]">
+                  <table className="w-full text-left border-collapse min-w-[760px]">
                     <thead>
                       <tr className="bg-[#fcf9f9]/50 border-b border-[#eae1e1]">
                         <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider">
@@ -638,6 +688,9 @@ export const Reports = () => {
                         </th>
                         <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider">
                           Regime Contratual
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-center">
+                          Dias trabalhados
                         </th>
                         <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-right">
                           Base de Cálculo
@@ -650,6 +703,7 @@ export const Reports = () => {
                     <tbody className="divide-y divide-[#eae1e1]/40">
                       {payroll && payroll.items && payroll.items.length > 0 ? (
                         payroll.items.map((item) => {
+                          const daily = remunerationIsDaily(item.remunerationType);
                           return (
                             <tr
                               key={item.employeeId}
@@ -659,32 +713,45 @@ export const Reports = () => {
                                 {item.employeeName}
                               </td>
 
-                              {/* Remuneration Type Badge */}
                               <td className="px-6 py-4 text-sm">
-                                {item.remunerationType === 'SALARIO_FIXO' && (
-                                  <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                                    Salário Fixo
+                                {item.remunerationType ? (
+                                  <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-[#f3e9e7] text-[#8b6d68] border border-[#e6d5d1]">
+                                    {remunerationLabel(item.remunerationType)}
                                   </span>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
                                 )}
-                                {item.remunerationType === 'COMISSIONADO' && (
-                                  <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                    Comissionado
-                                  </span>
-                                )}
-                                {item.remunerationType === 'FIXO_E_COMISSIONADO' && (
-                                  <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                    Misto (Fixo + Com.)
-                                  </span>
-                                )}
-                                {!item.remunerationType && <span className="text-gray-400">-</span>}
                               </td>
 
-                              {/* Base Amount */}
+                              {/* Dias trabalhados — editável só para diaristas */}
+                              <td className="px-6 py-4 text-sm text-center">
+                                {daily ? (
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={daysWorked[item.employeeId] ?? ''}
+                                    onChange={(e) =>
+                                      setDaysWorked((prev) => ({
+                                        ...prev,
+                                        [item.employeeId]: e.target.value,
+                                      }))
+                                    }
+                                    placeholder="0"
+                                    className="w-20 px-2 py-1 text-sm text-center border border-[#eae1e1] rounded-lg focus:outline-none focus:border-[#be8a83]"
+                                  />
+                                ) : (
+                                  <span className="text-gray-400">—</span>
+                                )}
+                              </td>
+
+                              {/* Base de cálculo */}
                               <td className="px-6 py-4 text-sm text-[#7a7074] text-right">
-                                {formatBRL(item.baseAmount)}
+                                {daily && item.dailyRate != null
+                                  ? `${formatBRL(item.dailyRate)} / dia`
+                                  : formatBRL(item.baseAmount)}
                               </td>
 
-                              {/* Calculated Payout Highlight */}
                               <td className="px-6 py-4 text-sm font-extrabold text-[#be8a83] text-right">
                                 {formatBRL(item.calculatedPay)}
                               </td>
@@ -693,7 +760,7 @@ export const Reports = () => {
                         })
                       ) : (
                         <tr>
-                          <td colSpan={4} className="px-6 py-10 text-center text-sm text-[#7a7074]">
+                          <td colSpan={5} className="px-6 py-10 text-center text-sm text-[#7a7074]">
                             Nenhum registro de pagamento encontrado para o período selecionado.
                           </td>
                         </tr>

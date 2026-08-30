@@ -332,7 +332,7 @@ class ReportServiceTest {
         when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of(aptBob, aptAlice, aptDave));
 
         // When
-        PayrollReportResponse response = reportService.generatePayrollReport(salonClock.today(), salonClock.today());
+        PayrollReportResponse response = reportService.generatePayrollReport(salonClock.today(), salonClock.today(), java.util.Map.of());
 
         // Then
         assertEquals(3, response.items().size());
@@ -351,6 +351,89 @@ class ReportServiceTest {
         PayrollReportResponse.PayrollItem itemDave = response.items().stream().filter(i -> i.employeeId().equals(4L)).findFirst().orElseThrow();
         assertEquals(new BigDecimal("200.00"), itemDave.baseAmount());
         assertEquals(new BigDecimal("320.00"), itemDave.calculatedPay());
+    }
+
+    @Test
+    void payroll_diarista_paysDailyRateTimesDaysWorked() {
+        User user = new User();
+        user.setName("Ella");
+        Employee emp = new Employee();
+        emp.setId(7L);
+        emp.setUser(user);
+        emp.setRemunerationType(RemunerationType.DIARISTA);
+        emp.setRemunerationValue(new BigDecimal("120.00")); // diária
+
+        when(employeeRepository.findAll()).thenReturn(List.of(emp));
+
+        SalonService svc = new SalonService();
+        svc.setPrice(new BigDecimal("200.00"));
+        svc.setCommissionPercent(new BigDecimal("10")); // ignorado: DIARISTA não recebe comissão de serviço
+        Appointment apt = new Appointment();
+        apt.setStatus(AppointmentStatus.DONE);
+        apt.setEmployee(emp);
+        withService(apt, svc);
+        apt.setScheduledAt(salonClock.now());
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of(apt));
+
+        PayrollReportResponse response = reportService.generatePayrollReport(
+                salonClock.today(), salonClock.today(), java.util.Map.of(7L, 18));
+
+        PayrollReportResponse.PayrollItem item = response.items().get(0);
+        assertEquals(new BigDecimal("120.00"), item.dailyRate());
+        assertEquals(18, item.daysWorked());
+        // 120 × 18 = 2160, sem comissão de serviço
+        assertEquals(0, new BigDecimal("2160.00").compareTo(item.calculatedPay()));
+    }
+
+    @Test
+    void payroll_diariaEComissionado_addsServiceCommissionOnTopOfDaily() {
+        User user = new User();
+        user.setName("Fabi");
+        Employee emp = new Employee();
+        emp.setId(8L);
+        emp.setUser(user);
+        emp.setRemunerationType(RemunerationType.DIARIA_E_COMISSIONADO);
+        emp.setRemunerationValue(new BigDecimal("100.00")); // diária
+
+        when(employeeRepository.findAll()).thenReturn(List.of(emp));
+
+        SalonService svc = new SalonService();
+        svc.setPrice(new BigDecimal("200.00"));
+        svc.setCommissionPercent(new BigDecimal("10"));
+        Appointment apt = new Appointment();
+        apt.setStatus(AppointmentStatus.DONE);
+        apt.setEmployee(emp);
+        withService(apt, svc);
+        apt.setScheduledAt(salonClock.now());
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of(apt));
+
+        PayrollReportResponse response = reportService.generatePayrollReport(
+                salonClock.today(), salonClock.today(), java.util.Map.of(8L, 5));
+
+        PayrollReportResponse.PayrollItem item = response.items().get(0);
+        // 100 × 5 diária + 10% de 200 comissão = 500 + 20 = 520
+        assertEquals(0, new BigDecimal("520.00").compareTo(item.calculatedPay()));
+    }
+
+    @Test
+    void payroll_diarista_withoutDaysWorked_paysZeroDailyPart() {
+        User user = new User();
+        user.setName("Gi");
+        Employee emp = new Employee();
+        emp.setId(9L);
+        emp.setUser(user);
+        emp.setRemunerationType(RemunerationType.DIARISTA);
+        emp.setRemunerationValue(new BigDecimal("150.00"));
+
+        when(employeeRepository.findAll()).thenReturn(List.of(emp));
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of());
+
+        PayrollReportResponse response = reportService.generatePayrollReport(
+                salonClock.today(), salonClock.today(), java.util.Map.of());
+
+        PayrollReportResponse.PayrollItem item = response.items().get(0);
+        assertEquals(0, item.daysWorked());
+        assertEquals(0, BigDecimal.ZERO.compareTo(item.calculatedPay()));
     }
 
     @Test
@@ -582,7 +665,7 @@ class ReportServiceTest {
         when(employeeRepository.findAll()).thenReturn(List.of(emp));
         when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of(apt));
 
-        PayrollReportResponse response = reportService.generatePayrollReport(salonClock.today(), salonClock.today());
+        PayrollReportResponse response = reportService.generatePayrollReport(salonClock.today(), salonClock.today(), java.util.Map.of());
 
         PayrollReportResponse.PayrollItem item = response.items().get(0);
         assertEquals(new BigDecimal("30.00"), item.calculatedPay());

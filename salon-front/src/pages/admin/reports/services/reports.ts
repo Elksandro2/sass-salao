@@ -1,12 +1,13 @@
 import api from '../../../../services/api';
 import { normalizePage, type SpringPageResponse } from '../../../../utils/pagination';
+import type { RemunerationType } from '../../../../utils/remuneration';
 export type { PageResponse } from '../../../../utils/pagination';
 
 export interface EmployeeFinanceResponse {
   employeeId: number;
   employeeName: string;
-  remunerationType?: 'SALARIO_FIXO' | 'COMISSIONADO' | 'FIXO_E_COMISSIONADO';
-  /** Salário base — só preenchido para SALARIO_FIXO/FIXO_E_COMISSIONADO. */
+  remunerationType?: RemunerationType;
+  /** Salário base (fixo) ou valor da diária (diarista). Não se aplica a COMISSIONADO. */
   remunerationValue?: number;
   doneAppointmentsCount: number;
   doneAppointmentsValue: number;
@@ -41,9 +42,13 @@ export interface AppointmentReportResponse {
 export interface PayrollItem {
   employeeId: number;
   employeeName: string;
-  remunerationType?: 'SALARIO_FIXO' | 'COMISSIONADO' | 'FIXO_E_COMISSIONADO';
+  remunerationType?: RemunerationType;
   baseAmount: number;
   calculatedPay: number;
+  /** Valor da diária — só para Diarista/Diária+Comissão, senão null. */
+  dailyRate?: number | null;
+  /** Dias trabalhados usados no cálculo — só para Diarista/Diária+Comissão, senão null. */
+  daysWorked?: number | null;
 }
 
 export interface PayrollReportResponse {
@@ -109,10 +114,21 @@ export const reportsApi = {
     return data;
   },
 
-  getPayrollReport: async (from?: string, to?: string) => {
+  /**
+   * @param daysWorked mapa employeeId -> dias trabalhados no período (só usado para diaristas).
+   *   Enviado ao backend como "5:20,7:18".
+   */
+  getPayrollReport: async (from?: string, to?: string, daysWorked?: Record<number, number>) => {
     const params: Record<string, string> = {};
     if (from) params.from = from;
     if (to) params.to = to;
+    if (daysWorked) {
+      const serialized = Object.entries(daysWorked)
+        .filter(([, days]) => Number.isFinite(days) && days >= 0)
+        .map(([id, days]) => `${id}:${days}`)
+        .join(',');
+      if (serialized) params.daysWorked = serialized;
+    }
     const { data } = await api.get<PayrollReportResponse>('/reports/payroll', { params });
     return data;
   },

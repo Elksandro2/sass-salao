@@ -1,10 +1,18 @@
 import { z } from 'zod';
 import { isValidCpf } from '../../../utils/cpfValidator';
+import { remunerationNeedsValue, remunerationIsDaily } from '../../../utils/remuneration';
 
 const roleNameSchema = z.enum(['FUNCIONARIA', 'GERENTE_DE_ATENDIMENTO']);
 const genderSchema = z.enum(['', 'FEMININO', 'MASCULINO', 'NAO_BINARIO', 'OUTRO', 'PREFIRO_NAO_INFORMAR']);
 const pixKeyTypeSchema = z.enum(['', 'CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA']);
-const remunerationTypeSchema = z.enum(['', 'SALARIO_FIXO', 'COMISSIONADO', 'FIXO_E_COMISSIONADO']);
+const remunerationTypeSchema = z.enum([
+  '',
+  'SALARIO_FIXO',
+  'COMISSIONADO',
+  'FIXO_E_COMISSIONADO',
+  'DIARISTA',
+  'DIARIA_E_COMISSIONADO',
+]);
 
 const BRAZILIAN_STATES = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
@@ -135,14 +143,15 @@ export const staffFormSchema = z
         return;
       }
 
-      const needsSalary =
-        data.remunerationType === 'SALARIO_FIXO' || data.remunerationType === 'FIXO_E_COMISSIONADO';
+      const needsSalary = remunerationNeedsValue(data.remunerationType);
 
       if (needsSalary) {
         if (!data.remunerationValue) {
           ctx.addIssue({
             code: 'custom',
-            message: 'O valor do salário é obrigatório',
+            message: remunerationIsDaily(data.remunerationType)
+              ? 'O valor da diária é obrigatório'
+              : 'O valor do salário é obrigatório',
             path: ['remunerationValue'],
           });
         } else if (Number(data.remunerationValue) < 0) {

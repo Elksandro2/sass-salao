@@ -5,7 +5,6 @@ import com.cristiane.salon.models.appointment.entity.AppointmentProductItem;
 import com.cristiane.salon.models.appointment.entity.AppointmentServiceItem;
 import com.cristiane.salon.models.businesssettings.service.SalonBusinessSettingsService;
 import com.cristiane.salon.models.employee.entity.Employee;
-import com.cristiane.salon.models.employee.entity.RemunerationType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -62,8 +61,7 @@ public class SplitPaymentCalculator {
         }
 
         BigDecimal serviceCommission = BigDecimal.ZERO;
-        if (employee.getRemunerationType() == RemunerationType.COMISSIONADO
-                || employee.getRemunerationType() == RemunerationType.FIXO_E_COMISSIONADO) {
+        if (employee.getRemunerationType().paysServiceCommission()) {
             for (AppointmentServiceItem item : appointment.getServices()) {
                 BigDecimal pct = item.getSalonService().getCommissionPercent();
                 if (pct == null) continue;

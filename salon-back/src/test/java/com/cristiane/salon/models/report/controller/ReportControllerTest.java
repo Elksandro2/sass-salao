@@ -55,7 +55,8 @@ class ReportControllerTest extends BaseControllerTest {
     @WithMockUser(roles = { "ADMIN" })
     void getPayrollReportReturns200() throws Exception {
         PayrollReportResponse response = new PayrollReportResponse(List.of(), "Period");
-        when(reportService.generatePayrollReport(any(LocalDate.class), any(LocalDate.class))).thenReturn(response);
+        when(reportService.generatePayrollReport(any(LocalDate.class), any(LocalDate.class), any()))
+                .thenReturn(response);
 
         mvc.perform(get("/v1/reports/payroll?from=2026-05-01&to=2026-05-16")
                 .contentType(MediaType.APPLICATION_JSON))
@@ -89,5 +90,19 @@ class ReportControllerTest extends BaseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].serviceName").value("Corte"));
+    }
+
+    @Test
+    void parseDaysWorked_parsesPairsAndIgnoresGarbage() {
+        Map<Long, Integer> parsed = ReportController.parseDaysWorked("5:20, 7:18 ,bad,9:-3,x:y");
+        org.junit.jupiter.api.Assertions.assertEquals(2, parsed.size());
+        org.junit.jupiter.api.Assertions.assertEquals(20, parsed.get(5L));
+        org.junit.jupiter.api.Assertions.assertEquals(18, parsed.get(7L));
+    }
+
+    @Test
+    void parseDaysWorked_nullOrBlank_returnsEmptyMap() {
+        org.junit.jupiter.api.Assertions.assertTrue(ReportController.parseDaysWorked(null).isEmpty());
+        org.junit.jupiter.api.Assertions.assertTrue(ReportController.parseDaysWorked("  ").isEmpty());
     }
 }
