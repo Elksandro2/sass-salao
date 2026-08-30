@@ -204,10 +204,11 @@ public class ReportService {
                 acc.count++;
                 acc.revenue = acc.revenue.add(effectivePrice);
 
-                BigDecimal recipeCost = serviceProductUsageRepository.findBySalonServiceId(service.getId()).stream()
-                        .map(SalonServiceProductUsage::getEstimatedCost)
-                        .filter(cost -> cost != null)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                // Custo de receita congelado no atendimento (ver V72); linha antiga sem snapshot
+                // cai no cálculo pela receita atual do serviço.
+                BigDecimal recipeCost = item.getSnapshotRecipeCost() != null
+                        ? item.getSnapshotRecipeCost()
+                        : liveRecipeCost(service.getId());
                 acc.recipeCost = acc.recipeCost.add(recipeCost);
 
                 acc.commission = acc.commission.add(computeServiceCommission(employee, List.of(item)));

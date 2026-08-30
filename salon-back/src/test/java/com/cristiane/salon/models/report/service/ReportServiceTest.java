@@ -1091,4 +1091,38 @@ class ReportServiceTest {
         assertThat(response.items().get(0).healthy()).isFalse();
         assertThat(response.items().get(0).netProfit()).isEqualByComparingTo("-470.00");
     }
+
+    @Test
+    void generateServicePricingAnalysis_usesFrozenRecipeCostSnapshotOverCurrentRecipe() {
+        Employee employee = new Employee();
+        employee.setId(1L);
+        employee.setUser(new User());
+        employee.setRemunerationType(RemunerationType.SALARIO_FIXO);
+
+        SalonService service = new SalonService();
+        service.setId(1L);
+        service.setName("Coloração");
+        service.setPrice(new BigDecimal("100.00"));
+
+        Appointment apt = new Appointment();
+        apt.setStatus(AppointmentStatus.DONE);
+        apt.setEmployee(employee);
+        var item = new com.cristiane.salon.models.appointment.entity.AppointmentServiceItem();
+        item.setAppointment(apt);
+        item.setSalonService(service);
+        item.setSnapshotPrice(new BigDecimal("100.00"));
+        item.setSnapshotRecipeCost(new BigDecimal("7.00")); // congelado no atendimento
+        apt.getServices().add(item);
+        apt.setScheduledAt(salonClock.now());
+
+        List<Appointment> apts = List.of(apt);
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(apts);
+
+        var response = reportService.generateServicePricingAnalysis(salonClock.today(), salonClock.today());
+
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.items().get(0).recipeCostTotal()).isEqualByComparingTo("7.00");
+        // nunca consultou a receita atual do serviço
+        verify(serviceProductUsageRepository, never()).findBySalonServiceId(any());
+    }
 }
