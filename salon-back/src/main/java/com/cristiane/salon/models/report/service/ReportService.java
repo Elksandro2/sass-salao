@@ -92,16 +92,17 @@ public class ReportService {
 
         BigDecimal grossRevenue = appointment.getGrandTotal();
 
+        // Custo de receita congelado no atendimento (ver V72); linha antiga sem snapshot cai no
+        // cálculo ao vivo a partir da receita atual do serviço.
         BigDecimal recipeCost = appointment.getServices().stream()
-                .flatMap(item -> serviceProductUsageRepository
-                        .findBySalonServiceId(item.getSalonService().getId()).stream())
-                .map(SalonServiceProductUsage::getEstimatedCost)
-                .filter(cost -> cost != null)
+                .map(item -> item.getSnapshotRecipeCost() != null
+                        ? item.getSnapshotRecipeCost()
+                        : liveRecipeCost(item.getSalonService().getId()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal productsSoldCost = appointment.getProducts().stream()
                 .map(item -> {
-                    BigDecimal costPrice = item.getProduct().getCostPrice();
+                    BigDecimal costPrice = item.getEffectiveCostPrice();
                     if (costPrice == null) return BigDecimal.ZERO;
                     return costPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
                 })
@@ -109,7 +110,7 @@ public class ReportService {
 
         Employee employee = appointment.getEmployee();
         BigDecimal serviceCommission = computeServiceCommission(employee, appointment.getServices());
-        BigDecimal productCommission = computeProductCommission(appointment.getProducts());
+        BigDecimal productCommission = computeProductCommission(appointment);
 
         return AppointmentProfitResponse.of(
                 appointment.getId(), grossRevenue, recipeCost, productsSoldCost,
@@ -129,7 +130,7 @@ public class ReportService {
 
         BigDecimal total = BigDecimal.ZERO;
         for (AppointmentServiceItem item : items) {
-            BigDecimal pct = item.getSalonService().getCommissionPercent();
+            BigDecimal pct = item.getEffectiveCommissionPercent();
             if (pct == null) continue;
             BigDecimal price = item.getEffectivePrice() != null ? item.getEffectivePrice() : BigDecimal.ZERO;
             total = total.add(price.multiply(pct).divide(HUNDRED, 2, RoundingMode.HALF_UP));
@@ -138,21 +139,32 @@ public class ReportService {
     }
 
     /**
-     * Comissão de produto: % única do salão ({@link SalonBusinessSettingsService}) sobre
-     * produtos vendidos — vale pra QUALQUER tipo de remuneração, inclusive Salário Fixo (venda
-     * de produto é tratada como incentivo, exceção deliberada à regra geral).
+     * Comissão de produto: % de comissão de produto sobre produtos vendidos — vale pra QUALQUER
+     * tipo de remuneração, inclusive Salário Fixo (venda de produto é incentivo, exceção
+     * deliberada). Usa o % congelado no agendamento (ver V72); agendamento antigo sem snapshot
+     * cai no % atual de {@link SalonBusinessSettingsService}.
      */
-    private BigDecimal computeProductCommission(List<AppointmentProductItem> items) {
-        BigDecimal pct = businessSettingsService.getProductCommissionPercent();
+    private BigDecimal computeProductCommission(Appointment appointment) {
+        BigDecimal pct = appointment.getSnapshotProductCommissionPercent() != null
+                ? appointment.getSnapshotProductCommissionPercent()
+                : businessSettingsService.getProductCommissionPercent();
         if (pct == null || pct.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
         BigDecimal total = BigDecimal.ZERO;
-        for (AppointmentProductItem item : items) {
+        for (AppointmentProductItem item : appointment.getProducts()) {
             BigDecimal price = item.getEffectiveTotalPrice() != null ? item.getEffectiveTotalPrice() : BigDecimal.ZERO;
             total = total.add(price.multiply(pct).divide(HUNDRED, 2, RoundingMode.HALF_UP));
         }
         return total;
+    }
+
+    /** Custo da receita atual do serviço (fallback para agendamentos sem snapshot). */
+    private BigDecimal liveRecipeCost(Long salonServiceId) {
+        return serviceProductUsageRepository.findBySalonServiceId(salonServiceId).stream()
+                .map(SalonServiceProductUsage::getEstimatedCost)
+                .filter(cost -> cost != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /**
@@ -359,7 +371,7 @@ public class ReportService {
         BigDecimal commissionPart = BigDecimal.ZERO;
         for (Appointment appointment : empDoneAppointments) {
             commissionPart = commissionPart.add(computeServiceCommission(employee, appointment.getServices()));
-            commissionPart = commissionPart.add(computeProductCommission(appointment.getProducts()));
+            commissionPart = commissionPart.add(computeProductCommission(appointment));
         }
 
         BigDecimal payout = salaryPart.add(dailyPart).add(commissionPart);

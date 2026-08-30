@@ -109,6 +109,13 @@ public class Appointment {
     @Column(name = "reminded_at")
     private Instant remindedAt;
 
+    /**
+     * % de comissão de produto do salão congelado na criação/edição deste agendamento (ver V72).
+     * NULL em agendamentos antigos — nesse caso cai no % atual de SalonBusinessSettings.
+     */
+    @Column(name = "snapshot_product_commission_percent", precision = 5, scale = 2)
+    private BigDecimal snapshotProductCommissionPercent;
+
     public BigDecimal getTotalEffectivePrice() {
         return services.stream()
                 .map(AppointmentServiceItem::getEffectivePrice)

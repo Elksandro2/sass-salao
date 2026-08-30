@@ -40,11 +40,29 @@ public class AppointmentProductItem {
     @Column(name = "custom_price", precision = 10, scale = 2)
     private BigDecimal customPrice;
 
+    // --- Snapshots: preço de venda e custo unitário do produto congelados na criação/edição do
+    // item (ver V72). Nulos em linhas antigas — nesse caso cai no valor atual do produto. ---
+
+    @Column(name = "snapshot_unit_price", precision = 10, scale = 2)
+    private BigDecimal snapshotUnitPrice;
+
+    /** Custo da embalagem/produto ({@code Product.costPrice}) congelado — usado no lucro do atendimento. */
+    @Column(name = "snapshot_cost_price", precision = 10, scale = 2)
+    private BigDecimal snapshotCostPrice;
+
+    /** customPrice (sobrescrita manual) > snapshot (congelado) > preço atual do produto. */
     public BigDecimal getEffectiveUnitPrice() {
-        return customPrice != null ? customPrice : product.getPrice();
+        if (customPrice != null) return customPrice;
+        if (snapshotUnitPrice != null) return snapshotUnitPrice;
+        return product.getPrice();
     }
 
     public BigDecimal getEffectiveTotalPrice() {
         return getEffectiveUnitPrice().multiply(BigDecimal.valueOf(quantity));
+    }
+
+    /** Custo da embalagem congelado; cai no custo atual do produto se não houver snapshot. */
+    public BigDecimal getEffectiveCostPrice() {
+        return snapshotCostPrice != null ? snapshotCostPrice : product.getCostPrice();
     }
 }

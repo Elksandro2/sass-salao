@@ -798,6 +798,57 @@ class ReportServiceTest {
     }
 
     @Test
+    void getAppointmentProfit_prefersFrozenSnapshotsOverLiveCatalogValues() {
+        Employee emp = new Employee();
+        emp.setId(1L);
+        User user = new User();
+        user.setName("Alice");
+        emp.setUser(user);
+        emp.setRemunerationType(RemunerationType.COMISSIONADO);
+
+        SalonService service = new SalonService();
+        service.setId(1L);
+        service.setPrice(new BigDecimal("500.00"));       // preço atual (mudou depois)
+        service.setCommissionPercent(new BigDecimal("50")); // % atual (mudou depois)
+
+        Appointment apt = new Appointment();
+        apt.setId(5L);
+        apt.setEmployee(emp);
+        apt.setSnapshotProductCommissionPercent(new BigDecimal("5.00"));
+
+        var serviceItem = new com.cristiane.salon.models.appointment.entity.AppointmentServiceItem();
+        serviceItem.setAppointment(apt);
+        serviceItem.setSalonService(service);
+        serviceItem.setSnapshotPrice(new BigDecimal("100.00"));
+        serviceItem.setSnapshotCommissionPercent(new BigDecimal("10.00"));
+        serviceItem.setSnapshotRecipeCost(new BigDecimal("6.00")); // o "óleo de 6 reais" congelado
+        apt.getServices().add(serviceItem);
+
+        var product = new com.cristiane.salon.models.product.entity.Product();
+        product.setPrice(new BigDecimal("999.00"));
+        product.setCostPrice(new BigDecimal("900.00"));
+        var productItem = new com.cristiane.salon.models.appointment.entity.AppointmentProductItem();
+        productItem.setAppointment(apt);
+        productItem.setProduct(product);
+        productItem.setQuantity(1);
+        productItem.setSnapshotUnitPrice(new BigDecimal("50.00"));
+        productItem.setSnapshotCostPrice(new BigDecimal("20.00"));
+        apt.getProducts().add(productItem);
+
+        when(appointmentRepository.findById(5L)).thenReturn(java.util.Optional.of(apt));
+
+        AppointmentProfitResponse result = reportService.getAppointmentProfit(5L);
+
+        // Tudo pelos snapshots, nada pelo catálogo atual:
+        assertThat(result.serviceRecipeCost()).isEqualByComparingTo("6.00");
+        assertThat(result.productsSoldCost()).isEqualByComparingTo("20.00");
+        assertThat(result.serviceCommissionCost()).isEqualByComparingTo("10.00");   // 10% de 100
+        assertThat(result.productCommissionCost()).isEqualByComparingTo("2.50");    // 5% de 50
+        // receita = serviço 100 + produto 50 = 150 (grand total)
+        assertThat(result.grossRevenue()).isEqualByComparingTo("150.00");
+    }
+
+    @Test
     void getAppointmentProfit_whenAppointmentNotFound_shouldThrowResourceNotFoundException() {
         when(appointmentRepository.findById(99L)).thenReturn(java.util.Optional.empty());
 

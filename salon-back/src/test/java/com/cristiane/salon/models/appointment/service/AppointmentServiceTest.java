@@ -98,6 +98,12 @@ class AppointmentServiceTest {
     @Mock
     private AuditLogService auditLogService;
 
+    @Mock
+    private com.cristiane.salon.models.service.repository.SalonServiceProductUsageRepository serviceProductUsageRepository;
+
+    @Mock
+    private com.cristiane.salon.models.businesssettings.service.SalonBusinessSettingsService businessSettingsService;
+
     // SalonClock real, não mock: os testes dependem do "hoje"/"agora" de verdade no fuso
     // do salão, e um mock devolveria null silenciosamente.
     @Spy
@@ -118,6 +124,8 @@ class AppointmentServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(featureFlagService.isEnabled("MERCADO_PAGO_ATIVO")).thenReturn(true);
+        lenient().when(serviceProductUsageRepository.findBySalonServiceId(any())).thenReturn(java.util.List.of());
+        lenient().when(businessSettingsService.getProductCommissionPercent()).thenReturn(null);
 
         clientUser = new User();
         clientUser.setId(10L);
@@ -487,6 +495,43 @@ class AppointmentServiceTest {
         var item = result.services().get(0);
         assertThat(item.customPrice()).isNull();
         assertThat(result.totalPrice()).isEqualByComparingTo(salonService.getPrice());
+    }
+
+    @Test
+    void create_shouldFreezeServiceAndSalonCommissionSnapshotsOnTheAppointment() {
+        // Arrange
+        mockAuthenticatedUser(staffUser);
+        salonService.setCommissionPercent(new BigDecimal("15.00"));
+        when(businessSettingsService.getProductCommissionPercent()).thenReturn(new BigDecimal("8.00"));
+        when(userRepository.findById(10L)).thenReturn(Optional.of(clientUser));
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
+        when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
+
+        LocalDateTime targetTime = salonClock.now().plusDays(1);
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AppointmentRequest request = new AppointmentRequest(
+                5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, targetTime, null, null, 10L);
+
+        // Act
+        appointmentService.create(request);
+
+        // Assert: os valores atuais ficam gravados no item/agendamento
+        ArgumentCaptor<Appointment> captor = ArgumentCaptor.forClass(Appointment.class);
+        verify(appointmentRepository).save(captor.capture());
+        Appointment saved = captor.getValue();
+
+        assertThat(saved.getSnapshotProductCommissionPercent()).isEqualByComparingTo("8.00");
+        var serviceItem = saved.getServices().get(0);
+        assertThat(serviceItem.getSnapshotPrice()).isEqualByComparingTo("100.00");
+        assertThat(serviceItem.getSnapshotCommissionPercent()).isEqualByComparingTo("15.00");
+        assertThat(serviceItem.getSnapshotRecipeCost()).isEqualByComparingTo("0");
+
+        // E o item passa a usar o snapshot mesmo se o catálogo mudar depois
+        salonService.setPrice(new BigDecimal("999.00"));
+        salonService.setCommissionPercent(new BigDecimal("1.00"));
+        assertThat(serviceItem.getEffectivePrice()).isEqualByComparingTo("100.00");
+        assertThat(serviceItem.getEffectiveCommissionPercent()).isEqualByComparingTo("15.00");
     }
 
     // --- Múltiplos serviços por agendamento ---
