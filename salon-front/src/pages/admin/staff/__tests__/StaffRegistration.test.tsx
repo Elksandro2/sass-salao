@@ -84,7 +84,7 @@ describe('StaffRegistration', () => {
     fireEvent.click(screen.getByRole('button', { name: /Novo Cadastro/i }));
 
     expect(screen.getByText('Novo cadastro de equipe — escolha o papel')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Funcionária/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Colaboradora/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Gerente de Atendimento/ })).toBeInTheDocument();
   });
 
@@ -94,9 +94,9 @@ describe('StaffRegistration', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Novo Cadastro/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^Funcionária/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Colaboradora/ }));
 
-    expect(screen.getByText('Novo cadastro — Funcionária')).toBeInTheDocument();
+    expect(screen.getByText('Novo cadastro — Colaboradora')).toBeInTheDocument();
     expect(screen.getByText('Remuneração')).toBeInTheDocument();
   });
 
@@ -122,7 +122,7 @@ describe('StaffRegistration', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Novo Cadastro/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^Funcionária/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Colaboradora/ }));
     fireEvent.click(screen.getByRole('button', { name: /Trocar papel/i }));
 
     expect(screen.getByText('Novo cadastro de equipe — escolha o papel')).toBeInTheDocument();
@@ -136,7 +136,7 @@ describe('StaffRegistration', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Novo Cadastro/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^Funcionária/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Colaboradora/ }));
 
     fireEvent.change(screen.getByLabelText('Nome de exibição'), { target: { value: 'Maria' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'maria@example.com' } });

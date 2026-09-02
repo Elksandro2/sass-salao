@@ -23,6 +23,8 @@ import com.cristiane.salon.models.report.dto.EmployeeFinanceResponse;
 import com.cristiane.salon.models.report.dto.PayrollReportResponse;
 import com.cristiane.salon.models.report.dto.ServicePricingAnalysisResponse;
 import com.cristiane.salon.models.report.dto.ServicePricingItemResponse;
+import com.cristiane.salon.models.report.entity.DiaristaWorkedDaysOverride;
+import com.cristiane.salon.models.report.repository.DiaristaWorkedDaysOverrideRepository;
 import com.cristiane.salon.models.service.entity.SalonService;
 import com.cristiane.salon.models.service.entity.SalonServiceProductUsage;
 import com.cristiane.salon.models.service.repository.SalonServiceProductUsageRepository;
@@ -62,6 +64,7 @@ public class ReportService {
     private final SalonServiceProductUsageRepository serviceProductUsageRepository;
     private final FixedExpenseRepository fixedExpenseRepository;
     private final SalonBusinessSettingsService businessSettingsService;
+    private final DiaristaWorkedDaysOverrideRepository workedDaysOverrideRepository;
     private final SalonClock salonClock;
 
     @Transactional(readOnly = true)
@@ -92,16 +95,17 @@ public class ReportService {
 
         BigDecimal grossRevenue = appointment.getGrandTotal();
 
+        // Custo de receita congelado no atendimento (ver V72); linha antiga sem snapshot cai no
+        // cálculo ao vivo a partir da receita atual do serviço.
         BigDecimal recipeCost = appointment.getServices().stream()
-                .flatMap(item -> serviceProductUsageRepository
-                        .findBySalonServiceId(item.getSalonService().getId()).stream())
-                .map(SalonServiceProductUsage::getEstimatedCost)
-                .filter(cost -> cost != null)
+                .map(item -> item.getSnapshotRecipeCost() != null
+                        ? item.getSnapshotRecipeCost()
+                        : liveRecipeCost(item.getSalonService().getId()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal productsSoldCost = appointment.getProducts().stream()
                 .map(item -> {
-                    BigDecimal costPrice = item.getProduct().getCostPrice();
+                    BigDecimal costPrice = item.getEffectiveCostPrice();
                     if (costPrice == null) return BigDecimal.ZERO;
                     return costPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
                 })
@@ -109,7 +113,7 @@ public class ReportService {
 
         Employee employee = appointment.getEmployee();
         BigDecimal serviceCommission = computeServiceCommission(employee, appointment.getServices());
-        BigDecimal productCommission = computeProductCommission(appointment.getProducts());
+        BigDecimal productCommission = computeProductCommission(appointment);
 
         return AppointmentProfitResponse.of(
                 appointment.getId(), grossRevenue, recipeCost, productsSoldCost,
@@ -123,14 +127,13 @@ public class ReportService {
      */
     private BigDecimal computeServiceCommission(Employee employee, List<AppointmentServiceItem> items) {
         if (employee == null || employee.getRemunerationType() == null
-                || (employee.getRemunerationType() != RemunerationType.COMISSIONADO
-                        && employee.getRemunerationType() != RemunerationType.FIXO_E_COMISSIONADO)) {
+                || !employee.getRemunerationType().paysServiceCommission()) {
             return BigDecimal.ZERO;
         }
 
         BigDecimal total = BigDecimal.ZERO;
         for (AppointmentServiceItem item : items) {
-            BigDecimal pct = item.getSalonService().getCommissionPercent();
+            BigDecimal pct = item.getEffectiveCommissionPercent();
             if (pct == null) continue;
             BigDecimal price = item.getEffectivePrice() != null ? item.getEffectivePrice() : BigDecimal.ZERO;
             total = total.add(price.multiply(pct).divide(HUNDRED, 2, RoundingMode.HALF_UP));
@@ -139,21 +142,32 @@ public class ReportService {
     }
 
     /**
-     * Comissão de produto: % única do salão ({@link SalonBusinessSettingsService}) sobre
-     * produtos vendidos — vale pra QUALQUER tipo de remuneração, inclusive Salário Fixo (venda
-     * de produto é tratada como incentivo, exceção deliberada à regra geral).
+     * Comissão de produto: % de comissão de produto sobre produtos vendidos — vale pra QUALQUER
+     * tipo de remuneração, inclusive Salário Fixo (venda de produto é incentivo, exceção
+     * deliberada). Usa o % congelado no agendamento (ver V72); agendamento antigo sem snapshot
+     * cai no % atual de {@link SalonBusinessSettingsService}.
      */
-    private BigDecimal computeProductCommission(List<AppointmentProductItem> items) {
-        BigDecimal pct = businessSettingsService.getProductCommissionPercent();
+    private BigDecimal computeProductCommission(Appointment appointment) {
+        BigDecimal pct = appointment.getSnapshotProductCommissionPercent() != null
+                ? appointment.getSnapshotProductCommissionPercent()
+                : businessSettingsService.getProductCommissionPercent();
         if (pct == null || pct.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
         BigDecimal total = BigDecimal.ZERO;
-        for (AppointmentProductItem item : items) {
+        for (AppointmentProductItem item : appointment.getProducts()) {
             BigDecimal price = item.getEffectiveTotalPrice() != null ? item.getEffectiveTotalPrice() : BigDecimal.ZERO;
             total = total.add(price.multiply(pct).divide(HUNDRED, 2, RoundingMode.HALF_UP));
         }
         return total;
+    }
+
+    /** Custo da receita atual do serviço (fallback para agendamentos sem snapshot). */
+    private BigDecimal liveRecipeCost(Long salonServiceId) {
+        return serviceProductUsageRepository.findBySalonServiceId(salonServiceId).stream()
+                .map(SalonServiceProductUsage::getEstimatedCost)
+                .filter(cost -> cost != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /**
@@ -190,10 +204,11 @@ public class ReportService {
                 acc.count++;
                 acc.revenue = acc.revenue.add(effectivePrice);
 
-                BigDecimal recipeCost = serviceProductUsageRepository.findBySalonServiceId(service.getId()).stream()
-                        .map(SalonServiceProductUsage::getEstimatedCost)
-                        .filter(cost -> cost != null)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                // Custo de receita congelado no atendimento (ver V72); linha antiga sem snapshot
+                // cai no cálculo pela receita atual do serviço.
+                BigDecimal recipeCost = item.getSnapshotRecipeCost() != null
+                        ? item.getSnapshotRecipeCost()
+                        : liveRecipeCost(service.getId());
                 acc.recipeCost = acc.recipeCost.add(recipeCost);
 
                 acc.commission = acc.commission.add(computeServiceCommission(employee, List.of(item)));
@@ -264,6 +279,7 @@ public class ReportService {
                 .filter(a -> a.getStatus() == AppointmentStatus.DONE)
                 .collect(Collectors.toList());
 
+        Map<Long, Integer> workedDaysOverrides = loadWorkedDaysOverrides(from, to);
         List<Employee> employees = employeeRepository.findAll();
         List<EmployeeFinanceResponse> employeeFinanceDetails = new ArrayList<>();
 
@@ -283,19 +299,26 @@ public class ReportService {
                     .map(Appointment::getTotalProductsPrice)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneAppointments);
-            totalSalaryPaid = totalSalaryPaid.add(breakdown.salaryPart());
+            RemunerationType empType = employee.getRemunerationType();
+            boolean empDaily = empType != null && empType.isDaily();
+            WorkedDays worked = empDaily
+                    ? resolveWorkedDays(employee.getId(), empDoneAppointments, workedDaysOverrides)
+                    : new WorkedDays(0, 0, false);
+
+            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneAppointments, worked.days());
+            totalSalaryPaid = totalSalaryPaid.add(breakdown.salaryPart()).add(breakdown.dailyPart());
             totalCommissionPaid = totalCommissionPaid.add(breakdown.commissionPart());
 
             employeeFinanceDetails.add(new EmployeeFinanceResponse(
                     employee.getId(),
                     employee.getUser().getName(),
-                    employee.getRemunerationType() != null ? employee.getRemunerationType().name() : null,
+                    empType != null ? empType.name() : null,
                     employee.getRemunerationValue(),
                     doneCount,
                     empDoneValue,
                     empDoneProductsValue,
-                    breakdown.totalPayout()
+                    breakdown.totalPayout(),
+                    empDaily ? worked.days() : null
             ));
         }
 
@@ -329,31 +352,80 @@ public class ReportService {
      * qualquer tipo — inclusive Salário Fixo). Span manual: fica aninhado dentro de
      * "gerar-relatorio-financeiro" no trace, um span por funcionária.
      */
+    /**
+     * @param daysWorked dias trabalhados no período — só entra na conta para Diarista/Diária+Comissão.
+     *                   O relatório financeiro passa 0 (não coleta esse dado); a folha de
+     *                   pagamento passa o valor informado na tela.
+     */
     @WithSpan("calcular-pagamento-funcionaria")
-    private PayoutBreakdown calcularPagamentoFuncionaria(Employee employee, List<Appointment> empDoneAppointments) {
+    private PayoutBreakdown calcularPagamentoFuncionaria(Employee employee, List<Appointment> empDoneAppointments,
+                                                        int daysWorked) {
         Span span = Span.current();
         span.setAttribute("funcionaria.id", employee.getId());
-        span.setAttribute("funcionaria.tipo_remuneracao",
-                employee.getRemunerationType() != null ? employee.getRemunerationType().name() : "N/A");
+        RemunerationType type = employee.getRemunerationType();
+        span.setAttribute("funcionaria.tipo_remuneracao", type != null ? type.name() : "N/A");
+
+        BigDecimal value = employee.getRemunerationValue() != null
+                ? employee.getRemunerationValue() : BigDecimal.ZERO;
 
         BigDecimal salaryPart = BigDecimal.ZERO;
-        if (employee.getRemunerationType() == RemunerationType.SALARIO_FIXO
-                || employee.getRemunerationType() == RemunerationType.FIXO_E_COMISSIONADO) {
-            salaryPart = employee.getRemunerationValue() != null ? employee.getRemunerationValue() : BigDecimal.ZERO;
+        if (type != null && type.hasFixedSalary()) {
+            salaryPart = value;
+        }
+
+        BigDecimal dailyPart = BigDecimal.ZERO;
+        if (type != null && type.isDaily() && daysWorked > 0) {
+            dailyPart = value.multiply(BigDecimal.valueOf(daysWorked));
         }
 
         BigDecimal commissionPart = BigDecimal.ZERO;
         for (Appointment appointment : empDoneAppointments) {
             commissionPart = commissionPart.add(computeServiceCommission(employee, appointment.getServices()));
-            commissionPart = commissionPart.add(computeProductCommission(appointment.getProducts()));
+            commissionPart = commissionPart.add(computeProductCommission(appointment));
         }
 
-        BigDecimal payout = salaryPart.add(commissionPart);
+        BigDecimal payout = salaryPart.add(dailyPart).add(commissionPart);
         span.setAttribute("funcionaria.pagamento_calculado", payout.doubleValue());
-        return new PayoutBreakdown(salaryPart, commissionPart, payout);
+        return new PayoutBreakdown(salaryPart, dailyPart, commissionPart, payout);
     }
 
-    private record PayoutBreakdown(BigDecimal salaryPart, BigDecimal commissionPart, BigDecimal totalPayout) {}
+    private record PayoutBreakdown(BigDecimal salaryPart, BigDecimal dailyPart, BigDecimal commissionPart,
+                                   BigDecimal totalPayout) {}
+
+    /** Dias trabalhados de uma diarista num período: o valor efetivo, a contagem automática e
+     *  se o efetivo veio de um ajuste manual salvo. */
+    private record WorkedDays(int days, int auto, boolean isOverride) {}
+
+    /**
+     * Dias trabalhados de uma diarista no período: por padrão, os dias distintos em que ela foi
+     * a profissional de um atendimento concluído; se houver ajuste manual salvo para exatamente
+     * este período, ele vence.
+     */
+    private WorkedDays resolveWorkedDays(Long employeeId, List<Appointment> empDoneAppointments,
+                                         Map<Long, Integer> overrides) {
+        int auto = (int) empDoneAppointments.stream()
+                .map(this::appointmentDate)
+                .distinct()
+                .count();
+        Integer override = overrides.get(employeeId);
+        return override != null
+                ? new WorkedDays(Math.max(0, override), auto, true)
+                : new WorkedDays(auto, auto, false);
+    }
+
+    /** Mesma cadeia de fallback dos relatórios: scheduledAt > preferredDate > createdAt. */
+    private LocalDate appointmentDate(Appointment a) {
+        if (a.getScheduledAt() != null) return a.getScheduledAt().toLocalDate();
+        if (a.getPreferredDate() != null) return a.getPreferredDate();
+        return a.getCreatedAt().atZone(salonClock.zone()).toLocalDate();
+    }
+
+    /** Ajustes manuais de dias trabalhados salvos para exatamente [from, to], por employeeId. */
+    private Map<Long, Integer> loadWorkedDaysOverrides(LocalDate from, LocalDate to) {
+        return workedDaysOverrideRepository.findByPeriodStartAndPeriodEnd(from, to).stream()
+                .collect(Collectors.toMap(DiaristaWorkedDaysOverride::getEmployeeId,
+                        DiaristaWorkedDaysOverride::getDaysWorked, (a, b) -> b));
+    }
 
     @Transactional(readOnly = true)
     public AppointmentReportResponse generateAppointmentReport(LocalDate from, LocalDate to) {
@@ -401,6 +473,7 @@ public class ReportService {
                 .filter(a -> a.getStatus() == AppointmentStatus.DONE)
                 .collect(Collectors.toList());
 
+        Map<Long, Integer> overrides = loadWorkedDaysOverrides(from, to);
         List<Employee> employees = employeeRepository.findAll();
         List<PayrollReportResponse.PayrollItem> items = new ArrayList<>();
 
@@ -413,19 +486,63 @@ public class ReportService {
                     .map(a -> a.getTotalEffectivePrice() != null ? a.getTotalEffectivePrice() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneAppointments);
+            RemunerationType type = employee.getRemunerationType();
+            boolean daily = type != null && type.isDaily();
+            WorkedDays worked = daily
+                    ? resolveWorkedDays(employee.getId(), empDoneAppointments, overrides)
+                    : new WorkedDays(0, 0, false);
+
+            PayoutBreakdown breakdown = calcularPagamentoFuncionaria(employee, empDoneAppointments, worked.days());
 
             items.add(new PayrollReportResponse.PayrollItem(
                     employee.getId(),
                     employee.getUser().getName(),
-                    employee.getRemunerationType(),
+                    type,
                     empDoneValue,
-                    breakdown.totalPayout()
+                    breakdown.totalPayout(),
+                    daily ? employee.getRemunerationValue() : null,
+                    daily ? worked.days() : null,
+                    daily ? worked.auto() : null,
+                    daily ? worked.isOverride() : null
             ));
         }
 
         String period = from + " a " + to;
-        return new PayrollReportResponse(items, period);
+        return new PayrollReportResponse(items, period, from, to);
+    }
+
+    // --- Ajuste manual de dias trabalhados de diarista -----------------------------------------
+
+    @Transactional
+    public void saveWorkedDaysOverride(Long employeeId, LocalDate periodStart, LocalDate periodEnd, int daysWorked) {
+        if (periodStart == null || periodEnd == null || periodStart.isAfter(periodEnd)) {
+            throw new com.cristiane.salon.exception.BadRequestException("Período inválido");
+        }
+        if (daysWorked < 0) {
+            throw new com.cristiane.salon.exception.BadRequestException("Os dias trabalhados não podem ser negativos");
+        }
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Diarista não encontrada"));
+        if (employee.getRemunerationType() == null || !employee.getRemunerationType().isDaily()) {
+            throw new com.cristiane.salon.exception.BadRequestException(
+                    "Só faz sentido ajustar dias trabalhados de quem é Diarista ou Diarista + comissão");
+        }
+        DiaristaWorkedDaysOverride row = workedDaysOverrideRepository
+                .findByEmployeeIdAndPeriodStartAndPeriodEnd(employeeId, periodStart, periodEnd)
+                .orElseGet(DiaristaWorkedDaysOverride::new);
+        row.setEmployeeId(employeeId);
+        row.setPeriodStart(periodStart);
+        row.setPeriodEnd(periodEnd);
+        row.setDaysWorked(daysWorked);
+        workedDaysOverrideRepository.save(row);
+    }
+
+    /** Remove o ajuste manual — o período volta a usar a contagem automática. */
+    @Transactional
+    public void clearWorkedDaysOverride(Long employeeId, LocalDate periodStart, LocalDate periodEnd) {
+        workedDaysOverrideRepository
+                .findByEmployeeIdAndPeriodStartAndPeriodEnd(employeeId, periodStart, periodEnd)
+                .ifPresent(workedDaysOverrideRepository::delete);
     }
 
     /**

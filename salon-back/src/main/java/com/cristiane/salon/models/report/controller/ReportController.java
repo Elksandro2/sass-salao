@@ -6,9 +6,11 @@ import com.cristiane.salon.models.report.dto.AppointmentReportResponse;
 import com.cristiane.salon.models.report.dto.FinancialReportResponse;
 import com.cristiane.salon.models.report.dto.PayrollReportResponse;
 import com.cristiane.salon.models.report.dto.ServicePricingAnalysisResponse;
+import com.cristiane.salon.models.report.dto.WorkedDaysOverrideRequest;
 import com.cristiane.salon.models.report.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,8 +19,11 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -58,6 +63,26 @@ public class ReportController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ResponseEntity.ok(reportService.generatePayrollReport(from, to));
+    }
+
+    @PutMapping("/payroll/worked-days")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Operation(summary = "Ajusta manualmente os dias trabalhados de uma diarista num período (Admin)")
+    public ResponseEntity<Void> saveWorkedDays(@Valid @RequestBody WorkedDaysOverrideRequest request) {
+        reportService.saveWorkedDaysOverride(
+                request.employeeId(), request.periodStart(), request.periodEnd(), request.daysWorked());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/payroll/worked-days")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Operation(summary = "Remove o ajuste manual — o período volta a contar dias automaticamente (Admin)")
+    public ResponseEntity<Void> clearWorkedDays(
+            @RequestParam Long employeeId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodStart,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodEnd) {
+        reportService.clearWorkedDaysOverride(employeeId, periodStart, periodEnd);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/appointments/{id}/profit")

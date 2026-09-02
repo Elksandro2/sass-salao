@@ -1,17 +1,20 @@
 import api from '../../../../services/api';
 import { normalizePage, type SpringPageResponse } from '../../../../utils/pagination';
+import type { RemunerationType } from '../../../../utils/remuneration';
 export type { PageResponse } from '../../../../utils/pagination';
 
 export interface EmployeeFinanceResponse {
   employeeId: number;
   employeeName: string;
-  remunerationType?: 'SALARIO_FIXO' | 'COMISSIONADO' | 'FIXO_E_COMISSIONADO';
-  /** Salário base — só preenchido para SALARIO_FIXO/FIXO_E_COMISSIONADO. */
+  remunerationType?: RemunerationType;
+  /** Salário base (fixo) ou valor da diária (diarista). Não se aplica a COMISSIONADO. */
   remunerationValue?: number;
   doneAppointmentsCount: number;
   doneAppointmentsValue: number;
   doneProductsValue: number;
   calculatedPayout: number;
+  /** Dias trabalhados no período — só para Diarista/Diária+Comissão. */
+  daysWorked?: number | null;
 }
 
 export interface FinancialReportResponse {
@@ -41,14 +44,25 @@ export interface AppointmentReportResponse {
 export interface PayrollItem {
   employeeId: number;
   employeeName: string;
-  remunerationType?: 'SALARIO_FIXO' | 'COMISSIONADO' | 'FIXO_E_COMISSIONADO';
+  remunerationType?: RemunerationType;
   baseAmount: number;
   calculatedPay: number;
+  /** Valor da diária — só para Diarista/Diária+Comissão, senão null. */
+  dailyRate?: number | null;
+  /** Dias trabalhados usados no cálculo — só para Diarista/Diária+Comissão, senão null. */
+  daysWorked?: number | null;
+  /** Contagem automática (dias com atendimento concluído) — referência. */
+  daysWorkedAuto?: number | null;
+  /** true = o número veio de um ajuste manual salvo; false = veio do automático. */
+  daysWorkedIsOverride?: boolean | null;
 }
 
 export interface PayrollReportResponse {
   items: PayrollItem[];
   period: string;
+  /** Período já resolvido (defaults aplicados) — usar ao salvar ajuste de dias da diarista. */
+  periodStart?: string | null;
+  periodEnd?: string | null;
 }
 
 export interface AppointmentProfitResponse {
@@ -115,6 +129,21 @@ export const reportsApi = {
     if (to) params.to = to;
     const { data } = await api.get<PayrollReportResponse>('/reports/payroll', { params });
     return data;
+  },
+
+  /** Ajuste manual dos dias trabalhados de uma diarista para exatamente [periodStart, periodEnd]. */
+  saveWorkedDays: async (input: {
+    employeeId: number;
+    periodStart: string;
+    periodEnd: string;
+    daysWorked: number;
+  }) => {
+    await api.put('/reports/payroll/worked-days', input);
+  },
+
+  /** Remove o ajuste manual — o período volta a contar os dias automaticamente. */
+  resetWorkedDays: async (input: { employeeId: number; periodStart: string; periodEnd: string }) => {
+    await api.delete('/reports/payroll/worked-days', { params: input });
   },
 
   getServicePricingAnalysis: async (from?: string, to?: string) => {

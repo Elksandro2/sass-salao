@@ -40,7 +40,29 @@ public class AppointmentServiceItem {
     @Column(name = "custom_service_notes", columnDefinition = "TEXT")
     private String customServiceNotes;
 
+    // --- Snapshots: valores do serviço congelados na criação/edição do item, pra que mudanças
+    // no cadastro não alterem o financeiro de atendimentos já feitos (ver V72). Nulos em linhas
+    // antigas — nesse caso cai no valor atual do serviço. ---
+
+    @Column(name = "snapshot_price", precision = 10, scale = 2)
+    private BigDecimal snapshotPrice;
+
+    @Column(name = "snapshot_commission_percent", precision = 5, scale = 2)
+    private BigDecimal snapshotCommissionPercent;
+
+    /** Custo total da receita deste serviço no momento do atendimento (soma dos consumos × custo). */
+    @Column(name = "snapshot_recipe_cost", precision = 12, scale = 2)
+    private BigDecimal snapshotRecipeCost;
+
+    /** customPrice (sobrescrita manual) > snapshot (congelado) > preço atual do serviço. */
     public BigDecimal getEffectivePrice() {
-        return customPrice != null ? customPrice : salonService.getPrice();
+        if (customPrice != null) return customPrice;
+        if (snapshotPrice != null) return snapshotPrice;
+        return salonService.getPrice();
+    }
+
+    /** % de comissão congelado; cai no % atual do serviço se não houver snapshot (linha antiga). */
+    public BigDecimal getEffectiveCommissionPercent() {
+        return snapshotCommissionPercent != null ? snapshotCommissionPercent : salonService.getCommissionPercent();
     }
 }

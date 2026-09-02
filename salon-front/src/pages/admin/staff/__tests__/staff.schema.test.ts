@@ -172,4 +172,41 @@ describe('staffFormSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('accepts DIARISTA with the diária value', () => {
+    const result = staffFormSchema.safeParse({
+      ...validBase,
+      remunerationType: 'DIARISTA',
+      remunerationValue: '120',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects DIARISTA without the diária value', () => {
+    const { remunerationValue: _v, ...rest } = validBase;
+    const result = staffFormSchema.safeParse({ ...rest, remunerationType: 'DIARISTA' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path.includes('remunerationValue'))).toBe(true);
+    }
+  });
+
+  it('accepts DIARIA_E_COMISSIONADO with the diária value', () => {
+    const result = staffFormSchema.safeParse({
+      ...validBase,
+      remunerationType: 'DIARIA_E_COMISSIONADO',
+      remunerationValue: '100',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects DIARISTA for GERENTE_DE_ATENDIMENTO (only Salário Fixo allowed)', () => {
+    const result = staffFormSchema.safeParse({
+      ...validBase,
+      roleName: 'GERENTE_DE_ATENDIMENTO',
+      remunerationType: 'DIARISTA',
+      remunerationValue: '120',
+    });
+    expect(result.success).toBe(false);
+  });
 });

@@ -9,7 +9,7 @@ import { useAlert } from '../../../hooks/useAlert';
 type TeamTab = 'staff' | 'accounts';
 
 const TABS: { key: TeamTab; label: string; icon: typeof TeamIcon }[] = [
-  { key: 'staff', label: 'Funcionárias(os) & Gerentes', icon: TeamIcon },
+  { key: 'staff', label: 'Colaboradores(as) & Gerentes', icon: TeamIcon },
   { key: 'accounts', label: 'Contas administrativas', icon: ShieldCheck },
 ];
 

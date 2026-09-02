@@ -199,7 +199,7 @@ export const AdminLayout = () => {
                 : user?.role === 'ADMIN'
                   ? 'Administrador'
                   : user?.role === 'FUNCIONARIA'
-                    ? 'Funcionária'
+                    ? 'Colaboradora'
                     : 'Gerente'}
             </span>
           </div>

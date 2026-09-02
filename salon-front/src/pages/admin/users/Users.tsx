@@ -212,7 +212,7 @@ export const Users = () => {
             Contas Administrativas
           </h2>
           <p className="text-xs text-[#3b3036]/60 dark:text-gray-400 mt-1">
-            Login, senha e status de acesso das contas de Administrador(a). Funcionária(o) e
+            Login, senha e status de acesso das contas de Administrador(a). Colaborador(a) e
             Gerente têm seu próprio cadastro em Equipe.
           </p>
         </div>

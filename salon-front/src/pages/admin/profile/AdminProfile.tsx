@@ -5,13 +5,25 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { profileApi } from '../../profile/services/profile';
 import { useAuth } from '../../../hooks/useAuth';
 import type { UserUpdateRequest } from '../users/services/users';
-import { Save, User as UserIcon, Eye, EyeOff, Link2, Link2Off, Loader2 } from 'lucide-react';
+import {
+  Save,
+  User as UserIcon,
+  Eye,
+  EyeOff,
+  Link2,
+  Link2Off,
+  Loader2,
+  CalendarPlus,
+} from 'lucide-react';
 import { useAlert } from '../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import { profileFormSchema } from '../../profile/profile.schema';
 import type { ProfileFormValues } from '../../profile/profile.schema';
 import { employeeMercadoPagoApi } from '../employees/services/mercadoPago';
+import { employeesApi } from '../employees/services/employees';
+import type { EmployeeActingState } from '../employees/services/employees';
 import { useFeatureFlag } from '../../../hooks/useFeatureFlag';
+import { remunerationLabel } from '../../../utils/remuneration';
 
 // Aplica máscara ###.###.###-## enquanto o usuário digita
 const formatCpf = (value: string) => {
@@ -33,6 +45,10 @@ export const AdminProfile = () => {
   // null = ainda não sabe / usuário sem cadastro de funcionária (esconde a seção)
   const [mpConnected, setMpConnected] = useState<boolean | null>(null);
   const [isMpBusy, setIsMpBusy] = useState(false);
+
+  const isAdmin = user?.role === 'ADMIN';
+  const [acting, setActing] = useState<EmployeeActingState | null>(null);
+  const [isActingBusy, setIsActingBusy] = useState(false);
 
   const {
     register,
@@ -90,6 +106,33 @@ export const AdminProfile = () => {
       .then((status) => setMpConnected(status.connected))
       .catch(() => setMpConnected(null)); // sem cadastro de funcionária vinculado — some a seção
   }, [mercadoPagoEnabled]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    employeesApi
+      .getMyActing()
+      .then(setActing)
+      .catch(() => setActing(null));
+  }, [isAdmin]);
+
+  const handleToggleActing = async () => {
+    if (!acting) return;
+    const next = !acting.acting;
+    setIsActingBusy(true);
+    try {
+      const updated = await employeesApi.setMyActing(next);
+      setActing(updated);
+      await showSuccess(
+        next
+          ? 'Pronto! Você já aparece como profissional na criação de agendamentos.'
+          : 'Você não aparece mais no seletor de profissional dos agendamentos.'
+      );
+    } catch (err) {
+      await showError(getApiErrorMessage(err, 'Erro ao atualizar sua atuação em agendamentos.'));
+    } finally {
+      setIsActingBusy(false);
+    }
+  };
 
   const onSubmit = async (data: ProfileFormValues) => {
     if (!user?.userId) return;
@@ -303,6 +346,51 @@ export const AdminProfile = () => {
           </div>
         </form>
       </div>
+
+      {isAdmin && acting && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="bg-[#be8a83]/10 text-[#be8a83] rounded-full p-2.5 shrink-0">
+              <CalendarPlus size={20} />
+            </div>
+            <div>
+              <h4 className="font-semibold text-[#3b3036] text-lg">Atuar como profissional</h4>
+              <p className="text-sm text-[#3b3036]/60">
+                Ligando isto, você entra no seletor de profissional ao criar um agendamento e pode
+                marcar atendimentos para si. É criado um cadastro de colaborador com remuneração{' '}
+                <strong>Comissionado</strong> por padrão — o modelo de pagamento é editável em{' '}
+                <strong>Equipe → Colaboradores(as) &amp; Gerentes</strong>.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {acting.acting ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Ativo
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase bg-gray-100 text-gray-500 border border-gray-200">
+                Desativado
+              </span>
+            )}
+            {acting.acting && acting.remunerationType && (
+              <span className="text-xs text-[#3b3036]/60">
+                Remuneração atual: {remunerationLabel(acting.remunerationType)}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleToggleActing}
+              disabled={isActingBusy}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-[#be8a83] border border-[#be8a83]/40 hover:bg-[#be8a83]/5 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isActingBusy && <Loader2 size={16} className="animate-spin" />}
+              {acting.acting ? 'Desativar atuação' : 'Ativar atuação'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {mercadoPagoEnabled && mpConnected !== null && (
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs space-y-4">

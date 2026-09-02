@@ -34,7 +34,10 @@ import com.cristiane.salon.models.employee.repository.EmployeeRepository;
 import com.cristiane.salon.models.product.entity.Product;
 import com.cristiane.salon.models.product.repository.ProductRepository;
 import com.cristiane.salon.models.service.entity.SalonService;
+import com.cristiane.salon.models.service.entity.SalonServiceProductUsage;
+import com.cristiane.salon.models.service.repository.SalonServiceProductUsageRepository;
 import com.cristiane.salon.models.service.repository.SalonServiceRepository;
+import com.cristiane.salon.models.businesssettings.service.SalonBusinessSettingsService;
 import com.cristiane.salon.integrations.email.service.EmailService;
 import com.cristiane.salon.integrations.push.service.PushService;
 import com.cristiane.salon.models.featureflag.service.FeatureFlagService;
@@ -79,6 +82,8 @@ public class AppointmentService {
     private final com.cristiane.salon.integrations.payment.marketplace.SplitPaymentResolver splitPaymentResolver;
     private final AuditLogService auditLogService;
     private final SalonClock salonClock;
+    private final SalonServiceProductUsageRepository serviceProductUsageRepository;
+    private final SalonBusinessSettingsService businessSettingsService;
 
     private void notifyAdminsOfNewRequest(Appointment appointment) {
         for (User admin : userRepository.findByRole_NameAndActiveTrue("ADMIN")) {
@@ -230,6 +235,7 @@ public class AppointmentService {
             appointment.setPreferredDate(request.preferredDate());
             appointment.setClientNotes(request.clientNotes());
             appointment.setStatus(AppointmentStatus.CONFIRMED);
+            appointment.setSnapshotProductCommissionPercent(businessSettingsService.getProductCommissionPercent());
             appointment.setServices(buildServiceItems(appointment, serviceRequests, resolvedServices, true));
             if (request.products() != null && !request.products().isEmpty()) {
                 appointment.setProducts(buildProductItems(appointment, request.products()));
@@ -267,6 +273,7 @@ public class AppointmentService {
         appointment.setPreferredDate(request.preferredDate());
         appointment.setClientNotes(notes);
         appointment.setStatus(AppointmentStatus.REQUESTED);
+        appointment.setSnapshotProductCommissionPercent(businessSettingsService.getProductCommissionPercent());
         appointment.setServices(buildServiceItems(appointment, serviceRequests, resolvedServices, false));
 
         Appointment saved = appointmentRepository.save(appointment);
@@ -287,16 +294,31 @@ public class AppointmentService {
         List<AppointmentServiceItem> items = new java.util.ArrayList<>();
         for (int i = 0; i < serviceRequests.size(); i++) {
             AppointmentServiceRequest sr = serviceRequests.get(i);
+            SalonService svc = resolvedServices.get(i);
             AppointmentServiceItem item = new AppointmentServiceItem();
             item.setAppointment(appointment);
-            item.setSalonService(resolvedServices.get(i));
+            item.setSalonService(svc);
             if (allowCustomization) {
                 item.setCustomPrice(sr.customPrice());
                 item.setCustomServiceNotes(sr.customServiceNotes());
             }
+            // Congela os valores do serviço neste instante (ver V72): mudanças posteriores no
+            // cadastro não mexem no financeiro deste atendimento.
+            item.setSnapshotPrice(svc.getPrice());
+            item.setSnapshotCommissionPercent(svc.getCommissionPercent());
+            item.setSnapshotRecipeCost(computeRecipeCostSnapshot(svc.getId()));
             items.add(item);
         }
         return items;
+    }
+
+    /** Soma o custo estimado da receita atual do serviço — o que ele consome de produto por
+     * execução × custo unitário do produto. Zero se não há receita cadastrada. */
+    private BigDecimal computeRecipeCostSnapshot(Long salonServiceId) {
+        return serviceProductUsageRepository.findBySalonServiceId(salonServiceId).stream()
+                .map(SalonServiceProductUsage::getEstimatedCost)
+                .filter(cost -> cost != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private List<AppointmentProductItem> buildProductItems(Appointment appointment,
@@ -316,6 +338,9 @@ public class AppointmentService {
             item.setProduct(product);
             item.setQuantity(pr.quantity());
             item.setCustomPrice(pr.customPrice());
+            // Congela preço de venda e custo da embalagem do produto neste instante (ver V72).
+            item.setSnapshotUnitPrice(product.getPrice());
+            item.setSnapshotCostPrice(product.getCostPrice());
             items.add(item);
         }
         return items;
@@ -421,6 +446,8 @@ public class AppointmentService {
         assertCanManage(appointment, "editar os produtos de");
         assertNotBilled(appointment, "editar os produtos de");
 
+        // Reeditar os produtos re-congela também o % de comissão de produto do salão vigente agora.
+        appointment.setSnapshotProductCommissionPercent(businessSettingsService.getProductCommissionPercent());
         appointment.getProducts().clear();
         appointment.getProducts().addAll(buildProductItems(appointment, productRequests));
 

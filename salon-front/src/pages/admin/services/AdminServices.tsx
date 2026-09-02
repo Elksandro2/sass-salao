@@ -19,6 +19,7 @@ import { salonServiceFormSchema } from './adminService.schema';
 import type { SalonServiceFormValues } from './adminService.schema';
 import { useAlert } from '../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../utils/apiError';
+import { productUnitSymbol } from '../../../utils/productUnit';
 
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
@@ -353,15 +354,22 @@ export const AdminServices = () => {
                       ))}
                     </select>
                     <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className={`${inputCls} flex-1`}
-                        placeholder={product?.unit ? `Qtd. (${product.unit.toLowerCase()})` : 'Qtd.'}
-                        value={row.quantityUsed}
-                        onChange={(e) => updateUsageRow(index, { quantityUsed: e.target.value })}
-                      />
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className={`${inputCls} w-full ${product?.unit ? 'pr-12' : ''}`}
+                          placeholder="Quantidade consumida"
+                          value={row.quantityUsed}
+                          onChange={(e) => updateUsageRow(index, { quantityUsed: e.target.value })}
+                        />
+                        {product?.unit && (
+                          <span className="absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-[#7a7074] pointer-events-none">
+                            {productUnitSymbol(product.unit)}
+                          </span>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={() => removeUsageRow(index)}
@@ -370,6 +378,20 @@ export const AdminServices = () => {
                         <Trash2 size={14} />
                       </button>
                     </div>
+                    {product && !product.unit && (
+                      <p className="text-xs text-amber-600">
+                        Defina a unidade (ml/g/L…) no cadastro deste produto para medir o consumo
+                        corretamente.
+                      </p>
+                    )}
+                    {product?.unit && product.capacity != null && (
+                      <p className="text-xs text-gray-400">
+                        Embalagem cadastrada: {product.capacity} {productUnitSymbol(product.unit)}
+                        {product.unitCost != null && (
+                          <> · custo R$ {product.unitCost.toFixed(2)}/{productUnitSymbol(product.unit)}</>
+                        )}
+                      </p>
+                    )}
                   </div>
                 );
               })}

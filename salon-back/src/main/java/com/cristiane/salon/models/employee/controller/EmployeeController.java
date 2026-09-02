@@ -1,6 +1,8 @@
 package com.cristiane.salon.models.employee.controller;
 
 import com.cristiane.salon.annotation.Auditable;
+import com.cristiane.salon.models.employee.dto.EmployeeActingRequest;
+import com.cristiane.salon.models.employee.dto.EmployeeActingResponse;
 import com.cristiane.salon.models.employee.dto.EmployeeBookingResponse;
 import com.cristiane.salon.models.employee.dto.EmployeeFilter;
 import com.cristiane.salon.models.employee.dto.EmployeeRequest;
@@ -43,6 +45,21 @@ public class EmployeeController {
     @Operation(summary = "Lista funcionárias para agendamento (público)")
     public ResponseEntity<List<EmployeeBookingResponse>> findAllForBooking() {
         return ResponseEntity.ok(employeeService.findAllForBooking());
+    }
+
+    @GetMapping("/me/acting")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Diz se o usuário logado atua como profissional nos agendamentos")
+    public ResponseEntity<EmployeeActingResponse> getMyActing() {
+        return ResponseEntity.ok(employeeService.getMyActingProfile());
+    }
+
+    @PutMapping("/me/acting")
+    @PreAuthorize("isAuthenticated()")
+    @Auditable(action = "EMPLOYEE_ACTING_TOGGLED", entityType = "Employee", captureArgs = true)
+    @Operation(summary = "Liga/desliga a atuação do admin logado como profissional nos agendamentos")
+    public ResponseEntity<EmployeeActingResponse> setMyActing(@Valid @RequestBody EmployeeActingRequest request) {
+        return ResponseEntity.ok(employeeService.setMyActing(request.acting()));
     }
 
     @GetMapping("/{id}")

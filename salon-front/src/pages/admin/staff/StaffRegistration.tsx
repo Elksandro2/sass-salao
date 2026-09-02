@@ -24,13 +24,20 @@ import type { StaffProfileResponse, StaffRoleName, StaffPixQrCodeResponse } from
 import { staffFormSchema, BRAZILIAN_STATES } from './staff.schema';
 import type { StaffFormValues } from './staff.schema';
 import { RoleSelector } from './components/RoleSelector';
+import {
+  REMUNERATION_TYPES,
+  remunerationLabel,
+  remunerationNeedsValue,
+  remunerationPaysServiceCommission,
+  remunerationValueFieldLabel,
+} from '../../../utils/remuneration';
 
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
 const sectionTitleCls = 'flex items-center gap-2 font-heading text-sm font-bold text-[#3b3036] mt-2';
 
 const ROLE_LABELS: Record<string, string> = {
-  FUNCIONARIA: 'Funcionária',
+  FUNCIONARIA: 'Colaboradora',
   GERENTE_DE_ATENDIMENTO: 'Gerente de Atendimento',
 };
 
@@ -77,7 +84,7 @@ export const StaffRegistration = () => {
 
   const roleName = watch('roleName');
   const remunerationType = watch('remunerationType');
-  const isCommissioned = remunerationType === 'COMISSIONADO' || remunerationType === 'FIXO_E_COMISSIONADO';
+  const isCommissioned = remunerationPaysServiceCommission(remunerationType);
 
   const openModal = () => {
     reset({});
@@ -196,7 +203,7 @@ export const StaffRegistration = () => {
           <div>
             <h2 className="font-heading text-2xl font-bold text-[#3b3036]">Cadastro de Equipe</h2>
             <p className="text-xs text-[#3b3036]/60 mt-1">
-              Cadastro completo de funcionárias e gerentes de atendimento — restrito a
+              Cadastro completo de colaboradoras e gerentes de atendimento — restrito a
               administradores.
             </p>
           </div>
@@ -433,13 +440,13 @@ export const StaffRegistration = () => {
                           <label htmlFor="staff-remunerationType" className={labelCls}>Tipo de remuneração</label>
                           <select id="staff-remunerationType" className={inputCls} {...register('remunerationType')}>
                             <option value="">Selecione</option>
-                            <option value="SALARIO_FIXO">Salário fixo</option>
-                            {roleName === 'FUNCIONARIA' && (
-                              <>
-                                <option value="COMISSIONADO">Comissionado</option>
-                                <option value="FIXO_E_COMISSIONADO">Fixo + comissão</option>
-                              </>
-                            )}
+                            {REMUNERATION_TYPES.filter(
+                              (t) => roleName === 'FUNCIONARIA' || t === 'SALARIO_FIXO'
+                            ).map((t) => (
+                              <option key={t} value={t}>
+                                {remunerationLabel(t)}
+                              </option>
+                            ))}
                           </select>
                           {roleName === 'GERENTE_DE_ATENDIMENTO' && (
                             <p className="text-xs text-gray-400 mt-1">
@@ -450,9 +457,11 @@ export const StaffRegistration = () => {
                             <span className="text-xs text-rose-500 font-semibold">{errors.remunerationType.message}</span>
                           )}
                         </div>
-                        {(remunerationType === 'SALARIO_FIXO' || remunerationType === 'FIXO_E_COMISSIONADO') && (
+                        {remunerationNeedsValue(remunerationType) && (
                           <div>
-                            <label htmlFor="staff-remunerationValue" className={labelCls}>Valor do salário fixo (R$)</label>
+                            <label htmlFor="staff-remunerationValue" className={labelCls}>
+                              {remunerationValueFieldLabel(remunerationType)}
+                            </label>
                             <input id="staff-remunerationValue" type="number" step="0.01" min="0" className={inputCls} {...register('remunerationValue')} />
                             {errors.remunerationValue && (
                               <span className="text-xs text-rose-500 font-semibold">{errors.remunerationValue.message}</span>

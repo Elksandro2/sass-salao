@@ -17,6 +17,15 @@ import type { EmployeeFormValues } from './employee.schema';
 import { useAlert } from '../../../hooks/useAlert';
 import { useFeatureFlag } from '../../../hooks/useFeatureFlag';
 import { getApiErrorMessage } from '../../../utils/apiError';
+import {
+  REMUNERATION_TYPES,
+  remunerationLabel,
+  remunerationNeedsValue,
+  remunerationIsDaily,
+  remunerationHasFixedSalary,
+  remunerationPaysServiceCommission,
+  remunerationValueFieldLabel,
+} from '../../../utils/remuneration';
 
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
@@ -133,8 +142,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
   };
 
   const onSubmit = async (data: EmployeeFormValues) => {
-    const needsSalary =
-      data.remunerationType === 'SALARIO_FIXO' || data.remunerationType === 'FIXO_E_COMISSIONADO';
+    const needsSalary = remunerationNeedsValue(data.remunerationType);
 
     const payload: EmployeeData = {
       userId: Number(data.userId),
@@ -153,7 +161,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
     } catch (err) {
       const msg = getApiErrorMessage(
         err,
-        'Erro ao salvar funcionário(a). Verifique se o ID de usuário está correto.'
+        'Erro ao salvar colaborador(a). Verifique se o ID de usuário está correto.'
       );
       await showError(msg);
     }
@@ -166,7 +174,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
       setShowConfirm(false);
       setRefreshTrigger((prev) => prev + 1);
     } catch (err) {
-      const msg = getApiErrorMessage(err, 'Erro ao desvincular funcionário(a).');
+      const msg = getApiErrorMessage(err, 'Erro ao desvincular colaborador(a).');
       await showError(msg);
     }
   };
@@ -188,19 +196,17 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
     {
       key: 'remunerationType',
       label: 'Remuneração',
-      render: (item: EmployeeData) => {
-        if (item.remunerationType === 'SALARIO_FIXO') return 'Salário Fixo';
-        if (item.remunerationType === 'COMISSIONADO') return 'Comissionado';
-        if (item.remunerationType === 'FIXO_E_COMISSIONADO') return 'Fixo + Comissionado';
-        return 'Não definido';
-      },
+      render: (item: EmployeeData) => remunerationLabel(item.remunerationType),
     },
     {
       key: 'remunerationValue',
       label: 'Valor',
       render: (item: EmployeeData) => {
-        if (item.remunerationType === 'SALARIO_FIXO' || item.remunerationType === 'FIXO_E_COMISSIONADO') {
+        if (remunerationHasFixedSalary(item.remunerationType)) {
           return `R$ ${(item.remunerationValue ?? 0).toFixed(2)}`;
+        }
+        if (remunerationIsDaily(item.remunerationType)) {
+          return `R$ ${(item.remunerationValue ?? 0).toFixed(2)} / dia`;
         }
         if (item.remunerationType === 'COMISSIONADO') {
           return 'Comissão por serviço';
@@ -216,9 +222,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
             render: (item: EmployeeData) => (
               <MercadoPagoConnectionCell
                 employeeId={item.id!}
-                splitApplicable={
-                  item.remunerationType === 'COMISSIONADO' || item.remunerationType === 'FIXO_E_COMISSIONADO'
-                }
+                splitApplicable={remunerationPaysServiceCommission(item.remunerationType)}
               />
             ),
           },
@@ -284,10 +288,10 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
         </div>
       ) : (
         <div className="flex justify-between items-center">
-          <h2 className="font-heading text-2xl font-bold text-[#3b3036]">Gerenciar Funcionários(as)</h2>
+          <h2 className="font-heading text-2xl font-bold text-[#3b3036]">Gerenciar Colaboradores(as)</h2>
           <PermissionGate method="POST" endpoint="/v1/employees">
             <button onClick={() => handleOpenForm()} className="btn-premium">
-              <Plus size={18} /> Vincular Funcionário(a)
+              <Plus size={18} /> Adicionar Colaborador(a)
             </button>
           </PermissionGate>
         </div>
@@ -305,7 +309,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
       <ModalForm
         show={showForm}
         onHide={() => setShowForm(false)}
-        title={editingEmployee ? 'Editar Funcionário(a)' : 'Novo(a) Funcionário(a)'}
+        title={editingEmployee ? 'Editar Colaborador(a)' : 'Novo(a) Colaborador(a)'}
         onSubmit={handleSubmit(onSubmit)}
       >
         <div className="space-y-4">
@@ -344,7 +348,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
               </ul>
             )}
             <p className="text-xs text-gray-400 mt-1">
-              Busque pelo nome e selecione o usuário que será vinculado como funcionário(a).
+              Busque pelo nome e selecione o usuário que será vinculado como colaborador(a).
             </p>
             {errors.userId && (
               <span className="text-xs text-rose-500 font-semibold">{errors.userId.message}</span>
@@ -365,19 +369,17 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
                 <label className={labelCls}>Tipo de Remuneração</label>
                 <select className={inputCls} {...register('remunerationType')}>
                   <option value="">Não definido</option>
-                  <option value="SALARIO_FIXO">Salário Fixo</option>
-                  {!isManager && (
-                    <>
-                      <option value="COMISSIONADO">Comissionado</option>
-                      <option value="FIXO_E_COMISSIONADO">Salário Fixo + Comissionado</option>
-                    </>
-                  )}
+                  {REMUNERATION_TYPES.filter((t) => !isManager || t === 'SALARIO_FIXO').map((t) => (
+                    <option key={t} value={t}>
+                      {remunerationLabel(t)}
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              {(remunerationType === 'SALARIO_FIXO' || remunerationType === 'FIXO_E_COMISSIONADO') && (
+              {remunerationNeedsValue(remunerationType) && (
                 <div>
-                  <label className={labelCls}>Valor do Salário Fixo (R$) *</label>
+                  <label className={labelCls}>{remunerationValueFieldLabel(remunerationType)} *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -392,8 +394,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
                 </div>
               )}
 
-              {!isManager && (remunerationType === 'COMISSIONADO' ||
-                remunerationType === 'FIXO_E_COMISSIONADO') && (
+              {!isManager && remunerationPaysServiceCommission(remunerationType) && (
                 <p className="text-xs text-gray-400">
                   A comissão de serviço não é cadastrada aqui — é o % configurado em cada
                   serviço do catálogo (tela de Serviços). A comissão de produtos vendidos usa a
@@ -409,8 +410,8 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
         show={showConfirm}
         onHide={() => setShowConfirm(false)}
         onConfirm={confirmDelete}
-        title="Desvincular Funcionário(a)"
-        message="Tem certeza que deseja remover este(a) funcionário(a)? O usuário continuará existindo, apenas perderá o vínculo de funcionário(a)."
+        title="Desvincular Colaborador(a)"
+        message="Tem certeza que deseja remover este(a) colaborador(a)? O usuário continuará existindo, apenas perderá o vínculo de colaborador(a)."
       />
 
       {showDetails && selectedEmployee && (
@@ -424,7 +425,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
               {/* Header */}
               <div className="flex items-center justify-between p-5 border-b border-solid border-[#eae1e1] rounded-t-2xl">
                 <h3 className="text-lg font-semibold font-heading text-[#3b3036]">
-                  Detalhes do(a) Funcionário(a)
+                  Detalhes do(a) Colaborador(a)
                 </h3>
                 <button
                   onClick={() => setShowDetails(false)}
@@ -468,18 +469,16 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
                     <div>
                       <span className="font-semibold text-xs text-[#3b3036]/70">Tipo:</span>{' '}
                       <span className="text-sm font-semibold">
-                        {selectedEmployee.remunerationType === 'SALARIO_FIXO' && 'Salário Fixo'}
-                        {selectedEmployee.remunerationType === 'COMISSIONADO' && 'Comissionado'}
-                        {selectedEmployee.remunerationType === 'FIXO_E_COMISSIONADO' &&
-                          'Salário Fixo + Comissionado'}
-                        {!selectedEmployee.remunerationType && 'Não definido'}
+                        {remunerationLabel(selectedEmployee.remunerationType)}
                       </span>
                     </div>
 
-                    {selectedEmployee.remunerationType === 'SALARIO_FIXO' && (
+                    {remunerationHasFixedSalary(selectedEmployee.remunerationType) && (
                       <div>
                         <span className="font-semibold text-xs text-[#3b3036]/70">
-                          Salário Fixo:
+                          {selectedEmployee.remunerationType === 'FIXO_E_COMISSIONADO'
+                            ? 'Salário Fixo Base:'
+                            : 'Salário Fixo:'}
                         </span>{' '}
                         <span className="text-sm font-semibold text-[#8b6d68]">
                           R$ {(selectedEmployee.remunerationValue ?? 0).toFixed(2)}
@@ -487,24 +486,24 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
                       </div>
                     )}
 
-                    {(selectedEmployee.remunerationType === 'COMISSIONADO' ||
-                      selectedEmployee.remunerationType === 'FIXO_E_COMISSIONADO') && (
-                      <>
-                        {selectedEmployee.remunerationType === 'FIXO_E_COMISSIONADO' && (
-                          <div>
-                            <span className="font-semibold text-xs text-[#3b3036]/70">
-                              Salário Fixo Base:
-                            </span>{' '}
-                            <span className="text-sm font-semibold text-[#8b6d68]">
-                              R$ {(selectedEmployee.remunerationValue ?? 0).toFixed(2)}
-                            </span>
-                          </div>
-                        )}
-                        <p className="text-xs text-[#3b3036]/60">
-                          Comissão de serviço definida por serviço realizado (tela de Serviços) e
-                          comissão de produtos pela % única do salão (Perfil do Salão).
+                    {remunerationIsDaily(selectedEmployee.remunerationType) && (
+                      <div>
+                        <span className="font-semibold text-xs text-[#3b3036]/70">Diária:</span>{' '}
+                        <span className="text-sm font-semibold text-[#8b6d68]">
+                          R$ {(selectedEmployee.remunerationValue ?? 0).toFixed(2)} / dia
+                        </span>
+                        <p className="text-xs text-[#3b3036]/60 mt-1">
+                          O total é calculado na Folha de Pagamento: diária × dias trabalhados no
+                          período.
                         </p>
-                      </>
+                      </div>
+                    )}
+
+                    {remunerationPaysServiceCommission(selectedEmployee.remunerationType) && (
+                      <p className="text-xs text-[#3b3036]/60">
+                        Comissão de serviço definida por serviço realizado (tela de Serviços) e
+                        comissão de produtos pela % única do salão (Perfil do Salão).
+                      </p>
                     )}
                   </div>
                 </div>

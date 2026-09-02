@@ -1,6 +1,14 @@
 import { z } from 'zod';
+import { remunerationNeedsValue, remunerationIsDaily } from '../../../utils/remuneration';
 
-const remunerationTypeSchema = z.enum(['', 'SALARIO_FIXO', 'COMISSIONADO', 'FIXO_E_COMISSIONADO']);
+const remunerationTypeSchema = z.enum([
+  '',
+  'SALARIO_FIXO',
+  'COMISSIONADO',
+  'FIXO_E_COMISSIONADO',
+  'DIARISTA',
+  'DIARIA_E_COMISSIONADO',
+]);
 
 export const employeeFormSchema = z
   .object({
@@ -11,16 +19,18 @@ export const employeeFormSchema = z
   .superRefine((data, ctx) => {
     const { remunerationType, remunerationValue } = data;
 
-    // COMISSIONADO não tem mais % própria — a comissão vem do serviço/produto realizado, não
-    // é cadastrada aqui. Só SALARIO_FIXO/FIXO_E_COMISSIONADO usam remunerationValue (salário base).
-    const needsSalary =
-      remunerationType === 'SALARIO_FIXO' || remunerationType === 'FIXO_E_COMISSIONADO';
+    // COMISSIONADO não tem valor próprio — a comissão vem do serviço/produto realizado.
+    // SALARIO_FIXO/FIXO_E_COMISSIONADO usam remunerationValue como salário base;
+    // DIARISTA/DIARIA_E_COMISSIONADO usam como valor da diária.
+    const needsSalary = remunerationNeedsValue(remunerationType);
 
     if (needsSalary) {
       if (!remunerationValue) {
         ctx.addIssue({
           code: 'custom',
-          message: 'O valor do salário é obrigatório',
+          message: remunerationIsDaily(remunerationType)
+            ? 'O valor da diária é obrigatório'
+            : 'O valor do salário é obrigatório',
           path: ['remunerationValue'],
         });
       } else if (Number(remunerationValue) < 0) {

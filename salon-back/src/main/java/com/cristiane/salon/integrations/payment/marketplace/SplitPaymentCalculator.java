@@ -5,7 +5,6 @@ import com.cristiane.salon.models.appointment.entity.AppointmentProductItem;
 import com.cristiane.salon.models.appointment.entity.AppointmentServiceItem;
 import com.cristiane.salon.models.businesssettings.service.SalonBusinessSettingsService;
 import com.cristiane.salon.models.employee.entity.Employee;
-import com.cristiane.salon.models.employee.entity.RemunerationType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -62,10 +61,9 @@ public class SplitPaymentCalculator {
         }
 
         BigDecimal serviceCommission = BigDecimal.ZERO;
-        if (employee.getRemunerationType() == RemunerationType.COMISSIONADO
-                || employee.getRemunerationType() == RemunerationType.FIXO_E_COMISSIONADO) {
+        if (employee.getRemunerationType().paysServiceCommission()) {
             for (AppointmentServiceItem item : appointment.getServices()) {
-                BigDecimal pct = item.getSalonService().getCommissionPercent();
+                BigDecimal pct = item.getEffectiveCommissionPercent();
                 if (pct == null) continue;
                 BigDecimal price = item.getEffectivePrice() != null ? item.getEffectivePrice() : BigDecimal.ZERO;
                 serviceCommission = serviceCommission.add(
@@ -74,8 +72,11 @@ public class SplitPaymentCalculator {
         }
 
         // Comissão de produto é exceção universal — vale pra qualquer tipo de remuneração,
-        // inclusive Salário Fixo, como incentivo à venda.
-        BigDecimal productPct = businessSettingsService.getProductCommissionPercent();
+        // inclusive Salário Fixo, como incentivo à venda. Usa o % congelado no agendamento
+        // (ver V72); agendamento sem snapshot cai no % atual do salão.
+        BigDecimal productPct = appointment.getSnapshotProductCommissionPercent() != null
+                ? appointment.getSnapshotProductCommissionPercent()
+                : businessSettingsService.getProductCommissionPercent();
         BigDecimal productCommission = BigDecimal.ZERO;
         if (productPct != null && productPct.compareTo(BigDecimal.ZERO) > 0) {
             for (AppointmentProductItem item : appointment.getProducts()) {

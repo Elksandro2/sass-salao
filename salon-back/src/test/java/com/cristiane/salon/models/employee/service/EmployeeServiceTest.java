@@ -346,4 +346,91 @@ class EmployeeServiceTest {
         // Assert
         verify(employeeRepository).deleteById(1L);
     }
+
+    // --- atuação como profissional do usuário logado (Meu Perfil do admin) ---
+
+    private void authenticateAs(User user) {
+        org.springframework.security.core.Authentication auth =
+                mock(org.springframework.security.core.Authentication.class);
+        when(auth.getName()).thenReturn(user.getEmail());
+        org.springframework.security.core.context.SecurityContext ctx =
+                mock(org.springframework.security.core.context.SecurityContext.class);
+        when(ctx.getAuthentication()).thenReturn(auth);
+        org.springframework.security.core.context.SecurityContextHolder.setContext(ctx);
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearSecurityContext() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void getMyActingProfile_whenNoEmployee_shouldReturnNotActing() {
+        User admin = new User();
+        admin.setId(50L);
+        admin.setEmail("admin@salao.com");
+        admin.setRole(new Role(9L, "ADMIN", null));
+        authenticateAs(admin);
+        when(employeeRepository.findByUserId(50L)).thenReturn(Optional.empty());
+
+        var result = employeeService.getMyActingProfile();
+
+        assertThat(result.hasProfile()).isFalse();
+        assertThat(result.acting()).isFalse();
+    }
+
+    @Test
+    void setMyActing_whenAdminActivatesFirstTime_shouldCreateBookableCommissionedEmployee() {
+        User admin = new User();
+        admin.setId(50L);
+        admin.setEmail("admin@salao.com");
+        admin.setRole(new Role(9L, "ADMIN", null));
+        authenticateAs(admin);
+        when(employeeRepository.findByUserId(50L)).thenReturn(Optional.empty());
+        when(employeeRepository.save(any(Employee.class))).thenAnswer(inv -> {
+            Employee e = inv.getArgument(0);
+            e.setId(77L);
+            return e;
+        });
+
+        var result = employeeService.setMyActing(true);
+
+        assertThat(result.hasProfile()).isTrue();
+        assertThat(result.acting()).isTrue();
+        assertThat(result.remunerationType()).isEqualTo(RemunerationType.COMISSIONADO);
+        assertThat(result.remunerationValue()).isNull();
+    }
+
+    @Test
+    void setMyActing_whenAdminDeactivates_shouldKeepEmployeeButUnbook() {
+        User admin = new User();
+        admin.setId(50L);
+        admin.setEmail("admin@salao.com");
+        admin.setRole(new Role(9L, "ADMIN", null));
+        authenticateAs(admin);
+
+        Employee adminEmployee = new Employee();
+        adminEmployee.setId(77L);
+        adminEmployee.setUser(admin);
+        adminEmployee.setRemunerationType(RemunerationType.COMISSIONADO);
+        adminEmployee.setBookable(true);
+        when(employeeRepository.findByUserId(50L)).thenReturn(Optional.of(adminEmployee));
+        when(employeeRepository.save(any(Employee.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = employeeService.setMyActing(false);
+
+        assertThat(result.hasProfile()).isTrue();
+        assertThat(result.acting()).isFalse();
+        assertThat(adminEmployee.isBookable()).isFalse();
+    }
+
+    @Test
+    void setMyActing_whenNotAdmin_shouldThrowBadRequest() {
+        authenticateAs(staffUser); // FUNCIONARIA
+
+        assertThatThrownBy(() -> employeeService.setMyActing(true))
+                .isInstanceOf(BadRequestException.class);
+        verify(employeeRepository, never()).save(any());
+    }
 }
