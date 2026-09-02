@@ -214,9 +214,12 @@ public class AppointmentService {
             if (request.scheduledAt() == null) {
                 throw new BadRequestException("Informe data e hora do agendamento");
             }
-            if (request.scheduledAt().isBefore(salonClock.now())) {
-                throw new BadRequestException("Não é possível agendar no passado");
-            }
+            // Equipe pode cadastrar agendamento com data passada — é o único jeito de trazer
+            // histórico antigo (de fora do sistema) pra dentro, pros relatórios financeiros
+            // baterem com a realidade. Nasce direto como DONE (já aconteceu, então já entra no
+            // faturamento do período certo — ver billAppointmentOnce), mas o pagamento fica em
+            // aberto (PENDING) por padrão: quem cadastrou decide separadamente se/como foi pago.
+            boolean isHistorical = request.scheduledAt().isBefore(salonClock.now());
 
             for (AppointmentServiceRequest sr : serviceRequests) {
                 if (sr.customPrice() != null && sr.customPrice().compareTo(BigDecimal.ZERO) < 0) {
@@ -234,7 +237,7 @@ public class AppointmentService {
             appointment.setScheduledAt(request.scheduledAt());
             appointment.setPreferredDate(request.preferredDate());
             appointment.setClientNotes(request.clientNotes());
-            appointment.setStatus(AppointmentStatus.CONFIRMED);
+            appointment.setStatus(isHistorical ? AppointmentStatus.DONE : AppointmentStatus.CONFIRMED);
             appointment.setSnapshotProductCommissionPercent(businessSettingsService.getProductCommissionPercent());
             appointment.setServices(buildServiceItems(appointment, serviceRequests, resolvedServices, true));
             if (request.products() != null && !request.products().isEmpty()) {
@@ -242,9 +245,17 @@ public class AppointmentService {
             }
 
             Appointment saved = appointmentRepository.save(appointment);
-            emailService.sendConfirmationNotificationToClient(saved);
-            pushService.sendToUser(client.getId(), "Agendamento confirmado! ✅",
-                    "Seu horário de " + saved.getServiceNames() + " foi confirmado.", "/my-appointments");
+
+            if (isHistorical) {
+                // Já concluído, faturamento entra no período do atendimento — mas o pagamento
+                // (PaymentStatus) fica como PENDING, quem cadastrou decide depois se/como cobrar.
+                billAppointmentOnce(saved, saved.getGrandTotal(),
+                        "Pagamento do agendamento #" + saved.getId() + " - " + saved.getServiceNames());
+            } else {
+                emailService.sendConfirmationNotificationToClient(saved);
+                pushService.sendToUser(client.getId(), "Agendamento confirmado! ✅",
+                        "Seu horário de " + saved.getServiceNames() + " foi confirmado.", "/my-appointments");
+            }
             return AppointmentResponse.fromEntity(saved);
         }
 
@@ -864,7 +875,12 @@ public class AppointmentService {
             cashFlow.setType(CashFlowType.INCOME);
             cashFlow.setAmount(amount);
             cashFlow.setDescription(description);
-            cashFlow.setDate(salonClock.today());
+            // Data do próprio atendimento, não "hoje" — essencial pro cadastro de agendamento
+            // histórico (data passada) cair no período certo do relatório financeiro, em vez de
+            // aparecer no relatório de hoje só porque foi quando alguém deu baixa no sistema.
+            cashFlow.setDate(appointment.getScheduledAt() != null
+                    ? appointment.getScheduledAt().toLocalDate()
+                    : salonClock.today());
             cashFlow.setAppointment(appointment);
             cashFlowRepository.save(cashFlow);
         } catch (DataIntegrityViolationException e) {

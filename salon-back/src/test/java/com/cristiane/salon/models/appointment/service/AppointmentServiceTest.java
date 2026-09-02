@@ -10,6 +10,7 @@ import com.cristiane.salon.models.appointment.dto.AppointmentResponse;
 import com.cristiane.salon.models.appointment.dto.AppointmentServiceRequest;
 import com.cristiane.salon.models.appointment.entity.Appointment;
 import com.cristiane.salon.models.appointment.enums.AppointmentStatus;
+import com.cristiane.salon.models.appointment.enums.PaymentStatus;
 import com.cristiane.salon.models.appointment.repository.AppointmentRepository;
 import com.cristiane.salon.models.cashflow.entity.CashFlow;
 import com.cristiane.salon.models.cashflow.repository.CashFlowRepository;
@@ -334,19 +335,44 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void create_whenStaffFlowAndScheduledAtInPast_shouldThrowBadRequestException() {
-        // Arrange
+    void create_whenStaffFlowAndScheduledAtInPast_shouldCreateAsDoneAndBillWithoutNotifying() {
+        // Arrange — cadastro de agendamento histórico (de fora do sistema): nasce direto como
+        // DONE (já aconteceu) e fatura no Caixa na data do próprio atendimento, mas não manda
+        // e-mail/push de "confirmado" (não é uma confirmação de verdade) nem marca como pago.
         mockAuthenticatedUser(staffUser);
         when(userRepository.findById(10L)).thenReturn(Optional.of(clientUser));
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, salonClock.now().minusDays(1), null, null, 10L);
+        LocalDateTime pastTime = salonClock.now().minusDays(30);
 
-        // Act & Assert
-        assertThatThrownBy(() -> appointmentService.create(request))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessage("Não é possível agendar no passado");
+        Appointment saved = new Appointment();
+        saved.setId(101L);
+        saved.setClient(clientUser);
+        saved.setEmployee(employee);
+        withService(saved, salonService);
+        saved.setScheduledAt(pastTime);
+        saved.setStatus(AppointmentStatus.DONE);
+
+        when(appointmentRepository.save(any(Appointment.class))).thenReturn(saved);
+
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, pastTime, null, null, 10L);
+
+        // Act
+        AppointmentResponse result = appointmentService.create(request);
+
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.id()).isEqualTo(101L);
+        assertThat(result.status()).isEqualTo(AppointmentStatus.DONE.name());
+        assertThat(result.paymentStatus()).isEqualTo(PaymentStatus.PENDING.name());
+        verify(emailService, never()).sendConfirmationNotificationToClient(any());
+        verify(pushService, never()).sendToUser(any(), any(), any(), any());
+
+        ArgumentCaptor<CashFlow> cashFlowCaptor = ArgumentCaptor.forClass(CashFlow.class);
+        verify(cashFlowRepository).save(cashFlowCaptor.capture());
+        assertThat(cashFlowCaptor.getValue().getDate()).isEqualTo(pastTime.toLocalDate());
+        assertThat(cashFlowCaptor.getValue().getAmount()).isEqualByComparingTo("100.00");
     }
 
     @Test
