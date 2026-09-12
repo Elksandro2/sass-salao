@@ -23,7 +23,8 @@ public class Product {
     @Column(nullable = false, length = 150)
     private String name;
 
-    @Column(nullable = false, precision = 10, scale = 2)
+    /** Preço de venda ao cliente — null para produto só de uso interno (sem availableForSale). */
+    @Column(precision = 10, scale = 2)
     private BigDecimal price;
 
     @Column(nullable = false)

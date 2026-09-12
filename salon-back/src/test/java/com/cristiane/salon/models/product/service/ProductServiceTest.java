@@ -47,7 +47,7 @@ class ProductServiceTest {
         when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
 
         // Act
-        Page<ProductResponse> result = productService.findAll(new ProductFilter(null, null), pageable);
+        Page<ProductResponse> result = productService.findAll(new ProductFilter(null, null, null, null), pageable);
 
         // Assert
         assertThat(result.getContent()).hasSize(2);
@@ -213,5 +213,71 @@ class ProductServiceTest {
         // Act & Assert
         assertThatThrownBy(() -> productService.reactivate(id))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // --- Produtos "de uso" (sem preço de venda) --------------------------------------------
+
+    @Test
+    void create_whenAvailableForSaleAndNoPrice_shouldThrowBadRequestException() {
+        ProductRequest request = new ProductRequest(
+                "Óleo de coco", null, null, null, null, null, null, true, false);
+
+        assertThatThrownBy(() -> productService.create(request))
+                .isInstanceOf(com.cristiane.salon.exception.BadRequestException.class);
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void create_whenUseOnlyProductWithoutPrice_shouldSucceed() {
+        ProductRequest request = new ProductRequest(
+                "Óleo de coco", null, null, null, new BigDecimal("40.00"), new BigDecimal("1000"),
+                com.cristiane.salon.models.product.entity.ProductUnit.ML, false, true);
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ProductResponse result = productService.create(request);
+
+        assertThat(result.price()).isNull();
+        assertThat(result.availableForSale()).isFalse();
+        assertThat(result.usedInServiceRecipe()).isTrue();
+    }
+
+    @Test
+    void create_whenAvailableForSaleDefaultsTrueAndNoPrice_shouldThrowBadRequestException() {
+        // availableForSale omitido (null) -> ProductService assume true por padrão na criação
+        ProductRequest request = new ProductRequest(
+                "Shampoo", null, null, null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> productService.create(request))
+                .isInstanceOf(com.cristiane.salon.exception.BadRequestException.class);
+    }
+
+    @Test
+    void update_whenTogglingToAvailableForSaleWithoutAnyPrice_shouldThrowBadRequestException() {
+        Long id = 1L;
+        Product existing = new Product(id, "Óleo", null, true, null, null, null, null, false, true);
+        when(productRepository.findById(id)).thenReturn(Optional.of(existing));
+
+        ProductRequest request = new ProductRequest(
+                null, null, null, null, null, null, null, true, null);
+
+        assertThatThrownBy(() -> productService.update(id, request))
+                .isInstanceOf(com.cristiane.salon.exception.BadRequestException.class);
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void update_whenKeepingExistingPriceAndTogglingAvailableForSale_shouldSucceed() {
+        Long id = 1L;
+        Product existing = new Product(id, "Óleo", new BigDecimal("30.00"), true, null, null, null, null, false, true);
+        when(productRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ProductRequest request = new ProductRequest(
+                null, null, null, null, null, null, null, true, null);
+
+        ProductResponse result = productService.update(id, request);
+
+        assertThat(result.availableForSale()).isTrue();
+        assertThat(result.price()).isEqualByComparingTo("30.00");
     }
 }

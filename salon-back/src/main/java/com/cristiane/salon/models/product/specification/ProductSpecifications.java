@@ -29,6 +29,14 @@ public class ProductSpecifications {
                 if (filter.active() != null) {
                     predicates.add(criteriaBuilder.equal(root.get("active"), filter.active()));
                 }
+
+                if (filter.availableForSale() != null) {
+                    predicates.add(criteriaBuilder.equal(root.get("availableForSale"), filter.availableForSale()));
+                }
+
+                if (filter.usedInServiceRecipe() != null) {
+                    predicates.add(criteriaBuilder.equal(root.get("usedInServiceRecipe"), filter.usedInServiceRecipe()));
+                }
             }
 
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));

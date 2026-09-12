@@ -1,5 +1,6 @@
 package com.cristiane.salon.models.product.service;
 
+import com.cristiane.salon.exception.BadRequestException;
 import com.cristiane.salon.exception.ResourceNotFoundException;
 import com.cristiane.salon.models.product.dto.ProductFilter;
 import com.cristiane.salon.models.product.dto.ProductRequest;
@@ -12,6 +13,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +38,9 @@ public class ProductService {
     @Transactional
     public ProductResponse create(ProductRequest request) {
         Product product = new Product();
+        boolean availableForSale = request.availableForSale() != null ? request.availableForSale() : true;
+        validateSalePrice(availableForSale, request.price());
+
         product.setName(request.name());
         product.setPrice(request.price());
         product.setActive(request.active() != null ? request.active() : true);
@@ -42,7 +48,7 @@ public class ProductService {
         product.setCostPrice(request.costPrice());
         product.setCapacity(request.capacity());
         product.setUnit(request.unit());
-        product.setAvailableForSale(request.availableForSale() != null ? request.availableForSale() : true);
+        product.setAvailableForSale(availableForSale);
         product.setUsedInServiceRecipe(request.usedInServiceRecipe() != null ? request.usedInServiceRecipe() : true);
 
         return ProductResponse.fromEntity(productRepository.save(product));
@@ -53,10 +59,17 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Produto não encontrado"));
 
+        Boolean existingAvailableForSale = product.getAvailableForSale();
+        boolean availableForSale = request.availableForSale() != null
+                ? request.availableForSale()
+                : existingAvailableForSale == null || existingAvailableForSale;
+        BigDecimal effectivePrice = request.price() != null ? request.price() : product.getPrice();
+        validateSalePrice(availableForSale, effectivePrice);
+
         if (request.name() != null) product.setName(request.name());
         if (request.price() != null) product.setPrice(request.price());
         if (request.active() != null) product.setActive(request.active());
-        if (request.availableForSale() != null) product.setAvailableForSale(request.availableForSale());
+        product.setAvailableForSale(availableForSale);
         if (request.usedInServiceRecipe() != null) product.setUsedInServiceRecipe(request.usedInServiceRecipe());
         product.setBrand(blankToNull(request.brand()));
         product.setCostPrice(request.costPrice());
@@ -64,6 +77,14 @@ public class ProductService {
         product.setUnit(request.unit());
 
         return ProductResponse.fromEntity(productRepository.save(product));
+    }
+
+    /** Preço de venda só é obrigatório quando o produto aparece pra venda — uso interno fica sem. */
+    private void validateSalePrice(boolean availableForSale, BigDecimal price) {
+        if (availableForSale && price == null) {
+            throw new BadRequestException(
+                    "O preço de venda é obrigatório para produtos disponíveis para venda");
+        }
     }
 
     private static String blankToNull(String value) {

@@ -3,7 +3,6 @@ package com.cristiane.salon.models.product.dto;
 import com.cristiane.salon.models.product.entity.ProductUnit;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -13,7 +12,8 @@ public record ProductRequest(
         @Size(min = 3, max = 150, message = "O nome deve ter entre 3 e 150 caracteres")
         String name,
 
-        @NotNull(message = "O preço é obrigatório")
+        /** Obrigatório só quando availableForSale for true — validado em ProductService, não aqui,
+         * porque depende do valor de outro campo. Produto só de uso interno fica sem preço. */
         @DecimalMin(value = "0.00", message = "O preço não pode ser negativo")
         BigDecimal price,
 
