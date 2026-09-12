@@ -361,38 +361,40 @@ export const AdminServices = () => {
                       noResultsLabel="Nenhum produto encontrado"
                       className={`${inputCls} block w-full`}
                     />
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className={`${inputCls} flex-1`}
-                        placeholder="Quantidade consumida"
-                        value={row.quantityUsed}
-                        onChange={(e) => updateUsageRow(index, { quantityUsed: e.target.value })}
-                      />
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className={`${inputCls} flex-1`}
+                          placeholder="Quantidade consumida"
+                          value={row.quantityUsed}
+                          onChange={(e) => updateUsageRow(index, { quantityUsed: e.target.value })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeUsageRow(index)}
+                          className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer shrink-0"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                       {product && (
                         <select
                           aria-label="Unidade da receita"
-                          className={`${inputCls} w-28 shrink-0`}
+                          className={`${inputCls} block w-full`}
                           value={row.unit}
                           onChange={(e) => updateUsageRow(index, { unit: e.target.value })}
                         >
-                          <option value="">Un. do produto</option>
+                          <option value="">Un. do produto ({productUnitLabel(product.unit) || 'não definida'})</option>
                           {unitOptions.map((u) => (
                             <option key={u} value={u}>
-                              {productUnitSymbol(u)}
+                              {productUnitLabel(u)}
                             </option>
                           ))}
                         </select>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => removeUsageRow(index)}
-                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer shrink-0"
-                      >
-                        <Trash2 size={14} />
-                      </button>
                     </div>
                     {product && !product.unit && !row.unit && (
                       <p className="text-xs text-amber-600">

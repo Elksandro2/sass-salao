@@ -658,7 +658,6 @@ export const AdminAppointments = () => {
                   >
                     <option value="PENDING">Pendente</option>
                     <option value="MANUAL">Pago Manualmente</option>
-                    <option value="CANCELLED">Cancelado</option>
                   </select>
 
                   {manualPaymentTarget === item.id && (

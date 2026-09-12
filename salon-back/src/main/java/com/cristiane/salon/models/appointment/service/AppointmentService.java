@@ -751,6 +751,9 @@ public class AppointmentService {
         }
 
         appointment.setStatus(AppointmentStatus.CANCELLED);
+        // Cancelar o agendamento já cancela o pagamento junto — não existe mais uma opção manual
+        // separada pra isso (ver updatePaymentStatus): a intenção de cancelar tudo é uma só ação.
+        appointment.setPaymentStatus(PaymentStatus.CANCELLED);
         Appointment saved = appointmentRepository.save(appointment);
         emailService.sendCancellationNotification(saved);
         pushService.sendToUser(saved.getClient().getId(), "Agendamento cancelado",
@@ -778,6 +781,11 @@ public class AppointmentService {
                 ? AppointmentStatus.CONFIRMED
                 : AppointmentStatus.REQUESTED;
         appointment.setStatus(restored);
+        // Desfaz o cancelamento automático do pagamento feito em cancel() — senão o pagamento
+        // fica travado em CANCELLED pra sempre (updatePaymentStatus bloqueia esse estado).
+        if (appointment.getPaymentStatus() == PaymentStatus.CANCELLED) {
+            appointment.setPaymentStatus(PaymentStatus.PENDING);
+        }
         Appointment saved = appointmentRepository.save(appointment);
 
         if (restored == AppointmentStatus.CONFIRMED) {
@@ -863,6 +871,12 @@ public class AppointmentService {
 
         try {
             PaymentStatus paymentStatus = PaymentStatus.valueOf(paymentStatusStr.toUpperCase());
+
+            // Não existe mais transição manual pra CANCELLED aqui — cancelar o pagamento só
+            // acontece junto do cancelamento do agendamento inteiro (ver cancel()).
+            if (paymentStatus == PaymentStatus.CANCELLED) {
+                throw new BadRequestException("Para cancelar o pagamento, cancele o agendamento inteiro.");
+            }
 
             // Apenas o Webhook do Mercado Pago tem permissão de sistema para transitar um agendamento de PENDING para PAID.
             // O endpoint manual do admin não deve permitir essa transição sem um ID de pagamento válido.

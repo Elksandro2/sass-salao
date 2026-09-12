@@ -1305,6 +1305,7 @@ class AppointmentServiceTest {
 
         // Assert
         assertThat(result.status()).isEqualTo(AppointmentStatus.CANCELLED.name());
+        assertThat(result.paymentStatus()).isEqualTo("CANCELLED");
         verify(emailService).sendCancellationNotification(apt);
     }
 
@@ -1327,6 +1328,25 @@ class AppointmentServiceTest {
         // Assert
         assertThat(result.status()).isEqualTo(AppointmentStatus.CANCELLED.name());
         verify(emailService).sendCancellationNotification(apt);
+    }
+
+    @Test
+    void cancel_whenPaymentIsManual_shouldAlsoCancelPayment() {
+        mockAuthenticatedUser(staffUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setClient(clientUser);
+        apt.setEmployee(employee);
+        withService(apt, salonService);
+        apt.setStatus(AppointmentStatus.CONFIRMED);
+        apt.setPaymentStatus(com.cristiane.salon.models.appointment.enums.PaymentStatus.MANUAL);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AppointmentResponse result = appointmentService.cancel(1L);
+
+        assertThat(result.status()).isEqualTo(AppointmentStatus.CANCELLED.name());
+        assertThat(result.paymentStatus()).isEqualTo("CANCELLED");
     }
 
     @Test
@@ -1423,6 +1443,26 @@ class AppointmentServiceTest {
 
         assertThat(result.status()).isEqualTo(AppointmentStatus.REQUESTED.name());
         verify(emailService, never()).sendConfirmationNotificationToClient(any());
+    }
+
+    @Test
+    void reopen_whenPaymentWasAutoCancelled_shouldRestoreToPending() {
+        // cancel() cancela o pagamento junto (ver cancel_whenSuccessByOwner_shouldSetStatusCancelled)
+        // — reabrir precisa desfazer isso, senão o pagamento fica travado em CANCELLED pra sempre.
+        mockAuthenticatedUser(staffUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setClient(clientUser);
+        apt.setEmployee(employee);
+        withService(apt, salonService);
+        apt.setStatus(AppointmentStatus.CANCELLED);
+        apt.setPaymentStatus(com.cristiane.salon.models.appointment.enums.PaymentStatus.CANCELLED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AppointmentResponse result = appointmentService.reopen(1L);
+
+        assertThat(result.paymentStatus()).isEqualTo("PENDING");
     }
 
     @Test
@@ -1965,6 +2005,23 @@ class AppointmentServiceTest {
                 .hasMessage("Agendamentos pagos ou cancelados não podem ter seu status alterado.");
     }
 
+
+    @Test
+    void updatePaymentStatus_whenTransitioningToCancelled_shouldThrowBadRequestException() {
+        // Não existe mais opção manual de cancelar só o pagamento — cancelar é do agendamento
+        // inteiro (ver cancel()), que já cancela o pagamento junto.
+        mockAuthenticatedUser(staffUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setClient(clientUser);
+        apt.setStatus(AppointmentStatus.CONFIRMED);
+        apt.setPaymentStatus(com.cristiane.salon.models.appointment.enums.PaymentStatus.PENDING);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        assertThatThrownBy(() -> appointmentService.updatePaymentStatus(1L, "CANCELLED", null))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Para cancelar o pagamento, cancele o agendamento inteiro.");
+    }
 
     @Test
     void updatePaymentStatus_whenManualPaidTransitionWithoutPaymentId_shouldThrowBusinessException() {
