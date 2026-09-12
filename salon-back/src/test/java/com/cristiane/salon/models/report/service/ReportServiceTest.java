@@ -967,6 +967,138 @@ class ReportServiceTest {
     }
 
     @Test
+    void getAppointmentProfit_whenServiceHasNoPriceAtAll_shouldTreatItAsZeroRevenueInsteadOfCrashing() {
+        // Serviço "a combinar" (sem preço no catálogo) e sem customPrice/snapshot — não deve
+        // estourar NPE; a receita desse item entra como zero (visível pra dona conferir, não some).
+        Employee emp = new Employee();
+        emp.setId(1L);
+        emp.setUser(new User());
+        emp.setRemunerationType(RemunerationType.SALARIO_FIXO);
+
+        SalonService service = new SalonService();
+        service.setId(1L);
+        service.setPrice(null);
+
+        Appointment apt = new Appointment();
+        apt.setId(5L);
+        apt.setEmployee(emp);
+        withService(apt, service);
+        when(appointmentRepository.findById(5L)).thenReturn(java.util.Optional.of(apt));
+
+        AppointmentProfitResponse result = reportService.getAppointmentProfit(5L);
+
+        assertThat(result.grossRevenue()).isEqualByComparingTo("0.00");
+        assertThat(result.netProfit()).isEqualByComparingTo("0.00");
+        assertThat(result.positive()).isTrue();
+    }
+
+    @Test
+    void getAppointmentProfit_whenProductHasNoCostDataRegistered_shouldSkipItsCostInsteadOfCrashing() {
+        // Produto vendido sem custeio cadastrado (sem costPrice/capacity) — custo entra como
+        // zero, não derruba o cálculo do resto do atendimento.
+        Employee emp = new Employee();
+        emp.setId(1L);
+        emp.setUser(new User());
+        emp.setRemunerationType(RemunerationType.SALARIO_FIXO);
+
+        SalonService service = new SalonService();
+        service.setId(1L);
+        service.setPrice(new BigDecimal("100.00"));
+
+        Appointment apt = new Appointment();
+        apt.setId(5L);
+        apt.setEmployee(emp);
+        withService(apt, service);
+        withProduct(apt, new BigDecimal("30.00"), 2); // produto sem costPrice/capacity cadastrados
+        when(appointmentRepository.findById(5L)).thenReturn(java.util.Optional.of(apt));
+
+        AppointmentProfitResponse result = reportService.getAppointmentProfit(5L);
+
+        assertThat(result.productsSoldCost()).isEqualByComparingTo("0.00");
+        // receita = 100 (serviço) + 30×2 (produto) = 160; sem custo, sem comissão (Salário Fixo)
+        assertThat(result.grossRevenue()).isEqualByComparingTo("160.00");
+        assertThat(result.netProfit()).isEqualByComparingTo("160.00");
+    }
+
+    @Test
+    void getAppointmentProfit_whenEmployeeHasNoRemunerationType_shouldChargeNoCommission() {
+        // Funcionária cadastrada sem tipo de remuneração definido — não deve estourar NPE nem
+        // cobrar comissão indevida.
+        Employee emp = new Employee();
+        emp.setId(1L);
+        emp.setUser(new User());
+        emp.setRemunerationType(null);
+
+        SalonService service = new SalonService();
+        service.setId(1L);
+        service.setPrice(new BigDecimal("100.00"));
+        service.setCommissionPercent(new BigDecimal("10")); // % existe no serviço, mas ninguém recebe
+
+        Appointment apt = new Appointment();
+        apt.setId(5L);
+        apt.setEmployee(emp);
+        withService(apt, service);
+        when(appointmentRepository.findById(5L)).thenReturn(java.util.Optional.of(apt));
+
+        AppointmentProfitResponse result = reportService.getAppointmentProfit(5L);
+
+        assertThat(result.serviceCommissionCost()).isEqualByComparingTo("0.00");
+        assertThat(result.netProfit()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void getAppointmentProfit_whenMultipleServicesMixSnapshotAndLiveRecipeCost_shouldSumBoth() {
+        // Um serviço já congelado (V72) e outro antigo sem snapshot (cai no cálculo ao vivo) no
+        // mesmo agendamento — os dois precisam somar corretamente.
+        Employee emp = new Employee();
+        emp.setId(1L);
+        emp.setUser(new User());
+        emp.setRemunerationType(RemunerationType.SALARIO_FIXO);
+
+        SalonService serviceA = new SalonService();
+        serviceA.setId(1L);
+        serviceA.setPrice(new BigDecimal("100.00"));
+
+        SalonService serviceB = new SalonService();
+        serviceB.setId(2L);
+        serviceB.setPrice(new BigDecimal("50.00"));
+
+        var productForB = new com.cristiane.salon.models.product.entity.Product();
+        productForB.setId(20L);
+        productForB.setCostPrice(new BigDecimal("40.00"));
+        productForB.setCapacity(new BigDecimal("1000"));
+        var usageForB = new com.cristiane.salon.models.service.entity.SalonServiceProductUsage();
+        usageForB.setSalonService(serviceB);
+        usageForB.setProduct(productForB);
+        usageForB.setQuantityUsed(new BigDecimal("50")); // custo ao vivo = 40/1000 * 50 = 2.00
+        when(serviceProductUsageRepository.findBySalonServiceId(2L)).thenReturn(List.of(usageForB));
+
+        Appointment apt = new Appointment();
+        apt.setId(5L);
+        apt.setEmployee(emp);
+
+        var itemA = new com.cristiane.salon.models.appointment.entity.AppointmentServiceItem();
+        itemA.setAppointment(apt);
+        itemA.setSalonService(serviceA);
+        itemA.setSnapshotPrice(new BigDecimal("100.00"));
+        itemA.setSnapshotRecipeCost(new BigDecimal("6.00")); // congelado
+        apt.getServices().add(itemA);
+
+        var itemB = new com.cristiane.salon.models.appointment.entity.AppointmentServiceItem();
+        itemB.setAppointment(apt);
+        itemB.setSalonService(serviceB);
+        // sem snapshot -> cai no cálculo ao vivo (2.00)
+        apt.getServices().add(itemB);
+
+        when(appointmentRepository.findById(5L)).thenReturn(java.util.Optional.of(apt));
+
+        AppointmentProfitResponse result = reportService.getAppointmentProfit(5L);
+
+        assertThat(result.serviceRecipeCost()).isEqualByComparingTo("8.00"); // 6.00 + 2.00
+        assertThat(result.grossRevenue()).isEqualByComparingTo("150.00"); // 100 + 50
+    }
+
+    @Test
     void getAppointmentProfit_whenAppointmentNotFound_shouldThrowResourceNotFoundException() {
         when(appointmentRepository.findById(99L)).thenReturn(java.util.Optional.empty());
 
