@@ -82,7 +82,7 @@ class ReportControllerTest extends BaseControllerTest {
     @WithMockUser(roles = { "ADMIN" })
     void getEmployeeFinancialHistoryReturns200() throws Exception {
         AppointmentFinancialResponse response = new AppointmentFinancialResponse(
-                1L, null, null, "Corte", new BigDecimal("85.00"), "DONE", "PAID"
+                1L, null, null, null, null, "Corte", new BigDecimal("85.00"), "DONE", "PAID"
         );
         org.springframework.data.domain.Page<AppointmentFinancialResponse> page =
                 new org.springframework.data.domain.PageImpl<>(List.of(response));

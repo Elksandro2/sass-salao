@@ -99,6 +99,8 @@ export interface ServicePricingAnalysisResponse {
 export interface AppointmentFinancialResponse {
   id: number;
   scheduledAt: string | null;
+  scheduledDate?: string | null;
+  scheduledPeriod?: 'MORNING' | 'AFTERNOON' | null;
   preferredDate: string | null;
   serviceName: string;
   price: number | null;

@@ -1,10 +1,10 @@
 package com.cristiane.salon.models.appointment.dto;
 
+import com.cristiane.salon.models.appointment.enums.AppointmentPeriod;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 public record AppointmentRequest(
@@ -22,13 +22,19 @@ public record AppointmentRequest(
         List<AppointmentProductRequest> products,
 
         /**
-         * Obrigatório apenas no fluxo administrativo (agendamento com horário definido).
-         * No fluxo do cliente deve ser omitido/null — o salão confirma o horário depois.
+         * Obrigatórios apenas no fluxo administrativo (agendamento já marcado): dia + bloco.
+         * A equipe não crava mais hora exata — só manhã ou tarde. No fluxo do cliente devem ser
+         * omitidos/null — o salão define isso depois, ao aceitar o pedido.
          */
-        LocalDateTime scheduledAt,
+        LocalDate scheduledDate,
+        AppointmentPeriod scheduledPeriod,
 
         /** Cliente indica dia preferido (opcional). */
         LocalDate preferredDate,
+
+        /** Preferência de manhã/tarde do cliente pro dia acima (opcional, não vinculante — a
+         * equipe decide o período real ao aceitar o pedido). */
+        AppointmentPeriod preferredPeriod,
 
         /** Observações do cliente (opcional). */
         @Size(max = 1000, message = "As observações devem ter no máximo 1000 caracteres")

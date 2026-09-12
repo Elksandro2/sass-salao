@@ -415,7 +415,7 @@ public class ReportService {
 
     /** Mesma cadeia de fallback dos relatórios: scheduledAt > preferredDate > createdAt. */
     private LocalDate appointmentDate(Appointment a) {
-        if (a.getScheduledAt() != null) return a.getScheduledAt().toLocalDate();
+        if (a.isScheduled()) return a.getEffectiveScheduledDate();
         if (a.getPreferredDate() != null) return a.getPreferredDate();
         return a.getCreatedAt().atZone(salonClock.zone()).toLocalDate();
     }

@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.time.Instant;
 
@@ -55,7 +56,9 @@ public class AppointmentReminderService {
         LocalDateTime startOfDay = tomorrow.atStartOfDay();
         LocalDateTime endOfDay = tomorrow.plusDays(1).atStartOfDay();
 
-        List<Appointment> eligible = appointmentRepository.findConfirmedNotRemindedBetween(startOfDay, endOfDay);
+        List<Appointment> eligible = new ArrayList<>(
+                appointmentRepository.findConfirmedNotRemindedBetween(startOfDay, endOfDay));
+        eligible.addAll(appointmentRepository.findConfirmedNotRemindedOnDate(tomorrow));
         log.info("Lembrete de agendamento (D-1): {} agendamento(s) elegível(is) para {}", eligible.size(), tomorrow);
 
         for (Appointment appointment : eligible) {

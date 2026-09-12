@@ -1,6 +1,8 @@
 import api from '../../../services/api';
 import { normalizePage, type SpringPageResponse } from '../../../utils/pagination';
+import type { AppointmentPeriod } from '../../../utils/appointmentPeriod';
 export type { PageResponse } from '../../../utils/pagination';
+export type { AppointmentPeriod };
 
 export interface AppointmentServiceRequestItem {
   serviceId: number;
@@ -28,10 +30,12 @@ export interface AppointmentRequestBody {
   services: AppointmentServiceRequestItem[];
   /** Produtos vendidos junto do atendimento (só tem efeito no fluxo admin). */
   products?: AppointmentProductRequestItem[];
-  /** Fluxo admin: horário já definido */
-  scheduledAt?: string | null;
-  /** Fluxo cliente: dia preferido */
+  /** Fluxo admin: dia + período (manhã/tarde) já definidos pela equipe. */
+  scheduledDate?: string | null;
+  scheduledPeriod?: AppointmentPeriod | null;
+  /** Fluxo cliente: dia preferido e, opcionalmente, período preferido (não vinculante). */
   preferredDate?: string | null;
+  preferredPeriod?: AppointmentPeriod | null;
   clientNotes?: string | null;
   clientId?: number;
   /** Observação interna da equipe (opcional) — mesmo campo editável depois via updateInternalNotes. */
@@ -78,8 +82,14 @@ export interface AppointmentResponse {
   totalProductsPrice?: number | null;
   totalExpensesAmount?: number | null;
   grandTotal?: number | null;
+  /** Legado: hora exata (agendamentos criados antes do modelo manhã/tarde). */
   scheduledAt: string | null;
+  /** Atual: dia + período (manhã/tarde) definidos pela equipe — alternativa a scheduledAt. */
+  scheduledDate?: string | null;
+  scheduledPeriod?: AppointmentPeriod | null;
   preferredDate?: string | null;
+  /** Preferência de período do cliente pro preferredDate — não vinculante. */
+  preferredPeriod?: AppointmentPeriod | null;
   clientNotes?: string | null;
   internalNotes?: string | null;
   status: string;
@@ -95,9 +105,11 @@ interface AppointmentCreatePayload {
   employeeId: number;
   services: AppointmentServiceRequestItem[];
   products?: AppointmentProductRequestItem[];
-  scheduledAt?: string | null;
+  scheduledDate?: string | null;
+  scheduledPeriod?: AppointmentPeriod | null;
   clientId?: number | null;
   preferredDate?: string | null;
+  preferredPeriod?: AppointmentPeriod | null;
   clientNotes?: string | null;
   internalNotes?: string | null;
 }
@@ -125,14 +137,20 @@ function buildCreatePayload(request: AppointmentRequestBody): AppointmentCreateP
       return item;
     });
   }
-  if (request.scheduledAt != null && String(request.scheduledAt).trim() !== '') {
-    body.scheduledAt = request.scheduledAt;
+  if (request.scheduledDate != null && String(request.scheduledDate).trim() !== '') {
+    body.scheduledDate = request.scheduledDate;
+  }
+  if (request.scheduledPeriod != null) {
+    body.scheduledPeriod = request.scheduledPeriod;
   }
   if (request.clientId != null) {
     body.clientId = request.clientId;
   }
   if (request.preferredDate != null && String(request.preferredDate).trim() !== '') {
     body.preferredDate = request.preferredDate;
+  }
+  if (request.preferredPeriod != null) {
+    body.preferredPeriod = request.preferredPeriod;
   }
   if (request.clientNotes != null && request.clientNotes.trim() !== '') {
     body.clientNotes = request.clientNotes.trim();
@@ -167,9 +185,10 @@ export const appointmentsApi = {
     return data;
   },
 
-  confirm: async (id: number, scheduledAtIso: string) => {
+  confirm: async (id: number, scheduledDate: string, scheduledPeriod: AppointmentPeriod) => {
     const { data } = await api.patch<AppointmentResponse>(`/appointments/${id}/confirm`, {
-      scheduledAt: scheduledAtIso,
+      scheduledDate,
+      scheduledPeriod,
     });
     return data;
   },

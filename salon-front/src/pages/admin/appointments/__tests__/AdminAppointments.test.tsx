@@ -316,7 +316,7 @@ describe('AdminAppointments Component', () => {
     expect(appointmentsApi.cancel).toHaveBeenCalledWith(2);
   });
 
-  it('allows defining date and time to confirm a requested appointment', async () => {
+  it('allows defining date and period to confirm a requested appointment', async () => {
     vi.mocked(appointmentsApi.confirm).mockResolvedValue({} as any);
 
     await act(async () => {
@@ -328,18 +328,19 @@ describe('AdminAppointments Component', () => {
 
     fireEvent.click(defineTimeBtn);
 
-    // Confirm Modal for Date/Time should open
+    // Confirm Modal for Date/Period should open
     expect(screen.getByText('Confirmar horário')).toBeInTheDocument();
 
-    const dateTimeInput = screen.getByLabelText('Data e hora');
-    fireEvent.change(dateTimeInput, { target: { value: '2026-06-26T10:00' } });
+    const dateInput = screen.getByLabelText('Data');
+    fireEvent.change(dateInput, { target: { value: '2026-06-26' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Manhã' }));
 
     const submitBtn = screen.getByRole('button', { name: 'Confirmar solicitação' });
     await act(async () => {
       fireEvent.click(submitBtn);
     });
 
-    expect(appointmentsApi.confirm).toHaveBeenCalledWith(2, '2026-06-26T10:00:00');
+    expect(appointmentsApi.confirm).toHaveBeenCalledWith(2, '2026-06-26', 'MORNING');
   });
 
   it('creates an appointment with multiple selected services', async () => {
@@ -362,8 +363,9 @@ describe('AdminAppointments Component', () => {
     fireEvent.change(employeeInput, { target: { value: 'Mariana' } });
     fireEvent.click(screen.getByRole('button', { name: 'Mariana' }));
 
-    const dateTimeInput = screen.getByLabelText(/Data e hora/i);
-    fireEvent.change(dateTimeInput, { target: { value: '2026-07-01T09:00' } });
+    const dateInput = screen.getByLabelText(/^Data$/i);
+    fireEvent.change(dateInput, { target: { value: '2026-07-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Manhã' }));
 
     const submitBtn = screen.getByRole('button', { name: 'Criar Agendamento' });
     await act(async () => {
@@ -374,7 +376,8 @@ describe('AdminAppointments Component', () => {
       expect.objectContaining({
         clientId: 5,
         employeeId: 10,
-        scheduledAt: '2026-07-01T09:00:00',
+        scheduledDate: '2026-07-01',
+        scheduledPeriod: 'MORNING',
         services: expect.arrayContaining([
           expect.objectContaining({ serviceId: 100 }),
           expect.objectContaining({ serviceId: 101 }),

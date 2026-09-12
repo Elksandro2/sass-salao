@@ -148,15 +148,24 @@ public class RecommendationService {
         );
     }
 
+    // Bloco (scheduledDate/scheduledPeriod) não tem hora real, então usa início do dia — só
+    // serve para saber "há quantos dias sem agendar", não a hora exata da última visita.
+    private static LocalDateTime recommendationEffectiveDate(AppointmentResponse a) {
+        if (a.scheduledAt() != null) return a.scheduledAt();
+        if (a.scheduledDate() != null) return a.scheduledDate().atStartOfDay();
+        return null;
+    }
+
     private String buildRetencaoPrompt() {
         List<AppointmentResponse> appointments = appointmentService.findAllInternal();
         LocalDateTime now = salonClock.now();
 
         Map<String, LocalDateTime> lastVisitByClient = appointments.stream()
-                .filter(a -> a.scheduledAt() != null && ("DONE".equals(a.status()) || "CONFIRMED".equals(a.status())))
+                .filter(a -> ("DONE".equals(a.status()) || "CONFIRMED".equals(a.status()))
+                        && recommendationEffectiveDate(a) != null)
                 .collect(Collectors.toMap(
                         AppointmentResponse::clientName,
-                        AppointmentResponse::scheduledAt,
+                        RecommendationService::recommendationEffectiveDate,
                         (a, b) -> a.isAfter(b) ? a : b
                 ));
 

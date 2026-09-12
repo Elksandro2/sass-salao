@@ -45,11 +45,11 @@ public class AppointmentController {
     @PatchMapping("/{id}/confirm")
     @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
     @Auditable(action = "APPOINTMENT_CONFIRMED", entityType = "Appointment", captureArgs = true)
-    @Operation(summary = "Confirma solicitação do cliente definindo data e hora")
+    @Operation(summary = "Confirma solicitação do cliente definindo dia e período (manhã/tarde)")
     public ResponseEntity<AppointmentResponse> confirm(
             @PathVariable Long id,
             @Valid @RequestBody ConfirmAppointmentRequest body) {
-        return ResponseEntity.ok(appointmentService.confirm(id, body.scheduledAt()));
+        return ResponseEntity.ok(appointmentService.confirm(id, body.scheduledDate(), body.scheduledPeriod()));
     }
 
     @PatchMapping("/{id}/internal-notes")

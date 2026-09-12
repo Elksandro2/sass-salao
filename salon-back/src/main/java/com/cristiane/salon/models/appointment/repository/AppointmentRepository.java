@@ -25,13 +25,30 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long>,
     @Query("SELECT MAX(a.scheduledAt) FROM Appointment a WHERE a.client.id = :clientId")
     LocalDateTime findLastAppointmentDateByClientId(@Param("clientId") Long clientId);
 
+    // Complementa findLastAppointmentDateByClientId para agendamentos por bloco (manhã/tarde),
+    // que não têm scheduledAt — combinados em UserService pra achar a última visita real.
+    @Query("SELECT MAX(a.scheduledDate) FROM Appointment a WHERE a.client.id = :clientId")
+    LocalDate findLastScheduledDateByClientId(@Param("clientId") Long clientId);
+
+    // Lembrete D-1 para agendamentos por bloco (manhã/tarde) — scheduledDate é LocalDate puro,
+    // então comparar direto com o dia de amanhã, sem faixa de horário.
+    @Query("SELECT a FROM Appointment a WHERE a.status = 'CONFIRMED' AND a.remindedAt IS NULL "
+            + "AND a.scheduledAt IS NULL AND a.scheduledDate = :date")
+    List<Appointment> findConfirmedNotRemindedOnDate(@Param("date") LocalDate date);
+
     // CAST(:from/:to AS timestamp) na checagem IS NULL não é frescura — sem ele, o Postgres
     // não consegue inferir o tipo do parâmetro (ele aparece "nu", só num "? is null", sem
     // nenhum outro contexto de tipo) e a query quebra com "could not determine data type
     // of parameter $N" toda vez que from/to vêm nulos (bug real encontrado em produção).
     @Query("SELECT a FROM Appointment a WHERE a.employee.id = :employeeId "
-            + "AND (CAST(:from AS timestamp) IS NULL OR a.scheduledAt >= :from) "
-            + "AND (CAST(:to AS timestamp) IS NULL OR a.scheduledAt <= :to)")
+            + "AND ("
+            + "  (a.scheduledAt IS NOT NULL "
+            + "    AND (CAST(:from AS timestamp) IS NULL OR a.scheduledAt >= :from) "
+            + "    AND (CAST(:to AS timestamp) IS NULL OR a.scheduledAt <= :to))"
+            + "  OR (a.scheduledAt IS NULL AND a.scheduledDate IS NOT NULL "
+            + "    AND (CAST(:from AS timestamp) IS NULL OR a.scheduledDate >= CAST(:from AS date)) "
+            + "    AND (CAST(:to AS timestamp) IS NULL OR a.scheduledDate <= CAST(:to AS date)))"
+            + ")")
     Page<Appointment> findByEmployeeIdForFinancialHistory(
             @Param("employeeId") Long employeeId,
             @Param("from") LocalDateTime from,
@@ -48,8 +65,9 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long>,
     // quem chama converte o mesmo intervalo para as três representações usando o fuso do salão.
     @Query("SELECT a FROM Appointment a WHERE "
             + "(a.scheduledAt IS NOT NULL AND a.scheduledAt BETWEEN :startOfDay AND :endOfDay) "
-            + "OR (a.scheduledAt IS NULL AND a.preferredDate IS NOT NULL AND a.preferredDate BETWEEN :from AND :to) "
-            + "OR (a.scheduledAt IS NULL AND a.preferredDate IS NULL AND a.createdAt IS NOT NULL AND a.createdAt BETWEEN :startInstant AND :endInstant)")
+            + "OR (a.scheduledAt IS NULL AND a.scheduledDate IS NOT NULL AND a.scheduledDate BETWEEN :from AND :to) "
+            + "OR (a.scheduledAt IS NULL AND a.scheduledDate IS NULL AND a.preferredDate IS NOT NULL AND a.preferredDate BETWEEN :from AND :to) "
+            + "OR (a.scheduledAt IS NULL AND a.scheduledDate IS NULL AND a.preferredDate IS NULL AND a.createdAt IS NOT NULL AND a.createdAt BETWEEN :startInstant AND :endInstant)")
     List<Appointment> findAllInPeriod(
             @Param("from") LocalDate from,
             @Param("to") LocalDate to,

@@ -23,7 +23,8 @@ import { PixPaymentModal } from '../../../components/modal/PixPaymentModal';
 import { PermissionGate } from '../../../components/permissions/PermissionGate';
 import { SearchableSelect } from '../../../components/SearchableSelect';
 import { appointmentsApi } from '../../appointments/services/appointments';
-import type { AppointmentResponse } from '../../appointments/services/appointments';
+import type { AppointmentResponse, AppointmentPeriod } from '../../appointments/services/appointments';
+import { PERIOD_LABELS } from '../../../utils/appointmentPeriod';
 import { salonServicesApi } from '../../services/services/services';
 import type { SalonServiceData } from '../../services/services/services';
 import { productsApi } from '../products/services/products';
@@ -62,11 +63,6 @@ import {
 const selectCls = 'input-premium';
 const labelCls = 'label-premium';
 
-function toLocalDateTimeIso(dtLocal: string): string {
-  if (!dtLocal) return '';
-  return dtLocal.length === 16 ? `${dtLocal}:00` : dtLocal;
-}
-
 function formatServiceOption(s: SalonServiceData): string {
   const ref = s.price != null ? ` — a partir de R$ ${s.price.toFixed(2)}` : '';
   return `${s.name}${ref}`;
@@ -95,7 +91,8 @@ export const AdminAppointments = () => {
   const [productQuantities, setProductQuantities] = useState<Record<number, string>>({});
   const [internalNotes, setInternalNotes] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState('');
-  const [selectedDateTime, setSelectedDateTime] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedPeriod, setSelectedPeriod] = useState<AppointmentPeriod | ''>('');
   const [customizations, setCustomizations] = useState<Record<number, ServiceCustomizationValues>>({});
   const [detailTarget, setDetailTarget] = useState<AppointmentResponse | null>(null);
 
@@ -107,7 +104,8 @@ export const AdminAppointments = () => {
   const [isReopening, setIsReopening] = useState(false);
 
   const [confirmTarget, setConfirmTarget] = useState<AppointmentResponse | null>(null);
-  const [confirmDateTime, setConfirmDateTime] = useState('');
+  const [confirmDate, setConfirmDate] = useState('');
+  const [confirmPeriod, setConfirmPeriod] = useState<AppointmentPeriod | ''>('');
   const [confirmSaving, setConfirmSaving] = useState(false);
 
   const [showPixModal, setShowPixModal] = useState(false);
@@ -162,19 +160,19 @@ export const AdminAppointments = () => {
         20
       );
       const data = response.content;
-      data.sort((a, b) => {
-        const ta = a.scheduledAt
-          ? parseDate(a.scheduledAt)
-          : a.preferredDate
-            ? new Date(a.preferredDate + 'T12:00:00').getTime()
-            : 0;
-        const tb = b.scheduledAt
-          ? parseDate(b.scheduledAt)
-          : b.preferredDate
-            ? new Date(b.preferredDate + 'T12:00:00').getTime()
-            : 0;
-        return tb - ta;
-      });
+      // Sem hora exata no formato por bloco (manhã/tarde), a ordenação só pode ser por dia —
+      // dentro do mesmo dia, manhã vem antes de tarde, mas não há ordem entre atendimentos do
+      // mesmo dia+período (é a hairdresser quem decide a ordem real na hora).
+      const effectiveTime = (item: AppointmentResponse): number => {
+        if (item.scheduledAt) return parseDate(item.scheduledAt);
+        if (item.scheduledDate) {
+          const dayMs = new Date(item.scheduledDate + 'T12:00:00').getTime();
+          return dayMs + (item.scheduledPeriod === 'AFTERNOON' ? 1 : 0);
+        }
+        if (item.preferredDate) return new Date(item.preferredDate + 'T12:00:00').getTime();
+        return 0;
+      };
+      data.sort((a, b) => effectiveTime(b) - effectiveTime(a));
       setAppointments(data);
       setTotalPages(response.totalPages || 1);
     } catch (err) {
@@ -275,8 +273,8 @@ export const AdminAppointments = () => {
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedClient || selectedServiceIds.length === 0 || !selectedEmployee || !selectedDateTime) {
-      await showError('Preencha todos os campos, incluindo ao menos um serviço, data e hora');
+    if (!selectedClient || selectedServiceIds.length === 0 || !selectedEmployee || !selectedDate || !selectedPeriod) {
+      await showError('Preencha todos os campos, incluindo ao menos um serviço, data e período (manhã ou tarde)');
       return;
     }
     setIsSaving(true);
@@ -305,7 +303,8 @@ export const AdminAppointments = () => {
         services,
         products: productsPayload,
         employeeId: Number(selectedEmployee),
-        scheduledAt: toLocalDateTimeIso(selectedDateTime),
+        scheduledDate: selectedDate,
+        scheduledPeriod: selectedPeriod as AppointmentPeriod,
         internalNotes: internalNotes.trim() || null,
       });
       setShowModal(false);
@@ -318,7 +317,8 @@ export const AdminAppointments = () => {
       setProductQuantities({});
       setInternalNotes('');
       setSelectedEmployee('');
-      setSelectedDateTime('');
+      setSelectedDate('');
+      setSelectedPeriod('');
     } catch (error) {
       const msg = getApiErrorMessage(error, 'Erro ao criar agendamento');
       await showError(msg);
@@ -354,10 +354,10 @@ export const AdminAppointments = () => {
   };
 
   const submitConfirm = async () => {
-    if (!confirmTarget || !confirmDateTime) return;
+    if (!confirmTarget || !confirmDate || !confirmPeriod) return;
     setConfirmSaving(true);
     try {
-      await appointmentsApi.confirm(confirmTarget.id, toLocalDateTimeIso(confirmDateTime));
+      await appointmentsApi.confirm(confirmTarget.id, confirmDate, confirmPeriod);
       setConfirmTarget(null);
       loadAppointments();
     } catch (error) {
@@ -514,12 +514,18 @@ export const AdminAppointments = () => {
     {
       key: 'scheduledAt',
       label: 'Data / hora',
-      render: (item: AppointmentResponse) =>
-        item.scheduledAt
-          ? formatApiDateTime(item.scheduledAt)
-          : item.preferredDate
-            ? `Pref.: ${formatApiDate(item.preferredDate)} (a combinar)`
-            : 'A combinar',
+      render: (item: AppointmentResponse) => {
+        if (item.scheduledAt) return formatApiDateTime(item.scheduledAt);
+        if (item.scheduledDate) {
+          const period = item.scheduledPeriod ? PERIOD_LABELS[item.scheduledPeriod] : '';
+          return `${formatApiDate(item.scheduledDate)}${period ? ` — ${period}` : ''}`;
+        }
+        if (item.preferredDate) {
+          const period = item.preferredPeriod ? ` (pref. ${PERIOD_LABELS[item.preferredPeriod]})` : '';
+          return `Pref.: ${formatApiDate(item.preferredDate)}${period} (a combinar)`;
+        }
+        return 'A combinar';
+      },
     },
     { key: 'clientName', label: 'Cliente' },
     { key: 'employeeName', label: 'Profissional' },
@@ -575,7 +581,8 @@ export const AdminAppointments = () => {
                 <button
                   onClick={() => {
                     setConfirmTarget(item);
-                    setConfirmDateTime('');
+                    setConfirmDate('');
+                    setConfirmPeriod('');
                   }}
                   className="w-full text-center px-2.5 py-1.5 bg-[#be8a83] text-white hover:bg-[#a6726b] text-xs font-semibold rounded-lg transition-all cursor-pointer"
                 >
@@ -864,20 +871,42 @@ export const AdminAppointments = () => {
                     )}
                   </div>
                   <div>
-                    <label htmlFor="create-datetime" className={labelCls}>
+                    <label htmlFor="create-date" className={labelCls}>
                       <CalendarIcon size={14} className="inline mr-1" />
-                      Data e hora
+                      Data
                     </label>
                     <input
-                      id="create-datetime"
-                      type="datetime-local"
-                      value={selectedDateTime}
-                      onChange={(e) => setSelectedDateTime(e.target.value)}
+                      id="create-date"
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
                       required
                       className={selectCls}
                     />
+                  </div>
+                  <div>
+                    <label className={labelCls}>
+                      <Clock size={14} className="inline mr-1" />
+                      Período
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['MORNING', 'AFTERNOON'] as const).map((period) => (
+                        <button
+                          key={period}
+                          type="button"
+                          onClick={() => setSelectedPeriod(period)}
+                          className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all cursor-pointer ${
+                            selectedPeriod === period
+                              ? 'bg-[#be8a83] border-[#be8a83] text-white'
+                              : 'bg-white border-[#eae1e1] text-[#3b3036] hover:border-[#be8a83]/50'
+                          }`}
+                        >
+                          {PERIOD_LABELS[period]}
+                        </button>
+                      ))}
+                    </div>
                     <p className="text-xs text-gray-400 mt-1">
-                      Horário livre — sem grade fixa no sistema.
+                      Sem hora exata — só manhã ou tarde. Quem organiza a ordem dentro do período é a equipe.
                     </p>
                   </div>
                 </div>
@@ -1039,18 +1068,37 @@ export const AdminAppointments = () => {
             </div>
             <div className="p-6 space-y-4">
               <p className="text-xs text-gray-500 leading-relaxed">
-                Defina data e hora para <strong>{confirmTarget.clientName}</strong>. Conflitos com
-                outros agendamentos confirmados do mesmo profissional serão bloqueados.
+                Defina o dia e o período (manhã ou tarde) para <strong>{confirmTarget.clientName}</strong>.
+                Sem hora exata — quem organiza a ordem dentro do período é a equipe.
               </p>
               <div>
-                <label htmlFor="confirm-datetime" className={labelCls}>Data e hora</label>
+                <label htmlFor="confirm-date" className={labelCls}>Data</label>
                 <input
-                  id="confirm-datetime"
-                  type="datetime-local"
-                  value={confirmDateTime}
-                  onChange={(e) => setConfirmDateTime(e.target.value)}
+                  id="confirm-date"
+                  type="date"
+                  value={confirmDate}
+                  onChange={(e) => setConfirmDate(e.target.value)}
                   className={selectCls}
                 />
+              </div>
+              <div>
+                <label className={labelCls}>Período</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['MORNING', 'AFTERNOON'] as const).map((period) => (
+                    <button
+                      key={period}
+                      type="button"
+                      onClick={() => setConfirmPeriod(period)}
+                      className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all cursor-pointer ${
+                        confirmPeriod === period
+                          ? 'bg-[#be8a83] border-[#be8a83] text-white'
+                          : 'bg-white border-[#eae1e1] text-[#3b3036] hover:border-[#be8a83]/50'
+                      }`}
+                    >
+                      {PERIOD_LABELS[period]}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-[#eae1e1] bg-[#fcf9f9]/50">
@@ -1064,7 +1112,7 @@ export const AdminAppointments = () => {
               </button>
               <button
                 onClick={submitConfirm}
-                disabled={confirmSaving || !confirmDateTime}
+                disabled={confirmSaving || !confirmDate || !confirmPeriod}
                 className="px-5 py-2.5 bg-[#be8a83] text-white hover:bg-[#a6726b] font-semibold text-sm rounded-xl transition-all shadow-md shadow-[#be8a83]/10 disabled:opacity-50"
               >
                 {confirmSaving ? 'Salvando...' : 'Confirmar solicitação'}

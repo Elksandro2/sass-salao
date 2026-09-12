@@ -4,6 +4,7 @@ import { reportsApi } from './services/reports';
 import type { AppointmentFinancialResponse, EmployeeFinanceResponse } from './services/reports';
 import { useAlert } from '../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../utils/apiError';
+import { PERIOD_LABELS } from '../../../utils/appointmentPeriod';
 
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
@@ -24,9 +25,13 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
 };
 
 function formatDate(item: AppointmentFinancialResponse): string {
-  const raw = item.scheduledAt || item.preferredDate;
-  if (!raw) return '—';
-  return new Date(raw).toLocaleDateString('pt-BR');
+  if (item.scheduledAt) return new Date(item.scheduledAt).toLocaleDateString('pt-BR');
+  if (item.scheduledDate) {
+    const period = item.scheduledPeriod ? ` — ${PERIOD_LABELS[item.scheduledPeriod]}` : '';
+    return `${new Date(item.scheduledDate + 'T12:00:00').toLocaleDateString('pt-BR')}${period}`;
+  }
+  if (item.preferredDate) return new Date(item.preferredDate + 'T12:00:00').toLocaleDateString('pt-BR');
+  return '—';
 }
 
 function formatBRL(value: number | null): string {

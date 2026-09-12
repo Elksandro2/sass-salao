@@ -68,11 +68,11 @@ class AppointmentControllerTest extends BaseControllerTest {
                 List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
                 null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", null, null, null, null, false, ""
+                LocalDateTime.now(), null, null, LocalDate.now(), null, "Notes", null, "CONFIRMED", null, null, null, null, false, ""
         );
-        when(appointmentService.confirm(eq(1L), any())).thenReturn(response);
+        when(appointmentService.confirm(eq(1L), any(), any())).thenReturn(response);
 
-        String body = "{\"scheduledAt\":\"2026-06-16T10:00:00\"}";
+        String body = "{\"scheduledDate\":\"2026-06-16\",\"scheduledPeriod\":\"MORNING\"}";
 
         mvc.perform(patch("/v1/appointments/1/confirm")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -89,7 +89,7 @@ class AppointmentControllerTest extends BaseControllerTest {
                 List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
                 null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "DECLINED", null, null, null, null, false, ""
+                LocalDateTime.now(), null, null, LocalDate.now(), null, "Notes", null, "DECLINED", null, null, null, null, false, ""
         );
         when(appointmentService.decline(eq(1L))).thenReturn(response);
 
@@ -107,7 +107,7 @@ class AppointmentControllerTest extends BaseControllerTest {
                 List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
                 null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "REQUESTED", null, null, null, null, false, ""
+                LocalDateTime.now(), null, null, LocalDate.now(), null, "Notes", null, "REQUESTED", null, null, null, null, false, ""
         );
         when(appointmentService.getMyAppointments()).thenReturn(List.of(response));
 
@@ -125,7 +125,7 @@ class AppointmentControllerTest extends BaseControllerTest {
                 List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
                 null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", null, null, null, null, false, ""
+                LocalDateTime.now(), null, null, LocalDate.now(), null, "Notes", null, "CONFIRMED", null, null, null, null, false, ""
         );
         org.springframework.data.domain.Page<AppointmentResponse> page =
                 new org.springframework.data.domain.PageImpl<>(List.of(response));
@@ -145,7 +145,7 @@ class AppointmentControllerTest extends BaseControllerTest {
                 List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
                 null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CANCELLED", null, null, null, null, false, ""
+                LocalDateTime.now(), null, null, LocalDate.now(), null, "Notes", null, "CANCELLED", null, null, null, null, false, ""
         );
         when(appointmentService.cancel(eq(1L))).thenReturn(response);
 
@@ -163,7 +163,7 @@ class AppointmentControllerTest extends BaseControllerTest {
                 List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
                 null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", null, null, null, null, false, ""
+                LocalDateTime.now(), null, null, LocalDate.now(), null, "Notes", null, "CONFIRMED", null, null, null, null, false, ""
         );
         when(appointmentService.reopen(eq(1L))).thenReturn(response);
 
@@ -181,7 +181,7 @@ class AppointmentControllerTest extends BaseControllerTest {
                 List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
                 null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "DONE", null, null, null, null, false, ""
+                LocalDateTime.now(), null, null, LocalDate.now(), null, "Notes", null, "DONE", null, null, null, null, false, ""
         );
         when(appointmentService.updateStatus(eq(1L), eq("DONE"))).thenReturn(response);
 
@@ -200,7 +200,7 @@ class AppointmentControllerTest extends BaseControllerTest {
                 List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
                 null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", "PAID", null, null, null, false, ""
+                LocalDateTime.now(), null, null, LocalDate.now(), null, "Notes", null, "CONFIRMED", "PAID", null, null, null, false, ""
         );
         when(appointmentService.updatePaymentStatus(eq(1L), eq("PAID"), eq(null))).thenReturn(response);
 
@@ -219,7 +219,7 @@ class AppointmentControllerTest extends BaseControllerTest {
                 List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
                 List.of(), List.of(),
                 null, null, null, null,
-                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", null, null, null, null, false, ""
+                LocalDateTime.now(), null, null, LocalDate.now(), null, "Notes", null, "CONFIRMED", null, null, null, null, false, ""
         );
         when(appointmentService.findById(1L)).thenReturn(response);
 

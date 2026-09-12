@@ -18,6 +18,7 @@ import com.cristiane.salon.models.appointment.entity.Appointment;
 import com.cristiane.salon.models.appointment.entity.AppointmentExpenseItem;
 import com.cristiane.salon.models.appointment.entity.AppointmentProductItem;
 import com.cristiane.salon.models.appointment.entity.AppointmentServiceItem;
+import com.cristiane.salon.models.appointment.enums.AppointmentPeriod;
 import com.cristiane.salon.models.appointment.enums.AppointmentStatus;
 import com.cristiane.salon.models.appointment.enums.ExpenseValueType;
 import com.cristiane.salon.models.appointment.enums.PaymentMethod;
@@ -211,15 +212,16 @@ public class AppointmentService {
         }
 
         if (staffCreatesForClient) {
-            if (request.scheduledAt() == null) {
-                throw new BadRequestException("Informe data e hora do agendamento");
+            if (request.scheduledDate() == null || request.scheduledPeriod() == null) {
+                throw new BadRequestException("Informe a data e o período (manhã ou tarde) do agendamento");
             }
             // Equipe pode cadastrar agendamento com data passada — é o único jeito de trazer
             // histórico antigo (de fora do sistema) pra dentro, pros relatórios financeiros
             // baterem com a realidade. Nasce direto como DONE (já aconteceu, então já entra no
             // faturamento do período certo — ver billAppointmentOnce), mas o pagamento fica em
             // aberto (PENDING) por padrão: quem cadastrou decide separadamente se/como foi pago.
-            boolean isHistorical = request.scheduledAt().isBefore(salonClock.now());
+            // Sem hora exata (só manhã/tarde), a comparação é por dia — hoje nunca é histórico.
+            boolean isHistorical = request.scheduledDate().isBefore(salonClock.today());
 
             for (AppointmentServiceRequest sr : serviceRequests) {
                 if (sr.customPrice() != null && sr.customPrice().compareTo(BigDecimal.ZERO) < 0) {
@@ -234,8 +236,10 @@ public class AppointmentService {
             Appointment appointment = new Appointment();
             appointment.setClient(client);
             appointment.setEmployee(employee);
-            appointment.setScheduledAt(request.scheduledAt());
+            appointment.setScheduledDate(request.scheduledDate());
+            appointment.setScheduledPeriod(request.scheduledPeriod());
             appointment.setPreferredDate(request.preferredDate());
+            appointment.setPreferredPeriod(request.preferredPeriod());
             appointment.setClientNotes(request.clientNotes());
             appointment.setInternalNotes(request.internalNotes());
             appointment.setStatus(isHistorical ? AppointmentStatus.DONE : AppointmentStatus.CONFIRMED);
@@ -260,8 +264,8 @@ public class AppointmentService {
             return AppointmentResponse.fromEntity(saved);
         }
 
-        if (request.scheduledAt() != null) {
-            throw new BadRequestException("O horário será definido pelo salão após aceitar seu pedido");
+        if (request.scheduledDate() != null || request.scheduledPeriod() != null) {
+            throw new BadRequestException("O período será definido pelo salão após aceitar seu pedido");
         }
 
         if (request.preferredDate() != null && request.preferredDate().isBefore(salonClock.today())) {
@@ -283,6 +287,7 @@ public class AppointmentService {
         appointment.setClient(client);
         appointment.setEmployee(employee);
         appointment.setPreferredDate(request.preferredDate());
+        appointment.setPreferredPeriod(request.preferredPeriod());
         appointment.setClientNotes(notes);
         appointment.setStatus(AppointmentStatus.REQUESTED);
         appointment.setSnapshotProductCommissionPercent(businessSettingsService.getProductCommissionPercent());
@@ -484,20 +489,21 @@ public class AppointmentService {
     }
 
     @Transactional
-    public AppointmentResponse confirm(Long id, LocalDateTime scheduledAt) {
+    public AppointmentResponse confirm(Long id, LocalDate scheduledDate, AppointmentPeriod scheduledPeriod) {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
-        assertCanManage(appointment, "definir o horário de");
+        assertCanManage(appointment, "definir o período de");
 
         if (appointment.getStatus() != AppointmentStatus.REQUESTED) {
             throw new BadRequestException("Apenas solicitações pendentes de confirmação podem ser aprovadas");
         }
 
-        if (scheduledAt.isBefore(salonClock.now())) {
-            throw new BadRequestException("Não é possível confirmar um horário no passado");
+        if (scheduledDate.isBefore(salonClock.today())) {
+            throw new BadRequestException("Não é possível confirmar um período no passado");
         }
 
-        appointment.setScheduledAt(scheduledAt);
+        appointment.setScheduledDate(scheduledDate);
+        appointment.setScheduledPeriod(scheduledPeriod);
         appointment.setStatus(AppointmentStatus.CONFIRMED);
 
         Appointment saved = appointmentRepository.save(appointment);
@@ -768,7 +774,7 @@ public class AppointmentService {
             throw new BadRequestException("Só é possível reabrir um agendamento cancelado");
         }
 
-        AppointmentStatus restored = appointment.getScheduledAt() != null
+        AppointmentStatus restored = appointment.isScheduled()
                 ? AppointmentStatus.CONFIRMED
                 : AppointmentStatus.REQUESTED;
         appointment.setStatus(restored);
@@ -800,8 +806,8 @@ public class AppointmentService {
                 throw new BadRequestException("Status inválido para esta operação");
             }
             if ((status == AppointmentStatus.CONFIRMED || status == AppointmentStatus.DONE)
-                    && appointment.getScheduledAt() == null) {
-                throw new BadRequestException("É necessário ter data e hora definidas neste agendamento");
+                    && !appointment.isScheduled()) {
+                throw new BadRequestException("É necessário ter data e período definidos neste agendamento");
             }
 
             // Guard clause desacoplado: bloqueia alterações de status para não-DONE quando o pagamento está finalizado.
@@ -910,8 +916,8 @@ public class AppointmentService {
             // Data do próprio atendimento, não "hoje" — essencial pro cadastro de agendamento
             // histórico (data passada) cair no período certo do relatório financeiro, em vez de
             // aparecer no relatório de hoje só porque foi quando alguém deu baixa no sistema.
-            cashFlow.setDate(appointment.getScheduledAt() != null
-                    ? appointment.getScheduledAt().toLocalDate()
+            cashFlow.setDate(appointment.getEffectiveScheduledDate() != null
+                    ? appointment.getEffectiveScheduledDate()
                     : salonClock.today());
             cashFlow.setAppointment(appointment);
             cashFlowRepository.save(cashFlow);

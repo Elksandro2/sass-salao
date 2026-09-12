@@ -1,6 +1,7 @@
 package com.cristiane.salon.models.appointment.dto;
 
 import com.cristiane.salon.models.appointment.entity.Appointment;
+import com.cristiane.salon.models.appointment.enums.AppointmentPeriod;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -22,7 +23,10 @@ public record AppointmentResponse(
         BigDecimal totalExpensesAmount,
         BigDecimal grandTotal,
         LocalDateTime scheduledAt,
+        LocalDate scheduledDate,
+        AppointmentPeriod scheduledPeriod,
         LocalDate preferredDate,
+        AppointmentPeriod preferredPeriod,
         String clientNotes,
         String internalNotes,
         String status,
@@ -73,7 +77,10 @@ public record AppointmentResponse(
                 appointment.getTotalExpensesAmount(),
                 appointment.getGrandTotal(),
                 appointment.getScheduledAt(),
+                appointment.getScheduledDate(),
+                appointment.getScheduledPeriod(),
                 appointment.getPreferredDate(),
+                appointment.getPreferredPeriod(),
                 appointment.getClientNotes(),
                 appointment.getInternalNotes(),
                 appointment.getStatus().name(),

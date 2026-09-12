@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { appointmentsApi } from '../../../appointments/services/appointments';
 import type { AppointmentResponse } from '../../../appointments/services/appointments';
 import { formatApiDate, formatApiDateTime } from '../../../../utils/datetime';
+import { PERIOD_LABELS } from '../../../../utils/appointmentPeriod';
 import { PermissionGate } from '../../../../components/permissions/PermissionGate';
 import { useAlert } from '../../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../../utils/apiError';
@@ -87,6 +88,14 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
                   {formatApiDateTime(appointment.scheduledAt)}
                 </p>
               </div>
+            ) : appointment.scheduledDate ? (
+              <div>
+                <span className={labelCls}>Data e período</span>
+                <p className="text-[#3b3036] font-semibold">
+                  {formatApiDate(appointment.scheduledDate)}
+                  {appointment.scheduledPeriod ? ` — ${PERIOD_LABELS[appointment.scheduledPeriod]}` : ''}
+                </p>
+              </div>
             ) : (
               <div>
                 <span className={labelCls}>Data e hora</span>
@@ -96,7 +105,10 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
             {appointment.preferredDate && (
               <div>
                 <span className={labelCls}>Preferência do cliente</span>
-                <p className="text-[#3b3036]">{formatApiDate(appointment.preferredDate)}</p>
+                <p className="text-[#3b3036]">
+                  {formatApiDate(appointment.preferredDate)}
+                  {appointment.preferredPeriod ? ` (${PERIOD_LABELS[appointment.preferredPeriod]})` : ''}
+                </p>
               </div>
             )}
           </div>

@@ -1,5 +1,6 @@
 package com.cristiane.salon.models.appointment.entity;
 
+import com.cristiane.salon.models.appointment.enums.AppointmentPeriod;
 import com.cristiane.salon.models.appointment.enums.AppointmentStatus;
 import com.cristiane.salon.models.appointment.enums.PaymentMethod;
 import com.cristiane.salon.models.appointment.enums.PaymentStatus;
@@ -61,8 +62,31 @@ public class Appointment {
     @Column(name = "scheduled_at")
     private LocalDateTime scheduledAt;
 
+    /**
+     * Dia definido pela equipe quando ela agenda por bloco (manhã/tarde) em vez de hora exata —
+     * alternativa a {@link #scheduledAt}, nunca os dois preenchidos ao mesmo tempo. Todo
+     * agendamento criado antes desta coluna existir usa {@link #scheduledAt}; a equipe não
+     * cria mais agendamento com hora exata a partir daqui, só com {@link #scheduledDate} +
+     * {@link #scheduledPeriod}. Use {@link #isScheduled()}/{@link #getEffectiveScheduledDate()}
+     * em vez de checar estes dois campos direto — cobrem os dois formatos de uma vez.
+     */
+    @Column(name = "scheduled_date")
+    private LocalDate scheduledDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scheduled_period", length = 10)
+    private AppointmentPeriod scheduledPeriod;
+
     @Column(name = "preferred_date")
     private LocalDate preferredDate;
+
+    /**
+     * Preferência de manhã/tarde do cliente pro dia de {@link #preferredDate} — não vinculante,
+     * é só um chute de conveniência: quem decide o horário/bloco real é a equipe ao confirmar.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "preferred_period", length = 10)
+    private AppointmentPeriod preferredPeriod;
 
     @Column(name = "client_notes", columnDefinition = "TEXT")
     private String clientNotes;
@@ -115,6 +139,18 @@ public class Appointment {
      */
     @Column(name = "snapshot_product_commission_percent", precision = 5, scale = 2)
     private BigDecimal snapshotProductCommissionPercent;
+
+    /** Tem uma data (e, se for por bloco, um período) definidos — hora exata (legado) ou
+     * manhã/tarde (atual) — que autoriza confirmar/concluir o agendamento. */
+    public boolean isScheduled() {
+        return scheduledAt != null || (scheduledDate != null && scheduledPeriod != null);
+    }
+
+    /** O dia efetivamente marcado, seja pelo formato antigo (hora exata) ou pelo novo (bloco). */
+    public LocalDate getEffectiveScheduledDate() {
+        if (scheduledAt != null) return scheduledAt.toLocalDate();
+        return scheduledDate;
+    }
 
     public BigDecimal getTotalEffectivePrice() {
         return services.stream()

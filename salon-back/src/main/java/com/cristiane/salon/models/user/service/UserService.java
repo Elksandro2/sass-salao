@@ -30,6 +30,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -283,15 +284,25 @@ public class UserService {
 
         Long totalAppointments = appointmentRepository.countByClientId(id);
         LocalDateTime lastAppointmentDate = appointmentRepository.findLastAppointmentDateByClientId(id);
+        LocalDate lastScheduledDate = appointmentRepository.findLastScheduledDateByClientId(id);
+        if (lastScheduledDate != null) {
+            LocalDateTime lastScheduledDateTime = lastScheduledDate.atStartOfDay();
+            if (lastAppointmentDate == null || lastScheduledDateTime.isAfter(lastAppointmentDate)) {
+                lastAppointmentDate = lastScheduledDateTime;
+            }
+        }
 
         List<Appointment> appointments = appointmentRepository.findByClientId(id);
         List<AppointmentResponse> appointmentResponses = appointments.stream()
                 .sorted((a1, a2) -> {
-                    // createdAt é instante de máquina e scheduledAt é hora de parede do salão:
-                    // converter o primeiro antes de comparar, senão a ordenação erra por 3h nos
-                    // agendamentos que ainda não têm horário definido.
-                    LocalDateTime d1 = a1.getScheduledAt() != null ? a1.getScheduledAt() : salonClock.toLocalDateTime(a1.getCreatedAt());
-                    LocalDateTime d2 = a2.getScheduledAt() != null ? a2.getScheduledAt() : salonClock.toLocalDateTime(a2.getCreatedAt());
+                    // createdAt é instante de máquina e scheduledAt/scheduledDate são data/hora de
+                    // parede do salão: converter o primeiro antes de comparar, senão a ordenação
+                    // erra por 3h nos agendamentos que ainda não têm horário/bloco definido. Bloco
+                    // (scheduledDate) não tem hora, então usa início do dia — só serve para ordenar
+                    // dias diferentes; entre agendamentos do mesmo dia+período a ordem é irrelevante
+                    // (ver decisão do usuário sobre agendamentos por bloco).
+                    LocalDateTime d1 = effectiveSortDate(a1);
+                    LocalDateTime d2 = effectiveSortDate(a2);
                     if (d1 == null && d2 == null) return 0;
                     if (d1 == null) return 1;
                     if (d2 == null) return -1;
@@ -313,5 +324,13 @@ public class UserService {
                 lastAppointmentDate,
                 appointmentResponses
         );
+    }
+
+    // Ordena histórico do cliente por data efetiva: hora exata (legado) > bloco manhã/tarde
+    // (início do dia, sem hora real) > createdAt convertido para o fuso do salão.
+    private LocalDateTime effectiveSortDate(Appointment appointment) {
+        if (appointment.getScheduledAt() != null) return appointment.getScheduledAt();
+        if (appointment.getScheduledDate() != null) return appointment.getScheduledDate().atStartOfDay();
+        return salonClock.toLocalDateTime(appointment.getCreatedAt());
     }
 }

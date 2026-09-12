@@ -6,6 +6,7 @@ import type { AppointmentResponse } from '../../../appointments/services/appoint
 import { getApiErrorMessage } from '../../../../utils/apiError';
 import { useAlert } from '../../../../hooks/useAlert';
 import { maskCPF } from '../../../../utils/formatters';
+import { PERIOD_LABELS } from '../../../../utils/appointmentPeriod';
 import { ClientAnamnesisSection } from './ClientAnamnesisSection';
 import { AppointmentDetailModal } from '../../appointments/components/AppointmentDetailModal';
 
@@ -214,11 +215,13 @@ export function ClientDrawer({ isOpen, onClose, clientId }: ClientDrawerProps) {
                             <span>
                               {appt.scheduledAt
                                 ? new Date(appt.scheduledAt).toLocaleDateString('pt-BR')
-                                : appt.preferredDate
-                                  ? new Date(appt.preferredDate + 'T00:00:00').toLocaleDateString(
-                                      'pt-BR'
-                                    )
-                                  : 'Não definida'}
+                                : appt.scheduledDate
+                                  ? new Date(appt.scheduledDate + 'T00:00:00').toLocaleDateString('pt-BR')
+                                  : appt.preferredDate
+                                    ? new Date(appt.preferredDate + 'T00:00:00').toLocaleDateString(
+                                        'pt-BR'
+                                      )
+                                    : 'Não definida'}
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5 text-[#7a7074] dark:text-gray-400">
@@ -229,7 +232,9 @@ export function ClientDrawer({ isOpen, onClose, clientId }: ClientDrawerProps) {
                                     hour: '2-digit',
                                     minute: '2-digit',
                                   })
-                                : 'Horário pendente'}
+                                : appt.scheduledPeriod
+                                  ? PERIOD_LABELS[appt.scheduledPeriod]
+                                  : 'Horário pendente'}
                             </span>
                           </div>
                         </div>

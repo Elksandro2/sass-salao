@@ -7,6 +7,7 @@ import { useAlert } from '../../hooks/useAlert';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { CalendarX } from 'lucide-react';
 import { canCancel, canGeneratePix } from '../../utils/appointmentRules';
+import { PERIOD_LABELS } from '../../utils/appointmentPeriod';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 
 export const MyAppointments = () => {
@@ -34,6 +35,10 @@ export const MyAppointments = () => {
 
   const sortKey = (apt: AppointmentResponse): number => {
     if (apt.scheduledAt) return parseInstant(apt.scheduledAt);
+    if (apt.scheduledDate) {
+      const dayMs = new Date(apt.scheduledDate + 'T12:00:00').getTime();
+      return dayMs + (apt.scheduledPeriod === 'AFTERNOON' ? 1 : 0);
+    }
     if (apt.preferredDate) return new Date(apt.preferredDate + 'T12:00:00').getTime();
     return 0;
   };
@@ -203,6 +208,22 @@ export const MyAppointments = () => {
               {d.dayStr}
             </span>
             <span className="text-xs text-gray-400">{d.yearStr}</span>
+          </div>
+        </>
+      );
+    }
+    if (apt.scheduledDate) {
+      const d = new Date(apt.scheduledDate + 'T12:00:00');
+      return (
+        <>
+          <span className="text-base font-bold text-[#3b3036]">
+            {apt.scheduledPeriod ? PERIOD_LABELS[apt.scheduledPeriod] : '—'}
+          </span>
+          <div className="flex flex-col items-center mt-0.5">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#be8a83]">
+              {d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+            </span>
+            <span className="text-xs text-gray-400">{d.getFullYear()}</span>
           </div>
         </>
       );

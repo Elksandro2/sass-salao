@@ -22,6 +22,7 @@ import { getApiErrorMessage } from '../../utils/apiError';
 import { featureFlagsService } from '../../services/featureFlags';
 import { salonProfileService, DAY_LABELS } from '../../services/salonProfile';
 import type { DayOfWeek } from '../../services/salonProfile';
+import { PERIOD_LABELS, type AppointmentPeriod } from '../../utils/appointmentPeriod';
 
 const JS_DAY_TO_DAY_OF_WEEK: DayOfWeek[] = [
   'SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY',
@@ -53,6 +54,7 @@ export const PublicAppointment = () => {
   const [selectedServiceIds, setSelectedServiceIds] = useState<number[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<number | null>(null);
   const [preferredDate, setPreferredDate] = useState<string>('');
+  const [preferredPeriod, setPreferredPeriod] = useState<AppointmentPeriod | ''>('');
   const [clientNotes, setClientNotes] = useState<string>('');
 
   const [isLoading, setIsLoading] = useState(false);
@@ -72,11 +74,13 @@ export const PublicAppointment = () => {
           serviceIds?: number[];
           employeeId?: number;
           preferredDate?: string;
+          preferredPeriod?: AppointmentPeriod;
           clientNotes?: string;
         };
         if (p.serviceIds && p.serviceIds.length > 0) setSelectedServiceIds(p.serviceIds);
         if (p.employeeId) setSelectedEmployee(p.employeeId);
         if (p.preferredDate) setPreferredDate(p.preferredDate);
+        if (p.preferredPeriod) setPreferredPeriod(p.preferredPeriod);
         if (p.clientNotes) setClientNotes(p.clientNotes);
         if (p.serviceIds?.length && p.employeeId) setStep(4);
         else if (p.serviceIds?.length) setStep(2);
@@ -155,6 +159,7 @@ export const PublicAppointment = () => {
           serviceIds: selectedServiceIds,
           employeeId: selectedEmployee,
           preferredDate: preferredDate || undefined,
+          preferredPeriod: preferredPeriod || undefined,
           clientNotes: clientNotes || undefined,
         })
       );
@@ -168,6 +173,7 @@ export const PublicAppointment = () => {
         services: selectedServiceIds.map((serviceId) => ({ serviceId })),
         employeeId: selectedEmployee!,
         preferredDate: preferredDate || undefined,
+        preferredPeriod: preferredPeriod || undefined,
         clientNotes: clientNotes.trim() || undefined,
       });
       localStorage.removeItem('pending_appointment');
@@ -421,6 +427,30 @@ export const PublicAppointment = () => {
               )}
             </div>
             <div className="space-y-1.5">
+              <label className="flex items-center gap-2 text-xs font-semibold text-[#3b3036]/70 uppercase tracking-wider">
+                <Clock size={16} /> Período de preferência (opcional)
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {(['MORNING', 'AFTERNOON'] as const).map((period) => (
+                  <button
+                    key={period}
+                    type="button"
+                    onClick={() => setPreferredPeriod((prev) => (prev === period ? '' : period))}
+                    className={`px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
+                      preferredPeriod === period
+                        ? 'border-[#be8a83] bg-[#be8a83]/5 text-[#a6726b]'
+                        : 'border-gray-200 bg-white text-[#3b3036] hover:border-[#be8a83]/50'
+                    }`}
+                  >
+                    {PERIOD_LABELS[period]}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-[#3b3036]/50">
+                Só uma preferência — o salão decide o horário real ao confirmar.
+              </p>
+            </div>
+            <div className="space-y-1.5">
               <label
                 htmlFor="client-notes"
                 className="flex items-center gap-2 text-xs font-semibold text-[#3b3036]/70 uppercase tracking-wider"
@@ -465,6 +495,9 @@ export const PublicAppointment = () => {
                           value: new Date(preferredDate + 'T12:00:00').toLocaleDateString('pt-BR'),
                         },
                       ]
+                    : []),
+                  ...(preferredPeriod
+                    ? [{ label: 'Período de preferência', value: PERIOD_LABELS[preferredPeriod] }]
                     : []),
                   ...(clientNotes.trim()
                     ? [{ label: 'Observações', value: clientNotes.trim() }]
