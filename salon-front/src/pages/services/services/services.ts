@@ -1,17 +1,22 @@
 import api from '../../../services/api';
 import { normalizePage, type SpringPageResponse } from '../../../utils/pagination';
+import type { ProductUnitValue } from '../../../utils/productUnit';
 export type { PageResponse } from '../../../utils/pagination';
 
 export interface ServiceProductUsageRequest {
   productId: number;
   quantityUsed: number;
+  /** Unidade em que quantityUsed foi lançado — independente da unidade cadastrada no produto
+   * (ex.: produto embalado em Litro, receita consumindo em ml). Omitido = usa a do produto. */
+  unit?: ProductUnitValue | null;
 }
 
 export interface ServiceProductUsageResponse {
   productId: number;
   productName: string;
   quantityUsed: number;
-  unit: string | null;
+  /** Unidade da receita (não necessariamente a mesma cadastrada no produto). */
+  unit: ProductUnitValue | null;
   estimatedCost: number | null;
 }
 

@@ -34,3 +34,23 @@ export function productUnitLabel(unit: string | null | undefined): string {
   if (!unit) return '';
   return byLabel.get(unit as ProductUnitValue) ?? unit;
 }
+
+// Unidades da mesma grandeza — ML/L são volume, G/KG são massa, UNIDADE só combina com ela
+// mesma. Espelha ProductUnit.factorTo no backend: um valor só é convertível pro outro dentro
+// do mesmo grupo (ml pra g não faz sentido).
+const UNIT_FAMILIES: ProductUnitValue[][] = [
+  ['ML', 'L'],
+  ['G', 'KG'],
+  ['UNIDADE'],
+];
+
+/**
+ * Unidades que podem ser usadas numa receita para um produto cadastrado em `productUnit` — a
+ * própria unidade do produto sempre entra primeiro. Sem unidade cadastrada no produto, devolve
+ * a lista inteira (não há grandeza pra restringir contra).
+ */
+export function compatibleUnits(productUnit: string | null | undefined): ProductUnitValue[] {
+  if (!productUnit) return PRODUCT_UNITS.map((u) => u.value);
+  const family = UNIT_FAMILIES.find((f) => f.includes(productUnit as ProductUnitValue));
+  return family ?? [productUnit as ProductUnitValue];
+}

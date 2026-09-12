@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, act, customRender, waitFor } from '../../../../test/test-utils';
 import { AdminServices } from '../AdminServices';
 import { salonServicesApi } from '../../../services/services/services';
+import { productsApi } from '../../products/services/products';
 
 vi.mock('../../../services/services/services', () => ({
   salonServicesApi: {
@@ -10,6 +11,12 @@ vi.mock('../../../services/services/services', () => ({
     reactivate: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+  },
+}));
+
+vi.mock('../../products/services/products', () => ({
+  productsApi: {
+    findAll: vi.fn(),
   },
 }));
 
@@ -39,10 +46,22 @@ const mockPage = (content: typeof mockServices) => ({
   number: 0,
 });
 
+const mockProducts = [
+  { id: 10, name: 'Tintura', price: 50, costPrice: 40, capacity: 1, unit: 'L', unitCost: 40, usedInServiceRecipe: true },
+  { id: 11, name: 'Toalha', price: null, usedInServiceRecipe: true }, // sem unidade cadastrada
+];
+
 describe('AdminServices Page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(salonServicesApi.findAll).mockResolvedValue(mockPage(mockServices));
+    vi.mocked(productsApi.findAll).mockResolvedValue({
+      content: mockProducts,
+      totalPages: 1,
+      totalElements: mockProducts.length,
+      size: 1000,
+      number: 0,
+    } as never);
   });
 
   it('renders services and handles filter changes', async () => {
@@ -137,6 +156,86 @@ describe('AdminServices Page', () => {
     expect(salonServicesApi.delete).toHaveBeenCalledWith(1);
     await waitFor(() => {
       expect(salonServicesApi.findAll).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('Receita (opcional)', () => {
+    const openFormAndAddRow = async () => {
+      let rendered!: ReturnType<typeof customRender>;
+      await act(async () => {
+        rendered = customRender(<AdminServices />);
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Novo Serviço/i }));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Adicionar produto/i }));
+      });
+      return rendered;
+    };
+
+    it('finds the product through a single search+select field instead of a plain dropdown', async () => {
+      await openFormAndAddRow();
+
+      const productInput = screen.getByPlaceholderText('Buscar e selecionar o produto...');
+      fireEvent.change(productInput, { target: { value: 'Tintura' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Tintura' }));
+
+      expect(productInput).toHaveValue('Tintura');
+    });
+
+    it('defaults the recipe unit to the product\'s own unit, editable to a compatible one', async () => {
+      await openFormAndAddRow();
+
+      const productInput = screen.getByPlaceholderText('Buscar e selecionar o produto...');
+      fireEvent.change(productInput, { target: { value: 'Tintura' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Tintura' }));
+
+      // Tintura está cadastrada em Litro — a receita já sugere "L" por padrão...
+      const unitSelect = screen.getByRole('combobox', { name: 'Unidade da receita' }) as HTMLSelectElement;
+      const options = Array.from(unitSelect.options).map((o) => o.value);
+      // ...mas ML também é oferecido (mesma grandeza: volume), G/KG não (grandeza diferente).
+      expect(options).toEqual(expect.arrayContaining(['L', 'ML']));
+      expect(options).not.toEqual(expect.arrayContaining(['G', 'KG']));
+    });
+
+    it('warns when the product has no registered unit and the recipe unit was not chosen either', async () => {
+      await openFormAndAddRow();
+
+      const productInput = screen.getByPlaceholderText('Buscar e selecionar o produto...');
+      fireEvent.change(productInput, { target: { value: 'Toalha' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Toalha' }));
+
+      expect(
+        screen.getByText(/Defina a unidade \(ml\/g\/L…\) no cadastro deste produto/i)
+      ).toBeInTheDocument();
+    });
+
+    it('submits the recipe with the chosen product, quantity and unit', async () => {
+      vi.mocked(salonServicesApi.create).mockResolvedValue({} as never);
+      const { container } = await openFormAndAddRow();
+
+      const nameInput = container.querySelector('input[name="name"]') as HTMLInputElement;
+      fireEvent.change(nameInput, { target: { value: 'Coloração' } });
+
+      const productInput = screen.getByPlaceholderText('Buscar e selecionar o produto...');
+      fireEvent.change(productInput, { target: { value: 'Tintura' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Tintura' }));
+
+      fireEvent.change(screen.getByPlaceholderText('Quantidade consumida'), { target: { value: '30' } });
+
+      const unitSelect = screen.getByRole('combobox', { name: 'Unidade da receita' });
+      fireEvent.change(unitSelect, { target: { value: 'ML' } }); // troca de L (padrão) pra ml
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+      });
+
+      expect(salonServicesApi.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          productUsages: [{ productId: 10, quantityUsed: 30, unit: 'ML' }],
+        })
+      );
     });
   });
 });

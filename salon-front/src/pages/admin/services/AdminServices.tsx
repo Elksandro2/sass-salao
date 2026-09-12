@@ -19,7 +19,9 @@ import { salonServiceFormSchema } from './adminService.schema';
 import type { SalonServiceFormValues } from './adminService.schema';
 import { useAlert } from '../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../utils/apiError';
-import { productUnitSymbol } from '../../../utils/productUnit';
+import { productUnitSymbol, productUnitLabel, compatibleUnits } from '../../../utils/productUnit';
+import type { ProductUnitValue } from '../../../utils/productUnit';
+import { SearchableSelect } from '../../../components/SearchableSelect';
 
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
@@ -27,6 +29,8 @@ const labelCls = 'label-premium';
 interface UsageRow {
   productId: string;
   quantityUsed: string;
+  /** Unidade da receita — independente da unidade cadastrada no produto. */
+  unit: string;
 }
 
 export const AdminServices = () => {
@@ -75,6 +79,7 @@ export const AdminServices = () => {
         ((service.productUsages as ServiceProductUsageResponse[]) ?? []).map((u) => ({
           productId: String(u.productId),
           quantityUsed: String(u.quantityUsed),
+          unit: u.unit ?? '',
         }))
       );
     } else {
@@ -86,7 +91,7 @@ export const AdminServices = () => {
   };
 
   const addUsageRow = () => {
-    setUsageRows((prev) => [...prev, { productId: '', quantityUsed: '' }]);
+    setUsageRows((prev) => [...prev, { productId: '', quantityUsed: '', unit: '' }]);
   };
 
   const removeUsageRow = (index: number) => {
@@ -110,6 +115,7 @@ export const AdminServices = () => {
         productUsages: usageRows.map((r) => ({
           productId: Number(r.productId),
           quantityUsed: Number(r.quantityUsed),
+          unit: (r.unit || null) as ProductUnitValue | null,
         })),
       };
       if (editingService?.id) {
@@ -339,37 +345,47 @@ export const AdminServices = () => {
             <div className="space-y-3">
               {usageRows.map((row, index) => {
                 const product = products.find((p) => String(p.id) === row.productId);
+                const unitOptions = compatibleUnits(product?.unit);
                 return (
                   <div key={index} className="flex flex-col gap-2 p-2.5 bg-[#fcf9f9]/50 border border-[#eae1e1]/60 rounded-lg">
-                    <select
-                      className={`${inputCls} block w-full`}
+                    <SearchableSelect
                       value={row.productId}
-                      onChange={(e) => updateUsageRow(index, { productId: e.target.value })}
-                    >
-                      <option value="">Selecione o produto...</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                      onSelect={(id) => {
+                        const picked = products.find((p) => String(p.id) === id);
+                        // Ao trocar de produto, sugere a unidade dele por padrão — a pessoa pode
+                        // trocar depois (ex.: produto embalado em Litro, receita em ml).
+                        updateUsageRow(index, { productId: id, unit: picked?.unit ?? '' });
+                      }}
+                      options={products.map((p) => ({ id: p.id!, label: p.name }))}
+                      placeholder="Buscar e selecionar o produto..."
+                      noResultsLabel="Nenhum produto encontrado"
+                      className={`${inputCls} block w-full`}
+                    />
                     <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          className={`${inputCls} w-full ${product?.unit ? 'pr-12' : ''}`}
-                          placeholder="Quantidade consumida"
-                          value={row.quantityUsed}
-                          onChange={(e) => updateUsageRow(index, { quantityUsed: e.target.value })}
-                        />
-                        {product?.unit && (
-                          <span className="absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-[#7a7074] pointer-events-none">
-                            {productUnitSymbol(product.unit)}
-                          </span>
-                        )}
-                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className={`${inputCls} flex-1`}
+                        placeholder="Quantidade consumida"
+                        value={row.quantityUsed}
+                        onChange={(e) => updateUsageRow(index, { quantityUsed: e.target.value })}
+                      />
+                      {product && (
+                        <select
+                          aria-label="Unidade da receita"
+                          className={`${inputCls} w-28 shrink-0`}
+                          value={row.unit}
+                          onChange={(e) => updateUsageRow(index, { unit: e.target.value })}
+                        >
+                          <option value="">Un. do produto</option>
+                          {unitOptions.map((u) => (
+                            <option key={u} value={u}>
+                              {productUnitSymbol(u)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       <button
                         type="button"
                         onClick={() => removeUsageRow(index)}
@@ -378,10 +394,16 @@ export const AdminServices = () => {
                         <Trash2 size={14} />
                       </button>
                     </div>
-                    {product && !product.unit && (
+                    {product && !product.unit && !row.unit && (
                       <p className="text-xs text-amber-600">
-                        Defina a unidade (ml/g/L…) no cadastro deste produto para medir o consumo
-                        corretamente.
+                        Defina a unidade (ml/g/L…) no cadastro deste produto, ou escolha aqui em
+                        qual unidade a receita consome, para medir o consumo corretamente.
+                      </p>
+                    )}
+                    {row.unit && row.unit !== product?.unit && (
+                      <p className="text-xs text-gray-400">
+                        Receita em {productUnitLabel(row.unit)} — convertido pro custo cadastrado
+                        do produto ({productUnitLabel(product?.unit)}) automaticamente.
                       </p>
                     )}
                     {product?.unit && product.capacity != null && (
