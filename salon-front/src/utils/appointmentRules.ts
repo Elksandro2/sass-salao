@@ -71,6 +71,15 @@ export function getCancelBlockReason(apt: AppointmentForRules): string | null {
 }
 
 /**
+ * Retorna `true` se um agendamento cancelado pode ser reaberto ("descancelar").
+ * Espelha a guard clause do `reopen()` no AppointmentService.java: só um agendamento
+ * CANCELLED pode ser reaberto.
+ */
+export function canReopen(apt: AppointmentForRules): boolean {
+  return apt.status === 'CANCELLED';
+}
+
+/**
  * Retorna `true` se o status do agendamento pode ser alterado pelo admin.
  *
  * Espelha as guard clauses do `updateStatus()` no AppointmentService.java:

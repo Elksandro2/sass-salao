@@ -49,6 +49,7 @@ import { AppointmentDetailModal } from './components/AppointmentDetailModal';
 import {
   canCancel,
   getCancelBlockReason,
+  canReopen,
   canChangeStatus,
   getStatusChangeBlockReason,
   getValidStatusOptions,
@@ -59,6 +60,93 @@ import {
 
 const selectCls = 'input-premium';
 const labelCls = 'label-premium';
+
+interface SearchableSelectOption {
+  id: number;
+  label: string;
+}
+
+/**
+ * Um único campo de busca + seleção — digita pra filtrar, clica numa opção da lista pra
+ * escolher. Substitui o padrão antigo de "input de busca + <select> nativo embaixo dele",
+ * que parecia dois controles pra uma coisa só.
+ */
+const SearchableSelect = ({
+  value,
+  onSelect,
+  options,
+  placeholder,
+  noResultsLabel = 'Nenhum resultado encontrado',
+  disabled = false,
+}: {
+  value: string;
+  onSelect: (id: string) => void;
+  options: SearchableSelectOption[];
+  placeholder: string;
+  noResultsLabel?: string;
+  disabled?: boolean;
+}) => {
+  const [query, setQuery] = useState(
+    () => options.find((o) => String(o.id) === value)?.label ?? ''
+  );
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  // O campo travado (ex.: funcionária só pode agendar pra si mesma) recebe o valor de fora
+  // depois do primeiro render — sincroniza só nesse caso, pra não brigar com o que a pessoa
+  // está digitando quando o campo é editável.
+  useEffect(() => {
+    if (disabled) {
+      setQuery(options.find((o) => String(o.id) === value)?.label ?? '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled, value]);
+
+  const matches = options.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()));
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={query}
+        disabled={disabled}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setShowDropdown(true);
+          if (value) onSelect(''); // digitar de novo desfaz a seleção anterior
+        }}
+        onFocus={() => setShowDropdown(true)}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+        placeholder={placeholder}
+        autoComplete="off"
+        className={`${selectCls} ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+      />
+      {showDropdown && !disabled && (
+        <ul className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto bg-white border border-[#eae1e1] rounded-xl shadow-lg">
+          {matches.length === 0 ? (
+            <li className="px-3 py-2 text-sm text-gray-400">{noResultsLabel}</li>
+          ) : (
+            matches.map((o) => (
+              <li key={o.id}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onSelect(String(o.id));
+                    setQuery(o.label);
+                    setShowDropdown(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-[#fcf9f9] cursor-pointer"
+                >
+                  {o.label}
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
+  );
+};
 
 function toLocalDateTimeIso(dtLocal: string): string {
   if (!dtLocal) return '';
@@ -86,13 +174,12 @@ export const AdminAppointments = () => {
 
   const [products, setProducts] = useState<ProductData[]>([]);
   const [selectedClient, setSelectedClient] = useState('');
-  const [clientSearch, setClientSearch] = useState('');
-  const [employeeSearch, setEmployeeSearch] = useState('');
   const [selectedServiceIds, setSelectedServiceIds] = useState<number[]>([]);
   const [serviceSearch, setServiceSearch] = useState('');
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
   const [productSearch, setProductSearch] = useState('');
   const [productQuantities, setProductQuantities] = useState<Record<number, string>>({});
+  const [internalNotes, setInternalNotes] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [selectedDateTime, setSelectedDateTime] = useState('');
   const [customizations, setCustomizations] = useState<Record<number, ServiceCustomizationValues>>({});
@@ -100,6 +187,10 @@ export const AdminAppointments = () => {
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [appointmentToCancel, setAppointmentToCancel] = useState<number | null>(null);
+
+  const [showReopenConfirm, setShowReopenConfirm] = useState(false);
+  const [appointmentToReopen, setAppointmentToReopen] = useState<number | null>(null);
+  const [isReopening, setIsReopening] = useState(false);
 
   const [confirmTarget, setConfirmTarget] = useState<AppointmentResponse | null>(null);
   const [confirmDateTime, setConfirmDateTime] = useState('');
@@ -301,6 +392,7 @@ export const AdminAppointments = () => {
         products: productsPayload,
         employeeId: Number(selectedEmployee),
         scheduledAt: toLocalDateTimeIso(selectedDateTime),
+        internalNotes: internalNotes.trim() || null,
       });
       setShowModal(false);
       loadAppointments();
@@ -310,6 +402,7 @@ export const AdminAppointments = () => {
       setServiceSearch('');
       setSelectedProductIds([]);
       setProductQuantities({});
+      setInternalNotes('');
       setSelectedEmployee('');
       setSelectedDateTime('');
     } catch (error) {
@@ -328,6 +421,21 @@ export const AdminAppointments = () => {
       loadAppointments();
     } catch (error) {
       await showError('Erro ao cancelar agendamento');
+    }
+  };
+
+  const confirmReopen = async () => {
+    if (!appointmentToReopen) return;
+    setIsReopening(true);
+    try {
+      await appointmentsApi.reopen(appointmentToReopen);
+      setShowReopenConfirm(false);
+      loadAppointments();
+    } catch (error) {
+      const msg = getApiErrorMessage(error, 'Erro ao reabrir agendamento');
+      await showError(msg);
+    } finally {
+      setIsReopening(false);
     }
   };
 
@@ -692,25 +800,40 @@ export const AdminAppointments = () => {
 
         return (
           <div className="flex flex-col gap-1.5">
-            <PermissionGate method="PATCH" endpoint={`/v1/appointments/${item.id}/cancel`}>
-              <button
-                onClick={() => {
-                  if (!cancelDisabled) {
-                    setAppointmentToCancel(item.id);
-                    setShowConfirm(true);
-                  }
-                }}
-                disabled={cancelDisabled}
-                title={cancelReason || undefined}
-                className={`w-full text-center px-2.5 py-1.5 border text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
-                  cancelDisabled
-                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed opacity-60'
-                    : 'border-rose-200 text-rose-600 hover:bg-rose-50 cursor-pointer hover:border-rose-300'
-                }`}
-              >
-                Cancelar
-              </button>
-            </PermissionGate>
+            {canReopen(item) ? (
+              <PermissionGate method="PATCH" endpoint={`/v1/appointments/${item.id}/reopen`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAppointmentToReopen(item.id);
+                    setShowReopenConfirm(true);
+                  }}
+                  className="w-full text-center px-2.5 py-1.5 border border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 text-xs font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer"
+                >
+                  Reabrir
+                </button>
+              </PermissionGate>
+            ) : (
+              <PermissionGate method="PATCH" endpoint={`/v1/appointments/${item.id}/cancel`}>
+                <button
+                  onClick={() => {
+                    if (!cancelDisabled) {
+                      setAppointmentToCancel(item.id);
+                      setShowConfirm(true);
+                    }
+                  }}
+                  disabled={cancelDisabled}
+                  title={cancelReason || undefined}
+                  className={`w-full text-center px-2.5 py-1.5 border text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
+                    cancelDisabled
+                      ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed opacity-60'
+                      : 'border-rose-200 text-rose-600 hover:bg-rose-50 cursor-pointer hover:border-rose-300'
+                  }`}
+                >
+                  Cancelar
+                </button>
+              </PermissionGate>
+            )}
 
             {mercadoPagoEnabled && canGeneratePix(item) && (
               <>
@@ -799,69 +922,27 @@ export const AdminAppointments = () => {
                       <UserIcon size={14} className="inline mr-1" />
                       Cliente
                     </label>
-                    {clients.length > 6 && (
-                      <input
-                        type="text"
-                        value={clientSearch}
-                        onChange={(e) => setClientSearch(e.target.value)}
-                        placeholder="Buscar cliente por nome..."
-                        className={`${selectCls} mb-2`}
-                      />
-                    )}
-                    <select
+                    <SearchableSelect
                       value={selectedClient}
-                      onChange={(e) => setSelectedClient(e.target.value)}
-                      required
-                      className={selectCls}
-                    >
-                      <option value="">Selecione o cliente</option>
-                      {clients
-                        .filter(
-                          (c) =>
-                            String(c.id) === selectedClient ||
-                            c.name.toLowerCase().includes(clientSearch.trim().toLowerCase())
-                        )
-                        .map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                    </select>
+                      onSelect={setSelectedClient}
+                      options={clients.map((c) => ({ id: c.id, label: c.name }))}
+                      placeholder="Buscar e selecionar o cliente..."
+                      noResultsLabel="Nenhum cliente encontrado"
+                    />
                   </div>
                   <div>
                     <label className={labelCls}>
                       <UserIcon size={14} className="inline mr-1" />
                       Profissional
                     </label>
-                    {!isFuncionaria && employees.length > 6 && (
-                      <input
-                        type="text"
-                        value={employeeSearch}
-                        onChange={(e) => setEmployeeSearch(e.target.value)}
-                        placeholder="Buscar profissional por nome..."
-                        className={`${selectCls} mb-2`}
-                      />
-                    )}
-                    <select
+                    <SearchableSelect
                       value={selectedEmployee}
-                      onChange={(e) => setSelectedEmployee(e.target.value)}
-                      required
+                      onSelect={setSelectedEmployee}
+                      options={employees.map((e) => ({ id: e.id!, label: e.name ?? '' }))}
+                      placeholder="Buscar e selecionar a profissional..."
+                      noResultsLabel="Nenhuma profissional encontrada"
                       disabled={isFuncionaria}
-                      className={`${selectCls} ${isFuncionaria ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    >
-                      <option value="">Selecione a profissional</option>
-                      {employees
-                        .filter(
-                          (e) =>
-                            String(e.id) === selectedEmployee ||
-                            (e.name ?? '').toLowerCase().includes(employeeSearch.trim().toLowerCase())
-                        )
-                        .map((e) => (
-                          <option key={e.id} value={e.id}>
-                            {e.name}
-                          </option>
-                        ))}
-                    </select>
+                    />
                     {isFuncionaria && (
                       <p className="text-xs text-gray-400 mt-1">
                         Você só pode criar agendamentos pra você mesma.
@@ -970,7 +1051,7 @@ export const AdminAppointments = () => {
                               onChange={() => toggleProduct(p.id!)}
                               className="accent-[#be8a83]"
                             />
-                            {p.name} — R$ {p.price.toFixed(2)}
+                            {p.name} — R$ {(p.price ?? 0).toFixed(2)}
                           </label>
                           {selectedProductIds.includes(p.id!) && (
                             <input
@@ -988,6 +1069,18 @@ export const AdminAppointments = () => {
                     </div>
                   </div>
                 )}
+
+                <div>
+                  <label className={labelCls}>Observação (opcional)</label>
+                  <textarea
+                    rows={2}
+                    maxLength={4000}
+                    value={internalNotes}
+                    onChange={(e) => setInternalNotes(e.target.value)}
+                    placeholder="Anotação interna da equipe sobre este atendimento — a cliente não vê isso."
+                    className={selectCls}
+                  />
+                </div>
 
                 <div className="p-3.5 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
                   O agendamento nasce já <strong>confirmado</strong>. Clientes pelo site enviam uma{' '}
@@ -1082,6 +1175,17 @@ export const AdminAppointments = () => {
         onConfirm={confirmCancel}
         title="Cancelar Agendamento"
         message="Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita."
+      />
+
+      <ConfirmDialog
+        show={showReopenConfirm}
+        onHide={() => setShowReopenConfirm(false)}
+        onConfirm={confirmReopen}
+        title="Reabrir Agendamento"
+        message="Reabrir este agendamento cancelado? Ele volta a ficar ativo e a cliente será avisada."
+        confirmLabel="Reabrir"
+        variant="primary"
+        isProcessing={isReopening}
       />
 
       <PixPaymentModal

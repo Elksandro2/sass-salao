@@ -130,4 +130,24 @@ describe('AppointmentDetailModal', () => {
 
     expect(handleClose).toHaveBeenCalled();
   });
+
+  it('shows "Ver lucro deste atendimento" for an active appointment', () => {
+    render(<AppointmentDetailModal appointment={baseAppointment} onClose={vi.fn()} />, { user: adminUser, isAuthenticated: true });
+
+    expect(screen.getByText('Ver lucro deste atendimento')).toBeInTheDocument();
+  });
+
+  it('hides "Ver lucro deste atendimento" for a cancelled appointment — it never generates real revenue', () => {
+    const cancelled = { ...baseAppointment, status: 'CANCELLED' } as AppointmentResponse;
+    render(<AppointmentDetailModal appointment={cancelled} onClose={vi.fn()} />, { user: adminUser, isAuthenticated: true });
+
+    expect(screen.queryByText('Ver lucro deste atendimento')).not.toBeInTheDocument();
+  });
+
+  it('hides "Ver lucro deste atendimento" for a declined request', () => {
+    const declined = { ...baseAppointment, status: 'DECLINED' } as AppointmentResponse;
+    render(<AppointmentDetailModal appointment={declined} onClose={vi.fn()} />, { user: adminUser, isAuthenticated: true });
+
+    expect(screen.queryByText('Ver lucro deste atendimento')).not.toBeInTheDocument();
+  });
 });

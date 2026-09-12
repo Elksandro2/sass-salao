@@ -351,14 +351,16 @@ describe('AdminAppointments Component', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Novo Agendamento/i }));
 
-    const clientSelect = screen.getByText('Selecione o cliente').closest('select')!;
-    fireEvent.change(clientSelect, { target: { value: '5' } });
+    const clientInput = screen.getByPlaceholderText('Buscar e selecionar o cliente...');
+    fireEvent.change(clientInput, { target: { value: 'Elksandro' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Elksandro' }));
 
     fireEvent.click(screen.getByLabelText(/Corte de Cabelo/i));
     fireEvent.click(screen.getByLabelText(/Manicure/i));
 
-    const employeeSelect = screen.getByText('Selecione a profissional').closest('select')!;
-    fireEvent.change(employeeSelect, { target: { value: '10' } });
+    const employeeInput = screen.getByPlaceholderText('Buscar e selecionar a profissional...');
+    fireEvent.change(employeeInput, { target: { value: 'Mariana' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Mariana' }));
 
     const dateTimeInput = screen.getByLabelText(/Data e hora/i);
     fireEvent.change(dateTimeInput, { target: { value: '2026-07-01T09:00' } });
@@ -381,6 +383,24 @@ describe('AdminAppointments Component', () => {
     );
     const call = vi.mocked(appointmentsApi.create).mock.calls[0][0];
     expect(call.services).toHaveLength(2);
+  });
+
+  it('clears a selected client from the single search+select field when the person types again', async () => {
+    await act(async () => {
+      renderAdminAppointments();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Novo Agendamento/i }));
+
+    const clientInput = screen.getByPlaceholderText('Buscar e selecionar o cliente...');
+    fireEvent.change(clientInput, { target: { value: 'Elksandro' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Elksandro' }));
+    expect(clientInput).toHaveValue('Elksandro');
+
+    // Digitar de novo (ex.: escolheu errado) desfaz a seleção em vez de manter um id escondido.
+    fireEvent.change(clientInput, { target: { value: 'Joao' } });
+    expect(screen.getByRole('button', { name: 'Joao' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Elksandro' })).not.toBeInTheDocument();
   });
 
   it('shows a search box to filter services when there are more than 6, and filters the list', async () => {

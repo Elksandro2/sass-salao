@@ -34,6 +34,8 @@ export interface AppointmentRequestBody {
   preferredDate?: string | null;
   clientNotes?: string | null;
   clientId?: number;
+  /** Observação interna da equipe (opcional) — mesmo campo editável depois via updateInternalNotes. */
+  internalNotes?: string | null;
 }
 
 export interface AppointmentServiceResponse {
@@ -97,6 +99,7 @@ interface AppointmentCreatePayload {
   clientId?: number | null;
   preferredDate?: string | null;
   clientNotes?: string | null;
+  internalNotes?: string | null;
 }
 
 function buildCreatePayload(request: AppointmentRequestBody): AppointmentCreatePayload {
@@ -133,6 +136,9 @@ function buildCreatePayload(request: AppointmentRequestBody): AppointmentCreateP
   }
   if (request.clientNotes != null && request.clientNotes.trim() !== '') {
     body.clientNotes = request.clientNotes.trim();
+  }
+  if (request.internalNotes != null && request.internalNotes.trim() !== '') {
+    body.internalNotes = request.internalNotes.trim();
   }
   return body;
 }
@@ -194,6 +200,12 @@ export const appointmentsApi = {
 
   cancel: async (id: number) => {
     const { data } = await api.patch<AppointmentResponse>(`/appointments/${id}/cancel`);
+    return data;
+  },
+
+  /** Desfaz o cancelamento — só a equipe pode, o cliente não. */
+  reopen: async (id: number) => {
+    const { data } = await api.patch<AppointmentResponse>(`/appointments/${id}/reopen`);
     return data;
   },
 

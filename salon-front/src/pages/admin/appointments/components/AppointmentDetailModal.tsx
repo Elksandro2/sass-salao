@@ -163,7 +163,11 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
             />
           </div>
 
-          <AppointmentProfitSection appointmentId={appointment.id} />
+          {/* Cancelado/recusado nunca vai gerar receita de verdade — mostrar "lucro" aqui
+              induziria a dona a contar como real um valor que nunca vai entrar. */}
+          {appointment.status !== 'CANCELLED' && appointment.status !== 'DECLINED' && (
+            <AppointmentProfitSection appointmentId={appointment.id} />
+          )}
 
           {appointment.clientNotes && (
             <div>

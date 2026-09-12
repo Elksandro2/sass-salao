@@ -39,8 +39,33 @@ export function countActiveFilters(filters: AppointmentFiltersState): number {
   return Object.values(filters).filter((v) => v !== '').length;
 }
 
+/** Data de hoje no fuso do navegador, formato "YYYY-MM-DD" — mesmo formato dos filtros de data. */
+function todayIsoDate(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/** O filtro "Hoje" está ativo quando De/Até apontam exatamente para o dia de hoje. */
+export function isTodayFilterActive(filters: AppointmentFiltersState): boolean {
+  const today = todayIsoDate();
+  return filters.startDate === today && filters.endDate === today;
+}
+
 export const AppointmentFiltersBar = ({ filters, employees, onChange, onClear }: AppointmentFiltersBarProps) => {
   const activeCount = countActiveFilters(filters);
+  const todayActive = isTodayFilterActive(filters);
+
+  const toggleTodayFilter = () => {
+    if (todayActive) {
+      onChange({ startDate: '', endDate: '' });
+    } else {
+      const today = todayIsoDate();
+      onChange({ startDate: today, endDate: today });
+    }
+  };
 
   return (
     <div className="flex flex-wrap gap-4 items-end bg-white/80 backdrop-blur-md rounded-2xl border border-[#eae1e1]/80 p-5 shadow-sm">
@@ -108,6 +133,19 @@ export const AppointmentFiltersBar = ({ filters, employees, onChange, onClear }:
           onChange={(e) => onChange({ endDate: e.target.value })}
         />
       </div>
+
+      <button
+        type="button"
+        onClick={toggleTodayFilter}
+        aria-pressed={todayActive}
+        className={`px-5 py-2.5 border text-sm font-semibold rounded-xl transition-all duration-200 cursor-pointer ${
+          todayActive
+            ? 'bg-[#be8a83] border-[#be8a83] text-white'
+            : 'border-[#eae1e1] text-[#3b3036] hover:text-[#be8a83] hover:border-[#be8a83] bg-white'
+        }`}
+      >
+        Agendamentos de Hoje
+      </button>
 
       <button
         onClick={onClear}
