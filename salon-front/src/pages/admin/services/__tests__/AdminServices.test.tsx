@@ -184,19 +184,19 @@ describe('AdminServices Page', () => {
       expect(productInput).toHaveValue('Tintura');
     });
 
-    it('defaults the recipe unit to the product\'s own unit, editable to a compatible one', async () => {
+    it('defaults the recipe unit to the product\'s own unit, offering the same unit options as the product form', async () => {
       await openFormAndAddRow();
 
       const productInput = screen.getByPlaceholderText('Buscar e selecionar o produto...');
       fireEvent.change(productInput, { target: { value: 'Tintura' } });
       fireEvent.click(screen.getByRole('button', { name: 'Tintura' }));
 
-      // Tintura está cadastrada em Litro — a receita já sugere "L" por padrão...
+      // Tintura está cadastrada em Litro — a receita já sugere "L" por padrão (via SearchableSelect)...
       const unitSelect = screen.getByRole('combobox', { name: 'Unidade da receita' }) as HTMLSelectElement;
       const options = Array.from(unitSelect.options).map((o) => o.value);
-      // ...mas ML também é oferecido (mesma grandeza: volume), G/KG não (grandeza diferente).
-      expect(options).toEqual(expect.arrayContaining(['L', 'ML']));
-      expect(options).not.toEqual(expect.arrayContaining(['G', 'KG']));
+      // ...e oferece exatamente as mesmas unidades do select de "Unidade" no cadastro de produto,
+      // sem restringir por grandeza — a validação de compatibilidade acontece no backend ao salvar.
+      expect(options).toEqual(['', 'ML', 'L', 'G', 'KG', 'UNIDADE']);
     });
 
     it('warns when the product has no registered unit and the recipe unit was not chosen either', async () => {

@@ -19,7 +19,7 @@ import { salonServiceFormSchema } from './adminService.schema';
 import type { SalonServiceFormValues } from './adminService.schema';
 import { useAlert } from '../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../utils/apiError';
-import { productUnitSymbol, productUnitLabel, compatibleUnits } from '../../../utils/productUnit';
+import { productUnitSymbol, productUnitLabel, PRODUCT_UNITS } from '../../../utils/productUnit';
 import type { ProductUnitValue } from '../../../utils/productUnit';
 import { SearchableSelect } from '../../../components/SearchableSelect';
 
@@ -345,7 +345,6 @@ export const AdminServices = () => {
             <div className="space-y-3">
               {usageRows.map((row, index) => {
                 const product = products.find((p) => String(p.id) === row.productId);
-                const unitOptions = compatibleUnits(product?.unit);
                 return (
                   <div key={index} className="flex flex-col gap-2 p-2.5 bg-[#fcf9f9]/50 border border-[#eae1e1]/60 rounded-lg">
                     <SearchableSelect
@@ -387,10 +386,12 @@ export const AdminServices = () => {
                           value={row.unit}
                           onChange={(e) => updateUsageRow(index, { unit: e.target.value })}
                         >
-                          <option value="">Un. do produto ({productUnitLabel(product.unit) || 'não definida'})</option>
-                          {unitOptions.map((u) => (
-                            <option key={u} value={u}>
-                              {productUnitLabel(u)}
+                          <option value="">
+                            Não informado (usa a unidade do produto{product.unit ? `: ${productUnitLabel(product.unit)}` : ''})
+                          </option>
+                          {PRODUCT_UNITS.map((u) => (
+                            <option key={u.value} value={u.value}>
+                              {u.label}
                             </option>
                           ))}
                         </select>
