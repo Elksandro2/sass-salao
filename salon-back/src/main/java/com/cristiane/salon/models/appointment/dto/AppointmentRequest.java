@@ -35,6 +35,14 @@ public record AppointmentRequest(
         String clientNotes,
 
         /** Preenchido apenas quando admin/gerente agenda para um cliente. */
-        Long clientId
+        Long clientId,
+
+        /**
+         * Observação interna da equipe (opcional) — mesmo campo editável depois via
+         * {@code PATCH /{id}/internal-notes}, só que já disponível na criação. Só tem efeito no
+         * fluxo administrativo; ignorado no fluxo de solicitação do cliente.
+         */
+        @Size(max = 4000, message = "Observações muito longas (máx. 4000 caracteres)")
+        String internalNotes
 ) {
 }

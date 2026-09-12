@@ -157,6 +157,24 @@ class AppointmentControllerTest extends BaseControllerTest {
 
     @Test
     @WithMockUser
+    void reopenReturns200() throws Exception {
+        AppointmentResponse response = new AppointmentResponse(
+                1L, 1L, "Client", 2L, "Employee",
+                List.of(new AppointmentServiceResponse(3L, "Service", null, null, null, null)),
+                List.of(), List.of(),
+                null, null, null, null,
+                LocalDateTime.now(), LocalDate.now(), "Notes", null, "CONFIRMED", null, null, null, null, false, ""
+        );
+        when(appointmentService.reopen(eq(1L))).thenReturn(response);
+
+        mvc.perform(patch("/v1/appointments/1/reopen")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+    }
+
+    @Test
+    @WithMockUser
     void updateStatusReturns200() throws Exception {
         AppointmentResponse response = new AppointmentResponse(
                 1L, 1L, "Client", 2L, "Employee",

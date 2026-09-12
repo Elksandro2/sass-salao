@@ -217,7 +217,7 @@ class AppointmentServiceTest {
         SecurityContextHolder.setContext(secCtx);
         when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -230,7 +230,7 @@ class AppointmentServiceTest {
         // Arrange
         mockAuthenticatedUser(clientUser);
         when(featureFlagService.isEnabled("ENABLE_CUSTOMER_PORTAL")).thenReturn(false);
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -244,7 +244,7 @@ class AppointmentServiceTest {
         mockAuthenticatedUser(clientUser);
         when(featureFlagService.isEnabled("ENABLE_CUSTOMER_PORTAL")).thenReturn(true);
         when(featureFlagService.isEnabled("CLIENT_BOOKING")).thenReturn(false);
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -257,7 +257,7 @@ class AppointmentServiceTest {
         // Arrange
         mockAuthenticatedUser(staffUser);
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, 99L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, 99L, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -273,7 +273,7 @@ class AppointmentServiceTest {
         when(featureFlagService.isEnabled("CLIENT_BOOKING")).thenReturn(true);
         when(employeeRepository.findById(5L)).thenReturn(Optional.empty());
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -290,7 +290,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.empty());
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -308,7 +308,7 @@ class AppointmentServiceTest {
         salonService.setActive(false);
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -326,7 +326,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, 10L, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -356,7 +356,7 @@ class AppointmentServiceTest {
 
         when(appointmentRepository.save(any(Appointment.class))).thenReturn(saved);
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, pastTime, null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, pastTime, null, null, 10L, null);
 
         // Act
         AppointmentResponse result = appointmentService.create(request);
@@ -383,7 +383,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, salonClock.now().plusDays(1), salonClock.today().minusDays(1), null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, salonClock.now().plusDays(1), salonClock.today().minusDays(1), null, 10L, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -411,7 +411,7 @@ class AppointmentServiceTest {
 
         when(appointmentRepository.save(any(Appointment.class))).thenReturn(saved);
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, targetTime, salonClock.today().plusDays(1), "notes", 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, targetTime, salonClock.today().plusDays(1), "notes", 10L, null);
 
         // Act
         AppointmentResponse result = appointmentService.create(request);
@@ -424,6 +424,27 @@ class AppointmentServiceTest {
         // Horário de funcionamento (issue #116) só bloqueia a PREFERÊNCIA do cliente — a equipe
         // continua livre para encaixar alguém fora do expediente, mesmo com preferredDate setado.
         verify(salonProfileService, never()).isDayOpen(any());
+    }
+
+    @Test
+    void create_whenStaffFlowWithInternalNotes_shouldPersistThemOnTheAppointment() {
+        mockAuthenticatedUser(staffUser);
+        when(userRepository.findById(10L)).thenReturn(Optional.of(clientUser));
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
+        when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        LocalDateTime targetTime = salonClock.now().plusDays(1);
+        AppointmentRequest request = new AppointmentRequest(
+                5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, targetTime,
+                null, null, 10L, "Cliente pediu pra não usar produto com álcool");
+
+        appointmentService.create(request);
+
+        ArgumentCaptor<Appointment> captor = ArgumentCaptor.forClass(Appointment.class);
+        verify(appointmentRepository).save(captor.capture());
+        assertThat(captor.getValue().getInternalNotes())
+                .isEqualTo("Cliente pediu pra não usar produto com álcool");
     }
 
     @Test
@@ -444,7 +465,7 @@ class AppointmentServiceTest {
         saved.setStatus(AppointmentStatus.CONFIRMED);
         when(appointmentRepository.save(any(Appointment.class))).thenReturn(saved);
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, targetTime, null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, targetTime, null, null, 10L, null);
 
         AppointmentResponse result = appointmentService.create(request);
 
@@ -464,7 +485,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(6L)).thenReturn(Optional.of(colleagueEmployee));
 
         LocalDateTime targetTime = salonClock.now().plusDays(1);
-        AppointmentRequest request = new AppointmentRequest(6L, List.of(new AppointmentServiceRequest(8L, null, null)), null, targetTime, null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(6L, List.of(new AppointmentServiceRequest(8L, null, null)), null, targetTime, null, null, 10L, null);
 
         assertThatThrownBy(() -> appointmentService.create(request))
                 .isInstanceOf(UnauthorizedException.class)
@@ -485,7 +506,7 @@ class AppointmentServiceTest {
         LocalDateTime targetTime = salonClock.now().plusDays(1);
         when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, new BigDecimal("200.00"), "Cabelo mais longo, precisa de mais tempo")), null, targetTime, null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, new BigDecimal("200.00"), "Cabelo mais longo, precisa de mais tempo")), null, targetTime, null, null, 10L, null);
 
         // Act
         AppointmentResponse result = appointmentService.create(request);
@@ -511,7 +532,7 @@ class AppointmentServiceTest {
         LocalDateTime targetTime = salonClock.now().plusDays(1);
         when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, targetTime, null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, targetTime, null, null, 10L, null);
 
         // Act
         AppointmentResponse result = appointmentService.create(request);
@@ -537,7 +558,7 @@ class AppointmentServiceTest {
         when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
 
         AppointmentRequest request = new AppointmentRequest(
-                5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, targetTime, null, null, 10L);
+                5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, targetTime, null, null, 10L, null);
 
         // Act
         appointmentService.create(request);
@@ -587,8 +608,7 @@ class AppointmentServiceTest {
                         new AppointmentServiceRequest(9L, new BigDecimal("120.00"), null)
                 ),
                 null,
-                targetTime, null, null, 10L
-        );
+                targetTime, null, null, 10L, null);
 
         // Act
         AppointmentResponse result = appointmentService.create(request);
@@ -623,8 +643,7 @@ class AppointmentServiceTest {
                         new AppointmentServiceRequest(9L, new BigDecimal("1.00"), null)
                 ),
                 null,
-                null, null, null, null
-        );
+                null, null, null, null, null);
 
         // Act
         AppointmentResponse result = appointmentService.create(request);
@@ -643,7 +662,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, new BigDecimal("-1.00"), null)), null, salonClock.now().plusDays(1), null, null, 10L);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, new BigDecimal("-1.00"), null)), null, salonClock.now().plusDays(1), null, null, 10L, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -662,7 +681,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, salonClock.now().plusDays(1), null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, salonClock.now().plusDays(1), null, null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -679,7 +698,7 @@ class AppointmentServiceTest {
         when(employeeRepository.findById(5L)).thenReturn(Optional.of(employee));
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, salonClock.today().minusDays(1), null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, salonClock.today().minusDays(1), null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -697,7 +716,7 @@ class AppointmentServiceTest {
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
         when(salonProfileService.isDayOpen(any())).thenReturn(false);
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, salonClock.today().plusDays(3), null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, salonClock.today().plusDays(3), null, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -722,7 +741,7 @@ class AppointmentServiceTest {
         saved.setStatus(AppointmentStatus.REQUESTED);
         when(appointmentRepository.save(any(Appointment.class))).thenReturn(saved);
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, null, null, null);
 
         // Act
         appointmentService.create(request);
@@ -741,7 +760,7 @@ class AppointmentServiceTest {
         when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
 
         String longNotes = "a".repeat(4001);
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, longNotes, null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, null, longNotes, null, null);
 
         // Act & Assert
         assertThatThrownBy(() -> appointmentService.create(request))
@@ -767,7 +786,7 @@ class AppointmentServiceTest {
 
         when(appointmentRepository.save(any(Appointment.class))).thenReturn(saved);
 
-        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, salonClock.today().plusDays(2), "my notes", null);
+        AppointmentRequest request = new AppointmentRequest(5L, List.of(new AppointmentServiceRequest(8L, null, null)), null, null, salonClock.today().plusDays(2), "my notes", null, null);
 
         // Act
         AppointmentResponse result = appointmentService.create(request);
@@ -1323,7 +1342,118 @@ class AppointmentServiceTest {
                 .hasMessageContaining("estorno");
     }
 
+    // --- reopen ("descancelar") tests ---
 
+    @Test
+    void reopen_whenNotFound_shouldThrowResourceNotFoundException() {
+        mockAuthenticatedUser(staffUser);
+        when(appointmentRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> appointmentService.reopen(99L))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void reopen_whenNotCancelled_shouldThrowBadRequestException() {
+        mockAuthenticatedUser(staffUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setClient(clientUser);
+        apt.setEmployee(employee);
+        apt.setStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        assertThatThrownBy(() -> appointmentService.reopen(1L))
+                .isInstanceOf(BadRequestException.class);
+        verify(appointmentRepository, never()).save(any());
+    }
+
+    @Test
+    void reopen_whenClientTriesToReopen_shouldThrowUnauthorizedException() {
+        // Só a equipe pode reabrir — o cliente que cancelou não pode desfazer sozinho.
+        mockAuthenticatedUser(clientUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setClient(clientUser);
+        apt.setEmployee(employee);
+        apt.setStatus(AppointmentStatus.CANCELLED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        assertThatThrownBy(() -> appointmentService.reopen(1L))
+                .isInstanceOf(UnauthorizedException.class);
+    }
+
+    @Test
+    void reopen_whenHadScheduledAt_shouldRestoreToConfirmedAndNotify() {
+        mockAuthenticatedUser(staffUser);
+        LocalDateTime targetTime = salonClock.now().plusDays(1);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setClient(clientUser);
+        apt.setEmployee(employee);
+        withService(apt, salonService);
+        apt.setScheduledAt(targetTime);
+        apt.setStatus(AppointmentStatus.CANCELLED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AppointmentResponse result = appointmentService.reopen(1L);
+
+        assertThat(result.status()).isEqualTo(AppointmentStatus.CONFIRMED.name());
+        verify(emailService).sendConfirmationNotificationToClient(apt);
+    }
+
+    @Test
+    void reopen_whenNoScheduledAt_shouldRestoreToRequested() {
+        mockAuthenticatedUser(staffUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setClient(clientUser);
+        apt.setEmployee(employee);
+        withService(apt, salonService);
+        apt.setStatus(AppointmentStatus.CANCELLED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AppointmentResponse result = appointmentService.reopen(1L);
+
+        assertThat(result.status()).isEqualTo(AppointmentStatus.REQUESTED.name());
+        verify(emailService, never()).sendConfirmationNotificationToClient(any());
+    }
+
+    @Test
+    void reopen_whenAssignedProfessional_shouldSucceed() {
+        // FUNCIONARIA pode reabrir os próprios atendimentos cancelados
+        mockAuthenticatedUser(professionalUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setClient(clientUser);
+        apt.setEmployee(employee);
+        withService(apt, salonService);
+        apt.setScheduledAt(salonClock.now().plusDays(1));
+        apt.setStatus(AppointmentStatus.CANCELLED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AppointmentResponse result = appointmentService.reopen(1L);
+
+        assertThat(result.status()).isEqualTo(AppointmentStatus.CONFIRMED.name());
+    }
+
+    @Test
+    void reopen_whenOtherProfessional_shouldThrowUnauthorizedException() {
+        // A colega que não é a profissional responsável não pode reabrir
+        mockAuthenticatedUser(otherProfessionalUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setClient(clientUser);
+        apt.setEmployee(employee);
+        apt.setStatus(AppointmentStatus.CANCELLED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        assertThatThrownBy(() -> appointmentService.reopen(1L))
+                .isInstanceOf(UnauthorizedException.class);
+    }
 
     // --- updateStatus tests ---
 

@@ -237,6 +237,7 @@ public class AppointmentService {
             appointment.setScheduledAt(request.scheduledAt());
             appointment.setPreferredDate(request.preferredDate());
             appointment.setClientNotes(request.clientNotes());
+            appointment.setInternalNotes(request.internalNotes());
             appointment.setStatus(isHistorical ? AppointmentStatus.DONE : AppointmentStatus.CONFIRMED);
             appointment.setSnapshotProductCommissionPercent(businessSettingsService.getProductCommissionPercent());
             appointment.setServices(buildServiceItems(appointment, serviceRequests, resolvedServices, true));
@@ -748,6 +749,37 @@ public class AppointmentService {
         emailService.sendCancellationNotification(saved);
         pushService.sendToUser(saved.getClient().getId(), "Agendamento cancelado",
                 "Seu agendamento de " + saved.getServiceNames() + " foi cancelado.", "/my-appointments");
+        return AppointmentResponse.fromEntity(saved);
+    }
+
+    /**
+     * Desfaz um cancelamento — só a equipe pode ("descancelar"), o cliente não. Volta pro
+     * estado ativo que o agendamento teria se nunca tivesse sido cancelado: {@code CONFIRMED}
+     * se já tinha horário definido (fluxo administrativo), ou {@code REQUESTED} se ainda estava
+     * como pedido do cliente aguardando confirmação.
+     */
+    @Transactional
+    public AppointmentResponse reopen(Long id) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
+        assertCanManage(appointment, "reabrir");
+
+        if (appointment.getStatus() != AppointmentStatus.CANCELLED) {
+            throw new BadRequestException("Só é possível reabrir um agendamento cancelado");
+        }
+
+        AppointmentStatus restored = appointment.getScheduledAt() != null
+                ? AppointmentStatus.CONFIRMED
+                : AppointmentStatus.REQUESTED;
+        appointment.setStatus(restored);
+        Appointment saved = appointmentRepository.save(appointment);
+
+        if (restored == AppointmentStatus.CONFIRMED) {
+            emailService.sendConfirmationNotificationToClient(saved);
+        }
+        pushService.sendToUser(saved.getClient().getId(), "Agendamento reaberto",
+                "Seu agendamento de " + saved.getServiceNames() + " foi reaberto pelo salão.", "/my-appointments");
+
         return AppointmentResponse.fromEntity(saved);
     }
 
