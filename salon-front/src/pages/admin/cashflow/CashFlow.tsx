@@ -175,7 +175,7 @@ export const CashFlow = () => {
     setShowSvcDropdown(false);
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const cartTotal = cart.reduce((sum, item) => sum + (item.product.price ?? 0) * item.quantity, 0);
 
   // Sync React Hook Form values reactively when product cart updates
   useEffect(() => {
@@ -473,7 +473,7 @@ export const CashFlow = () => {
                         >
                           <span className="font-medium">{p.name}</span>
                           <span className="text-xs text-[#7a7074] group-hover:text-[#be8a83]">
-                            R$ {p.price.toFixed(2)}
+                            R$ {(p.price ?? 0).toFixed(2)}
                           </span>
                         </button>
                       ))
@@ -502,7 +502,7 @@ export const CashFlow = () => {
                               {item.product.name}
                             </div>
                             <div className="text-xs text-[#7a7074] mt-0.5">
-                              Preço Unit.: R$ {item.product.price.toFixed(2)}
+                              Preço Unit.: R$ {(item.product.price ?? 0).toFixed(2)}
                             </div>
                           </div>
 
@@ -534,7 +534,7 @@ export const CashFlow = () => {
                             </div>
 
                             <div className="text-sm font-bold text-[#3b3036] min-w-[70px] text-right">
-                              R$ {(item.product.price * item.quantity).toFixed(2)}
+                              R$ {((item.product.price ?? 0) * item.quantity).toFixed(2)}
                             </div>
 
                             <button

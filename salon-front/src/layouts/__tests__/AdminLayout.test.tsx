@@ -66,7 +66,8 @@ describe('AdminLayout', () => {
     expect(screen.getByText('Agendamentos')).toBeInTheDocument();
     expect(screen.queryByText('Relatórios')).not.toBeInTheDocument();
     expect(screen.queryByText('Fluxo de Caixa')).not.toBeInTheDocument();
-    expect(screen.queryByText('Produtos')).not.toBeInTheDocument();
+    expect(screen.queryByText('Produtos (Venda)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Produtos (Uso)')).not.toBeInTheDocument();
   });
 
   it('shows the "Colaboradora" role label in the header for a FUNCIONARIA user', () => {
@@ -74,7 +75,7 @@ describe('AdminLayout', () => {
     expect(screen.getByText('Colaboradora')).toBeInTheDocument();
   });
 
-  it('shows the full menu for ADMIN, including Produtos and Fluxo de Caixa', () => {
+  it('shows the full menu for ADMIN, including Produtos (Venda/Uso) and Fluxo de Caixa', () => {
     renderAdminLayout(
       { email: 'admin@x.com', role: 'ADMIN', userId: 3, permissions: [] },
       '/admin/reports'
@@ -83,7 +84,8 @@ describe('AdminLayout', () => {
     expect(screen.getByText('Reports Page')).toBeInTheDocument();
     expect(screen.getByText('Relatórios')).toBeInTheDocument();
     expect(screen.getByText('Fluxo de Caixa')).toBeInTheDocument();
-    expect(screen.getByText('Produtos')).toBeInTheDocument();
+    expect(screen.getByText('Produtos (Venda)')).toBeInTheDocument();
+    expect(screen.getByText('Produtos (Uso)')).toBeInTheDocument();
   });
 
   it('hides Produtos from GERENTE_DE_ATENDIMENTO while keeping other management items', () => {
@@ -93,7 +95,8 @@ describe('AdminLayout', () => {
     );
 
     expect(screen.getByText('Reports Page')).toBeInTheDocument();
-    expect(screen.queryByText('Produtos')).not.toBeInTheDocument();
+    expect(screen.queryByText('Produtos (Venda)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Produtos (Uso)')).not.toBeInTheDocument();
     expect(screen.getByText('Fluxo de Caixa')).toBeInTheDocument();
   });
 });

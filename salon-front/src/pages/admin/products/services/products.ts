@@ -7,7 +7,8 @@ export type ProductUnit = 'ML' | 'L' | 'G' | 'KG' | 'UNIDADE';
 export interface ProductData {
   id?: number;
   name: string;
-  price: number;
+  /** Preço de venda ao cliente — null para produto só de uso interno (sem availableForSale). */
+  price: number | null;
   active?: boolean;
   brand?: string | null;
   /** Quanto o salão pagou pela embalagem/produto (custeio interno, não é o preço de venda). */
@@ -26,6 +27,10 @@ export interface ProductData {
 export interface ProductFilter {
   name?: string;
   active?: boolean;
+  /** Filtra a tela "Produtos (Venda)". */
+  availableForSale?: boolean;
+  /** Filtra a tela "Produtos (Uso)". */
+  usedInServiceRecipe?: boolean;
 }
 
 export const productsApi = {

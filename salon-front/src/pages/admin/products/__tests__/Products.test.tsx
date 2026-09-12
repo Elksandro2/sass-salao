@@ -47,10 +47,10 @@ describe('Products Page', () => {
 
   it('renders products and handles filter changes', async () => {
     await act(async () => {
-      customRender(<Products />);
+      customRender(<Products mode="sale" />);
     });
 
-    expect(screen.getByText('Gerenciar Produtos')).toBeInTheDocument();
+    expect(screen.getByText('Gerenciar Produtos (Venda)')).toBeInTheDocument();
     expect(screen.getByText('Shampoo')).toBeInTheDocument();
     expect(screen.getByText('Condicionador')).toBeInTheDocument();
 
@@ -83,7 +83,7 @@ describe('Products Page', () => {
     });
 
     await act(async () => {
-      customRender(<Products />);
+      customRender(<Products mode="sale" />);
     });
 
     const reactivateButtons = screen.getAllByTitle('Reativar Produto');
@@ -113,7 +113,7 @@ describe('Products Page', () => {
     vi.mocked(productsApi.delete).mockResolvedValue(undefined);
 
     await act(async () => {
-      customRender(<Products />);
+      customRender(<Products mode="sale" />);
     });
 
     const deleteButtons = screen.getAllByTitle('Excluir Produto');
@@ -136,6 +136,66 @@ describe('Products Page', () => {
     expect(productsApi.delete).toHaveBeenCalledWith(1);
     await waitFor(() => {
       expect(productsApi.findAll).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('mode="use" (Produtos de uso interno)', () => {
+    it('renders the "Uso" heading, filters by usedInServiceRecipe and hides the sale price field by default', async () => {
+      await act(async () => {
+        customRender(<Products mode="use" />);
+      });
+
+      expect(screen.getByText('Gerenciar Produtos (Uso)')).toBeInTheDocument();
+      expect(productsApi.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ usedInServiceRecipe: true }),
+        0,
+        10
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Novo Produto de Uso/i }));
+      });
+
+      expect(screen.queryByLabelText(/Preço de Venda/i)).not.toBeInTheDocument();
+      expect(screen.getByText('Também disponível para venda')).toBeInTheDocument();
+    });
+
+    it('reveals the sale price field when "Também disponível para venda" is checked', async () => {
+      await act(async () => {
+        customRender(<Products mode="use" />);
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Novo Produto de Uso/i }));
+      });
+
+      const alsoForSale = screen.getByRole('checkbox', { name: 'Também disponível para venda' });
+      await act(async () => {
+        fireEvent.click(alsoForSale);
+      });
+
+      expect(screen.getByText(/Preço de Venda \(R\$\)/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('mode="sale" (Produtos de venda)', () => {
+    it('filters by availableForSale and offers "também usado na receita de serviço"', async () => {
+      await act(async () => {
+        customRender(<Products mode="sale" />);
+      });
+
+      expect(productsApi.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ availableForSale: true }),
+        0,
+        10
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Novo Produto de Venda/i }));
+      });
+
+      expect(screen.getByText(/Preço de Venda \(R\$\)/i)).toBeInTheDocument();
+      expect(screen.getByText('Também usado na receita de serviço (uso interno)')).toBeInTheDocument();
     });
   });
 });

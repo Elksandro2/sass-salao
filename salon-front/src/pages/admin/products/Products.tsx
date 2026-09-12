@@ -18,7 +18,17 @@ import { PRODUCT_UNITS } from '../../../utils/productUnit';
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
 
-export const Products = () => {
+interface ProductsProps {
+  /**
+   * 'sale' = tela "Produtos (Venda)": tem preço de venda, disponível pra venda por padrão.
+   * 'use' = tela "Produtos (Uso)": só custeio interno, sem preço — pode opcionalmente marcar
+   * "também disponível para venda" pra ganhar o campo de preço e aparecer nas duas telas.
+   */
+  mode: 'sale' | 'use';
+}
+
+export const Products = ({ mode }: ProductsProps) => {
+  const isSaleMode = mode === 'sale';
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const [showForm, setShowForm] = useState(false);
@@ -34,9 +44,14 @@ export const Products = () => {
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<ProductFormValues>({ resolver: zodResolver(productFormSchema) });
   const { error: showError } = useAlert();
+
+  // No modo Venda o produto é sempre disponível pra venda (o preço sempre aparece). No modo Uso
+  // o preço só aparece se a pessoa marcar "também disponível para venda".
+  const showPriceField = isSaleMode || watch('availableForSale');
 
   const fetchProductsData = async (filter: ProductFilter, page: number, size: number) => {
     return productsApi.findAll(filter, page, size);
@@ -47,7 +62,7 @@ export const Products = () => {
     if (product) {
       setEditingProduct(product);
       setValue('name', product.name);
-      setValue('price', String(product.price));
+      setValue('price', product.price != null ? String(product.price) : '');
       setValue('active', product.active !== false);
       setValue('brand', product.brand ?? '');
       setValue('costPrice', product.costPrice != null ? String(product.costPrice) : '');
@@ -58,8 +73,10 @@ export const Products = () => {
     } else {
       setEditingProduct(null);
       setValue('active', true);
-      setValue('availableForSale', true);
-      setValue('usedInServiceRecipe', true);
+      // O flag "principal" desta tela nasce ligado; o outro nasce desligado — a pessoa liga
+      // manualmente se o produto for dos dois tipos.
+      setValue('availableForSale', isSaleMode);
+      setValue('usedInServiceRecipe', !isSaleMode);
     }
     setShowForm(true);
   };
@@ -68,7 +85,7 @@ export const Products = () => {
     try {
       const payload: ProductData = {
         name: data.name,
-        price: Number(data.price),
+        price: data.price ? Number(data.price) : null,
         active: data.active,
         brand: data.brand?.trim() || null,
         costPrice: data.costPrice ? Number(data.costPrice) : null,
@@ -115,7 +132,19 @@ export const Products = () => {
   const columns = [
     { key: 'name', label: 'Nome do Produto' },
     { key: 'brand', label: 'Marca', render: (item: ProductData) => item.brand?.trim() || '—' },
-    { key: 'price', label: 'Preço', render: (item: ProductData) => `R$ ${item.price.toFixed(2)}` },
+    isSaleMode
+      ? {
+          key: 'price',
+          label: 'Preço de Venda',
+          render: (item: ProductData) =>
+            item.price != null ? `R$ ${item.price.toFixed(2)}` : '—',
+        }
+      : {
+          key: 'costPrice',
+          label: 'Quanto Pagou',
+          render: (item: ProductData) =>
+            item.costPrice != null ? `R$ ${item.costPrice.toFixed(2)}` : '—',
+        },
     {
       key: 'active',
       label: 'Status',
@@ -177,18 +206,27 @@ export const Products = () => {
     { key: 'active', label: 'Status', type: 'boolean' },
   ];
 
-  const initialFilters: ProductFilter = {
-    name: '',
-    active: undefined,
-  };
+  const initialFilters: ProductFilter = isSaleMode
+    ? { name: '', active: undefined, availableForSale: true }
+    : { name: '', active: undefined, usedInServiceRecipe: true };
+
+  const pageTitle = isSaleMode ? 'Produtos (Venda)' : 'Produtos (Uso)';
+  const newButtonLabel = isSaleMode ? 'Novo Produto de Venda' : 'Novo Produto de Uso';
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="font-heading text-2xl font-bold text-[#3b3036]">Gerenciar Produtos</h2>
+        <div>
+          <h2 className="font-heading text-2xl font-bold text-[#3b3036]">Gerenciar {pageTitle}</h2>
+          <p className="text-xs text-[#3b3036]/60 mt-1">
+            {isSaleMode
+              ? 'Produtos vendidos ao cliente — no Fluxo de Caixa e nos atendimentos.'
+              : 'Produtos de uso interno consumidos na receita de um serviço (ex.: tintura, óleo).'}
+          </p>
+        </div>
         <PermissionGate method="POST" endpoint="/v1/products">
           <button onClick={() => handleOpenForm()} className="btn-premium">
-            <Plus size={18} /> Novo Produto
+            <Plus size={18} /> {newButtonLabel}
           </button>
         </PermissionGate>
       </div>
@@ -205,7 +243,11 @@ export const Products = () => {
       <ModalForm
         show={showForm}
         onHide={() => setShowForm(false)}
-        title={editingProduct ? 'Editar Produto' : 'Novo Produto'}
+        title={
+          editingProduct
+            ? isSaleMode ? 'Editar Produto de Venda' : 'Editar Produto de Uso'
+            : newButtonLabel
+        }
         onSubmit={handleSubmit(onSubmit)}
       >
         <div className="space-y-4">
@@ -221,21 +263,31 @@ export const Products = () => {
               <span className="text-xs text-rose-500 font-semibold">{errors.name.message}</span>
             )}
           </div>
-          <div>
-            <label className={labelCls}>Preço (R$) *</label>
-            <input
-              type="number"
-              step="0.01"
-              className={`${inputCls} ${errors.price ? 'border-rose-300' : ''}`}
-              {...register('price')}
-            />
-            {errors.price && (
-              <span className="text-xs text-rose-500 font-semibold">{errors.price.message}</span>
-            )}
-          </div>
+
+          {showPriceField && (
+            <div>
+              <label className={labelCls}>
+                Preço de Venda (R$) {isSaleMode && '*'}
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                className={`${inputCls} ${errors.price ? 'border-rose-300' : ''}`}
+                {...register('price')}
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Este é o valor cobrado da cliente — aparece no Fluxo de Caixa e no seletor de
+                produtos vendidos no atendimento.
+              </p>
+              {errors.price && (
+                <span className="text-xs text-rose-500 font-semibold">{errors.price.message}</span>
+              )}
+            </div>
+          )}
+
           <div className="border-t border-[#eae1e1]/50 pt-4">
             <h4 className="font-heading font-semibold text-sm text-[#3b3036] mb-3">
-              Custeio (opcional)
+              {isSaleMode ? 'Custeio (opcional)' : 'Quanto o salão pagou'}
             </h4>
             <p className="text-xs text-gray-400 -mt-2 mb-3">
               Usado só internamente pra calcular custo por atendimento nos relatórios — não
@@ -294,20 +346,21 @@ export const Products = () => {
 
           <div className="border-t border-[#eae1e1]/50 pt-4 space-y-2">
             <h4 className="font-heading font-semibold text-sm text-[#3b3036] mb-1">
-              Onde este produto aparece
+              Onde este produto também aparece
             </h4>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" className="rounded" {...register('availableForSale')} />
-              <span className="text-sm text-[#3b3036]">
-                Disponível para venda (Fluxo de Caixa e produtos vendidos no atendimento)
-              </span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" className="rounded" {...register('usedInServiceRecipe')} />
-              <span className="text-sm text-[#3b3036]">
-                Usado em receita de serviço (quanto o serviço consome)
-              </span>
-            </label>
+            {isSaleMode ? (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="rounded" {...register('usedInServiceRecipe')} />
+                <span className="text-sm text-[#3b3036]">
+                  Também usado na receita de serviço (uso interno)
+                </span>
+              </label>
+            ) : (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="rounded" {...register('availableForSale')} />
+                <span className="text-sm text-[#3b3036]">Também disponível para venda</span>
+              </label>
+            )}
           </div>
         </div>
       </ModalForm>

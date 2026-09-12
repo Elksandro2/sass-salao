@@ -232,7 +232,7 @@ export const AppointmentProductsExpensesEditor = ({
                       )
                       .map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.name} — R$ {p.price.toFixed(2)}
+                          {p.name} — R$ {(p.price ?? 0).toFixed(2)}
                         </option>
                       ))}
                   </select>

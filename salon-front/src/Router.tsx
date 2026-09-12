@@ -165,7 +165,15 @@ export const Router = () => {
           path="/admin/products"
           element={
             <ProtectedRoute allowedRoles={['ADMIN']}>
-              <Products />
+              <Products mode="sale" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/products/uso"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <Products mode="use" />
             </ProtectedRoute>
           }
         />
