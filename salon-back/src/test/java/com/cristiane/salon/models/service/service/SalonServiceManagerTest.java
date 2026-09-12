@@ -157,7 +157,7 @@ class SalonServiceManagerTest {
         SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true, null);
         when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
 
-        var usageRequest = new ServiceProductUsageRequest(30L, new BigDecimal("30"));
+        var usageRequest = new ServiceProductUsageRequest(30L, new BigDecimal("30"), null);
         SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, List.of(usageRequest), null);
 
         SalonServiceResponse result = salonServiceManager.create(request);
@@ -174,12 +174,65 @@ class SalonServiceManagerTest {
         SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true, null);
         when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
 
-        var usageRequest = new ServiceProductUsageRequest(99L, new BigDecimal("10"));
+        var usageRequest = new ServiceProductUsageRequest(99L, new BigDecimal("10"), null);
         SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, List.of(usageRequest), null);
 
         assertThatThrownBy(() -> salonServiceManager.create(request))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Produto não encontrado");
+    }
+
+    @Test
+    void create_withRecipeInDifferentButCompatibleUnit_shouldConvertBeforeCosting() {
+        // Produto embalado em Litro, mas a receita lança o consumo em ml — unidades diferentes,
+        // mesma grandeza (volume), deve converter em vez de tratar como incompatível.
+        com.cristiane.salon.models.product.entity.Product coloring =
+                new com.cristiane.salon.models.product.entity.Product();
+        coloring.setId(30L);
+        coloring.setName("Tintura");
+        coloring.setPrice(new BigDecimal("50.00"));
+        coloring.setCostPrice(new BigDecimal("40.00"));
+        coloring.setCapacity(new BigDecimal("1")); // 1 Litro
+        coloring.setUnit(com.cristiane.salon.models.product.entity.ProductUnit.L);
+
+        when(productRepository.findById(30L)).thenReturn(Optional.of(coloring));
+        when(serviceProductUsageRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        SalonService saved = new SalonService(1L, "Coloração", "Desc", new BigDecimal("100.0"), true, null);
+        when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
+
+        var usageRequest = new ServiceProductUsageRequest(
+                30L, new BigDecimal("30"), com.cristiane.salon.models.product.entity.ProductUnit.ML);
+        SalonServiceRequest request = new SalonServiceRequest("Coloração", "Desc", new BigDecimal("100.0"), true, List.of(usageRequest), null);
+
+        SalonServiceResponse result = salonServiceManager.create(request);
+
+        // custo/L = 40.00; 30ml = 0.03L; custo = 40 × 0.03 = 1.20
+        assertThat(result.estimatedProductCost()).isEqualByComparingTo("1.20");
+        assertThat(result.productUsages()).hasSize(1);
+        assertThat(result.productUsages().get(0).unit())
+                .isEqualTo(com.cristiane.salon.models.product.entity.ProductUnit.ML);
+    }
+
+    @Test
+    void create_withRecipeInIncompatibleUnit_shouldThrowBadRequestException() {
+        // Produto medido em ml (volume); receita tentando lançar em gramas (massa) não faz sentido.
+        com.cristiane.salon.models.product.entity.Product shampoo =
+                new com.cristiane.salon.models.product.entity.Product();
+        shampoo.setId(30L);
+        shampoo.setName("Shampoo");
+        shampoo.setUnit(com.cristiane.salon.models.product.entity.ProductUnit.ML);
+        when(productRepository.findById(30L)).thenReturn(Optional.of(shampoo));
+
+        SalonService saved = new SalonService(1L, "Corte", "Desc", new BigDecimal("50.0"), true, null);
+        when(salonServiceRepository.save(any(SalonService.class))).thenReturn(saved);
+
+        var usageRequest = new ServiceProductUsageRequest(
+                30L, new BigDecimal("30"), com.cristiane.salon.models.product.entity.ProductUnit.G);
+        SalonServiceRequest request = new SalonServiceRequest("Corte", "Desc", new BigDecimal("50.0"), true, List.of(usageRequest), null);
+
+        assertThatThrownBy(() -> salonServiceManager.create(request))
+                .isInstanceOf(com.cristiane.salon.exception.BadRequestException.class);
+        verify(serviceProductUsageRepository, never()).saveAll(any());
     }
 
     @Test

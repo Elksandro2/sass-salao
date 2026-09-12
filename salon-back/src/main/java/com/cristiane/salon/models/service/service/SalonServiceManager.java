@@ -103,10 +103,22 @@ public class SalonServiceManager {
         List<SalonServiceProductUsage> toSave = requests.stream().map(r -> {
             Product product = productRepository.findById(r.productId())
                     .orElseThrow(() -> new ResourceNotFoundException("Produto não encontrado"));
+
+            // A unidade da receita pode ser diferente da do produto (ex.: produto embalado em
+            // Litro, receita consome em ml) — só não pode ser de outra grandeza (ml pra g não
+            // faz sentido). Sem unidade em nenhum dos dois lados, não há o que validar.
+            if (r.unit() != null && product.getUnit() != null
+                    && r.unit().factorTo(product.getUnit()) == null) {
+                throw new BadRequestException(
+                        "A unidade da receita (" + r.unit() + ") não é conversível pra unidade "
+                                + "cadastrada no produto (" + product.getUnit() + ")");
+            }
+
             SalonServiceProductUsage usage = new SalonServiceProductUsage();
             usage.setSalonService(service);
             usage.setProduct(product);
             usage.setQuantityUsed(r.quantityUsed());
+            usage.setUnit(r.unit());
             return usage;
         }).collect(Collectors.toList());
 
