@@ -228,6 +228,12 @@ export const appointmentsApi = {
     return data;
   },
 
+  /** Exclusão definitiva (some da listagem e do banco) — diferente de cancel, que só muda o
+   * status. Só ADMIN/GERENTE, e só antes do agendamento virar fato financeiro. */
+  delete: async (id: number) => {
+    await api.delete(`/appointments/${id}`);
+  },
+
   updateStatus: async (id: number, status: string) => {
     const { data } = await api.patch<AppointmentResponse>(`/appointments/${id}/status`, null, {
       params: { status },

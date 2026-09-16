@@ -762,6 +762,36 @@ public class AppointmentService {
     }
 
     /**
+     * Exclui definitivamente um agendamento (erro de cadastro, duplicidade, etc.) — some da
+     * listagem e do banco de vez, diferente de {@link #cancel}, que só muda o status e mantém o
+     * registro no histórico. Só a equipe de gestão pode (ADMIN/GERENTE_DE_ATENDIMENTO), e só
+     * enquanto o agendamento não virou fato financeiro: nada de excluir algo que já foi
+     * concluído, pago ou faturado — aí a ferramenta certa é cancelar, não apagar.
+     */
+    @Transactional
+    public void delete(Long id) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
+
+        User currentUser = getAuthenticatedUser();
+        if (!isStaff(currentUser)) {
+            throw new UnauthorizedException("Você não tem permissão para excluir agendamentos");
+        }
+
+        if (appointment.getStatus() == AppointmentStatus.DONE) {
+            throw new BusinessException("Não é possível excluir um agendamento já concluído — ele faz parte do histórico e faturamento do salão.");
+        }
+        if (appointment.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new BusinessException("Não é possível excluir um agendamento que já foi pago.");
+        }
+        if (cashFlowRepository.existsByAppointmentId(id)) {
+            throw new BusinessException("Não é possível excluir um agendamento com lançamento financeiro associado.");
+        }
+
+        appointmentRepository.delete(appointment);
+    }
+
+    /**
      * Desfaz um cancelamento — só a equipe pode ("descancelar"), o cliente não. Volta pro
      * estado ativo que o agendamento teria se nunca tivesse sido cancelado: {@code CONFIRMED}
      * se já tinha horário definido (fluxo administrativo), ou {@code REQUESTED} se ainda estava

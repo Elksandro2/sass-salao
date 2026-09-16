@@ -17,6 +17,8 @@ vi.mock('../../../appointments/services/appointments', () => ({
     confirm: vi.fn(),
     decline: vi.fn(),
     cancel: vi.fn(),
+    reopen: vi.fn(),
+    delete: vi.fn(),
     updateStatus: vi.fn(),
     updatePaymentStatus: vi.fn(),
     generatePix: vi.fn(),
@@ -314,6 +316,46 @@ describe('AdminAppointments Component', () => {
     });
 
     expect(appointmentsApi.cancel).toHaveBeenCalledWith(2);
+  });
+
+  it('opens confirmation modal and deletes appointment when delete button is clicked', async () => {
+    vi.mocked(appointmentsApi.delete).mockResolvedValue(undefined);
+
+    await act(async () => {
+      renderAdminAppointments();
+    });
+
+    const deleteButtons = screen.getAllByRole('button', { name: 'Excluir' });
+    expect(deleteButtons.length).toBeGreaterThan(0);
+
+    // deleteButtons[0] belongs to Row 0 (Joao, ID 2)
+    fireEvent.click(deleteButtons[0]);
+
+    expect(screen.getByText('Excluir Agendamento')).toBeInTheDocument();
+
+    const confirmBtn = screen.getByRole('button', { name: 'Excluir definitivamente' });
+    await act(async () => {
+      fireEvent.click(confirmBtn);
+    });
+
+    expect(appointmentsApi.delete).toHaveBeenCalledWith(2);
+  });
+
+  it('disables the delete button for a completed (DONE) appointment', async () => {
+    vi.mocked(appointmentsApi.findAll).mockResolvedValue({
+      content: [{ ...mockAppointments[0], status: 'DONE' }],
+      totalPages: 1,
+      totalElements: 1,
+      size: 1000,
+      number: 0,
+    } as any);
+
+    await act(async () => {
+      renderAdminAppointments();
+    });
+
+    const deleteButton = screen.getByRole('button', { name: 'Excluir' });
+    expect(deleteButton).toBeDisabled();
   });
 
   it('allows defining date and period to confirm a requested appointment', async () => {

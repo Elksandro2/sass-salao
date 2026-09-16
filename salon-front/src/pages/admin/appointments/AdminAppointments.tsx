@@ -52,6 +52,8 @@ import {
   canCancel,
   getCancelBlockReason,
   canReopen,
+  canDelete,
+  getDeleteBlockReason,
   canChangeStatus,
   getStatusChangeBlockReason,
   getValidStatusOptions,
@@ -102,6 +104,10 @@ export const AdminAppointments = () => {
   const [showReopenConfirm, setShowReopenConfirm] = useState(false);
   const [appointmentToReopen, setAppointmentToReopen] = useState<number | null>(null);
   const [isReopening, setIsReopening] = useState(false);
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [appointmentToDelete, setAppointmentToDelete] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [confirmTarget, setConfirmTarget] = useState<AppointmentResponse | null>(null);
   const [confirmDate, setConfirmDate] = useState('');
@@ -350,6 +356,21 @@ export const AdminAppointments = () => {
       await showError(msg);
     } finally {
       setIsReopening(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!appointmentToDelete) return;
+    setIsDeleting(true);
+    try {
+      await appointmentsApi.delete(appointmentToDelete);
+      setShowDeleteConfirm(false);
+      loadAppointments();
+    } catch (error) {
+      const msg = getApiErrorMessage(error, 'Erro ao excluir agendamento');
+      await showError(msg);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -717,6 +738,8 @@ export const AdminAppointments = () => {
         const serviceNames = item.services.map((s) => s.serviceName).join(', ');
         const cancelDisabled = !canCancel(item);
         const cancelReason = getCancelBlockReason(item);
+        const deleteDisabled = !canDelete(item);
+        const deleteReason = getDeleteBlockReason(item);
 
         return (
           <div className="flex flex-col gap-1.5">
@@ -754,6 +777,27 @@ export const AdminAppointments = () => {
                 </button>
               </PermissionGate>
             )}
+
+            <PermissionGate method="DELETE" endpoint={`/v1/appointments/${item.id}`}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!deleteDisabled) {
+                    setAppointmentToDelete(item.id);
+                    setShowDeleteConfirm(true);
+                  }
+                }}
+                disabled={deleteDisabled}
+                title={deleteReason || undefined}
+                className={`w-full text-center px-2.5 py-1.5 border text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
+                  deleteDisabled
+                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed opacity-60'
+                    : 'border-rose-300 text-rose-700 bg-rose-50/50 hover:bg-rose-100 cursor-pointer hover:border-rose-400'
+                }`}
+              >
+                Excluir
+              </button>
+            </PermissionGate>
 
             {mercadoPagoEnabled && canGeneratePix(item) && (
               <>
@@ -1147,6 +1191,17 @@ export const AdminAppointments = () => {
         confirmLabel="Reabrir"
         variant="primary"
         isProcessing={isReopening}
+      />
+
+      <ConfirmDialog
+        show={showDeleteConfirm}
+        onHide={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title="Excluir Agendamento"
+        message="Tem certeza que deseja excluir este agendamento? Ele some da listagem e do sistema de vez — diferente de cancelar, não dá pra desfazer nem reabrir depois."
+        confirmLabel="Excluir definitivamente"
+        variant="danger"
+        isProcessing={isDeleting}
       />
 
       <PixPaymentModal

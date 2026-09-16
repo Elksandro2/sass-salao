@@ -80,6 +80,30 @@ export function canReopen(apt: AppointmentForRules): boolean {
 }
 
 /**
+ * Retorna `true` se o agendamento pode ser excluído definitivamente (some da listagem e do
+ * banco — diferente de cancelar, que só muda o status e mantém o histórico).
+ *
+ * Espelha as guard clauses do `delete()` no AppointmentService.java: bloqueado se já concluído
+ * ou já pago. O backend também bloqueia se já houver lançamento financeiro associado — essa
+ * checagem não tem como ser replicada aqui (não temos essa info na listagem), então o botão
+ * pode ficar habilitado e o backend ainda assim recusar; a mensagem de erro cobre esse caso.
+ */
+export function canDelete(apt: AppointmentForRules): boolean {
+  if (apt.status === 'DONE') return false;
+  if (apt.paymentStatus === 'PAID') return false;
+  return true;
+}
+
+/**
+ * Retorna o motivo pelo qual a exclusão está bloqueada, ou `null` se pode excluir.
+ */
+export function getDeleteBlockReason(apt: AppointmentForRules): string | null {
+  if (apt.status === 'DONE') return 'Agendamentos concluídos não podem ser excluídos — eles já fazem parte do histórico e faturamento do salão.';
+  if (apt.paymentStatus === 'PAID') return 'Agendamentos pagos não podem ser excluídos.';
+  return null;
+}
+
+/**
  * Retorna `true` se o status do agendamento pode ser alterado pelo admin.
  *
  * Espelha as guard clauses do `updateStatus()` no AppointmentService.java:

@@ -131,6 +131,15 @@ public class AppointmentController {
         return ResponseEntity.ok(appointmentService.cancel(id));
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Auditable(action = "APPOINTMENT_DELETED", entityType = "Appointment", captureArgs = true)
+    @Operation(summary = "Exclui definitivamente um agendamento (Admin/Gerente) — só se ainda não virou fato financeiro")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        appointmentService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @PatchMapping("/{id}/reopen")
     @PreAuthorize("isAuthenticated()")
     @Auditable(action = "APPOINTMENT_REOPENED", entityType = "Appointment", captureArgs = true)

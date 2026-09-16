@@ -1366,6 +1366,108 @@ class AppointmentServiceTest {
                 .hasMessageContaining("estorno");
     }
 
+    // --- delete tests ---
+
+    @Test
+    void delete_whenNotFound_shouldThrowResourceNotFoundException() {
+        mockAuthenticatedUser(staffUser);
+        when(appointmentRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> appointmentService.delete(99L))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void delete_whenClientTries_shouldThrowUnauthorizedException() {
+        // Exclusão é ação de gestão (ADMIN/GERENTE) — nem o dono do agendamento pode excluir,
+        // só cancelar.
+        mockAuthenticatedUser(clientUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setClient(clientUser);
+        apt.setStatus(AppointmentStatus.REQUESTED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        assertThatThrownBy(() -> appointmentService.delete(1L))
+                .isInstanceOf(UnauthorizedException.class);
+        verify(appointmentRepository, never()).delete(any(Appointment.class));
+    }
+
+    @Test
+    void delete_whenFuncionariaTries_shouldThrowUnauthorizedException() {
+        // FUNCIONARIA cancela/reabre os próprios, mas exclusão definitiva fica só com ADMIN/GERENTE.
+        mockAuthenticatedUser(professionalUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setEmployee(employee);
+        apt.setStatus(AppointmentStatus.REQUESTED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        assertThatThrownBy(() -> appointmentService.delete(1L))
+                .isInstanceOf(UnauthorizedException.class);
+        verify(appointmentRepository, never()).delete(any(Appointment.class));
+    }
+
+    @Test
+    void delete_whenAppointmentIsDone_shouldThrowBusinessException() {
+        mockAuthenticatedUser(staffUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setStatus(AppointmentStatus.DONE);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        assertThatThrownBy(() -> appointmentService.delete(1L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("concluído");
+        verify(appointmentRepository, never()).delete(any(Appointment.class));
+    }
+
+    @Test
+    void delete_whenPaymentIsPaid_shouldThrowBusinessException() {
+        mockAuthenticatedUser(staffUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setStatus(AppointmentStatus.CONFIRMED);
+        apt.setPaymentStatus(com.cristiane.salon.models.appointment.enums.PaymentStatus.PAID);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        assertThatThrownBy(() -> appointmentService.delete(1L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("pago");
+        verify(appointmentRepository, never()).delete(any(Appointment.class));
+    }
+
+    @Test
+    void delete_whenCashFlowEntryExists_shouldThrowBusinessException() {
+        // Guarda extra além do status/pagamento: se já virou lançamento financeiro por qualquer
+        // caminho, não é mais um "engano de cadastro" — é fato do caixa.
+        mockAuthenticatedUser(staffUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(cashFlowRepository.existsByAppointmentId(1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> appointmentService.delete(1L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("lançamento financeiro");
+        verify(appointmentRepository, never()).delete(any(Appointment.class));
+    }
+
+    @Test
+    void delete_whenSuccessByAdmin_shouldRemoveAppointment() {
+        mockAuthenticatedUser(staffUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setStatus(AppointmentStatus.REQUESTED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(cashFlowRepository.existsByAppointmentId(1L)).thenReturn(false);
+
+        appointmentService.delete(1L);
+
+        verify(appointmentRepository).delete(eq(apt));
+    }
+
     // --- reopen ("descancelar") tests ---
 
     @Test
