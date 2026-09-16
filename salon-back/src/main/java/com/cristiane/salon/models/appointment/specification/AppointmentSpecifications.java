@@ -62,8 +62,11 @@ public class AppointmentSpecifications {
     }
 
     // Replica a cadeia de fallback usada em AppointmentRepository.findAllInPeriod
-    // (scheduledAt > preferredDate > createdAt) — mesma regra de negócio, aqui expressa via
-    // Criteria API pra poder compor com os demais filtros dinamicamente.
+    // (scheduledAt > scheduledDate > preferredDate > createdAt) — mesma regra de negócio, aqui
+    // expressa via Criteria API pra poder compor com os demais filtros dinamicamente. O filtro
+    // De/Até (e o atalho "Agendamentos de Hoje") tem que achar pelo dia PRA QUAL o atendimento
+    // está marcado, não pelo dia em que foi cadastrado — createdAt só entra como último recurso,
+    // pra pedido do cliente ainda sem dia nenhum definido (nem scheduledDate nem preferredDate).
     private static Predicate periodPredicate(Root<Appointment> root, CriteriaBuilder cb, LocalDate from, LocalDate to) {
         LocalDateTime startOfDay = from.atStartOfDay();
         LocalDateTime endOfDay = to.atTime(LocalTime.MAX);
@@ -72,18 +75,25 @@ public class AppointmentSpecifications {
                 cb.isNotNull(root.get("scheduledAt")),
                 cb.between(root.get("scheduledAt").as(LocalDateTime.class), startOfDay, endOfDay)
         );
+        Predicate byScheduledDate = cb.and(
+                cb.isNull(root.get("scheduledAt")),
+                cb.isNotNull(root.get("scheduledDate")),
+                cb.between(root.get("scheduledDate").as(LocalDate.class), from, to)
+        );
         Predicate byPreferredDate = cb.and(
                 cb.isNull(root.get("scheduledAt")),
+                cb.isNull(root.get("scheduledDate")),
                 cb.isNotNull(root.get("preferredDate")),
                 cb.between(root.get("preferredDate").as(LocalDate.class), from, to)
         );
         Predicate byCreatedAt = cb.and(
                 cb.isNull(root.get("scheduledAt")),
+                cb.isNull(root.get("scheduledDate")),
                 cb.isNull(root.get("preferredDate")),
                 cb.isNotNull(root.get("createdAt")),
                 cb.between(root.get("createdAt").as(LocalDateTime.class), startOfDay, endOfDay)
         );
 
-        return cb.or(byScheduledAt, byPreferredDate, byCreatedAt);
+        return cb.or(byScheduledAt, byScheduledDate, byPreferredDate, byCreatedAt);
     }
 }

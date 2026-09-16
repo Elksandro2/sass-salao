@@ -175,6 +175,34 @@ class AppointmentSpecificationsTest {
     }
 
     @Test
+    void filter_byPeriod_matchesConfirmedAppointmentUsingScheduledDateFallback() {
+        // Agendamento por bloco (manhã/tarde) da equipe: sem scheduledAt, sem preferredDate
+        // (preferredDate é só do fluxo de pedido do cliente) — tem que ser achado pelo dia PRA
+        // QUAL está marcado (scheduledDate), não pelo dia em que foi criado (createdAt). Esse é
+        // exatamente o bug do filtro "Agendamentos de Hoje": antes caía no fallback de createdAt.
+        Appointment scheduled = newAppointment(alice, AppointmentStatus.CONFIRMED);
+        scheduled.setScheduledDate(LocalDate.of(2026, 8, 15));
+        scheduled.setScheduledPeriod(com.cristiane.salon.models.appointment.enums.AppointmentPeriod.MORNING);
+        appointmentRepository.save(scheduled);
+
+        Appointment outOfRange = newAppointment(bob, AppointmentStatus.CONFIRMED);
+        outOfRange.setScheduledDate(LocalDate.of(2026, 1, 1));
+        outOfRange.setScheduledPeriod(com.cristiane.salon.models.appointment.enums.AppointmentPeriod.AFTERNOON);
+        appointmentRepository.save(outOfRange);
+
+        AppointmentFilter filter = new AppointmentFilter(
+                AppointmentStatus.CONFIRMED, null, employee.getId(), null, null,
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31)
+        );
+        List<Appointment> result = appointmentRepository.findAll(
+                AppointmentSpecifications.filter(filter), PageRequest.of(0, 10)
+        ).getContent();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getClient().getId()).isEqualTo(alice.getId());
+    }
+
+    @Test
     void filter_byPeriod_prefersScheduledAtOverPreferredDateWhenBothPresent() {
         Appointment apt = newAppointment(alice, AppointmentStatus.CONFIRMED);
         apt.setScheduledAt(LocalDateTime.of(2026, 8, 10, 14, 0));
