@@ -18,6 +18,7 @@ import { employeesApi } from '../employees/services/employees';
 import type { EmployeeData } from '../employees/services/employees';
 import { businessSettingsService } from '../../../services/businessSettings';
 import { getApiErrorMessage } from '../../../utils/apiError';
+import { formatApiDate } from '../../../utils/datetime';
 import { useAlert } from '../../../hooks/useAlert';
 
 const inputCls = 'input-premium';
@@ -253,7 +254,7 @@ export const CashFlow = () => {
     {
       key: 'date',
       label: 'Data',
-      render: (item: CashFlowData) => new Date(item.date).toLocaleDateString('pt-BR'),
+      render: (item: CashFlowData) => formatApiDate(item.date),
     },
     {
       key: 'description',

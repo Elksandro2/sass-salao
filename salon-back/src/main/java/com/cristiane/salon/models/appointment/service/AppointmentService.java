@@ -754,6 +754,11 @@ public class AppointmentService {
         // Cancelar o agendamento já cancela o pagamento junto — não existe mais uma opção manual
         // separada pra isso (ver updatePaymentStatus): a intenção de cancelar tudo é uma só ação.
         appointment.setPaymentStatus(PaymentStatus.CANCELLED);
+        // Se este agendamento chegou a ser marcado DONE e faturado no Caixa antes de ser
+        // cancelado (ex.: status corrigido depois de um engano), desfaz o lançamento — pagamento
+        // PAID de verdade já bloqueou a guard clause acima, então isso nunca mexe em dinheiro
+        // efetivamente recebido. Cancelado não deve deixar receita fantasma nos relatórios.
+        cashFlowRepository.findByAppointmentId(id).ifPresent(cashFlowRepository::delete);
         Appointment saved = appointmentRepository.save(appointment);
         emailService.sendCancellationNotification(saved);
         pushService.sendToUser(saved.getClient().getId(), "Agendamento cancelado",
@@ -765,8 +770,10 @@ public class AppointmentService {
      * Exclui definitivamente um agendamento (erro de cadastro, duplicidade, etc.) — some da
      * listagem e do banco de vez, diferente de {@link #cancel}, que só muda o status e mantém o
      * registro no histórico. Só a equipe de gestão pode (ADMIN/GERENTE_DE_ATENDIMENTO), e só
-     * enquanto o agendamento não virou fato financeiro: nada de excluir algo que já foi
-     * concluído, pago ou faturado — aí a ferramenta certa é cancelar, não apagar.
+     * enquanto o agendamento não representa um fato financeiro real: nada de excluir algo que já
+     * foi concluído ou pago de verdade — aí a ferramenta certa é cancelar, não apagar. Um
+     * lançamento remanescente no Caixa (ex.: agendamento que passou por DONE e foi corrigido
+     * depois) não bloqueia — é removido junto, igual {@link #cancel} já faz.
      */
     @Transactional
     public void delete(Long id) {
@@ -784,9 +791,7 @@ public class AppointmentService {
         if (appointment.getPaymentStatus() == PaymentStatus.PAID) {
             throw new BusinessException("Não é possível excluir um agendamento que já foi pago.");
         }
-        if (cashFlowRepository.existsByAppointmentId(id)) {
-            throw new BusinessException("Não é possível excluir um agendamento com lançamento financeiro associado.");
-        }
+        cashFlowRepository.findByAppointmentId(id).ifPresent(cashFlowRepository::delete);
 
         appointmentRepository.delete(appointment);
     }

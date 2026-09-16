@@ -1350,6 +1350,29 @@ class AppointmentServiceTest {
     }
 
     @Test
+    void cancel_whenCashFlowEntryExists_shouldRemoveIt() {
+        // Agendamento que passou por DONE (faturou no Caixa) e depois teve o status corrigido —
+        // cancelar precisa desfazer esse lançamento, senão fica receita fantasma nos relatórios
+        // e a exclusão trava depois (ver delete_whenCashFlowEntryExists_shouldRemoveItAndDeleteAppointment).
+        mockAuthenticatedUser(staffUser);
+        Appointment apt = new Appointment();
+        apt.setId(1L);
+        apt.setClient(clientUser);
+        apt.setEmployee(employee);
+        withService(apt, salonService);
+        apt.setStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        com.cristiane.salon.models.cashflow.entity.CashFlow orphanedCashFlow =
+                new com.cristiane.salon.models.cashflow.entity.CashFlow();
+        when(cashFlowRepository.findByAppointmentId(1L)).thenReturn(Optional.of(orphanedCashFlow));
+
+        appointmentService.cancel(1L);
+
+        verify(cashFlowRepository).delete(orphanedCashFlow);
+    }
+
+    @Test
     void cancel_whenPaymentIsPaid_shouldThrowBusinessException() {
         // Não é possível cancelar um agendamento com pagamento confirmado sem estorno prévio
         mockAuthenticatedUser(staffUser);
@@ -1438,20 +1461,23 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void delete_whenCashFlowEntryExists_shouldThrowBusinessException() {
-        // Guarda extra além do status/pagamento: se já virou lançamento financeiro por qualquer
-        // caminho, não é mais um "engano de cadastro" — é fato do caixa.
+    void delete_whenCashFlowEntryExists_shouldRemoveItAndDeleteAppointment() {
+        // Lançamento remanescente (ex.: agendamento que passou por DONE — faturou — e depois foi
+        // corrigido pra outro status) não é mais um pagamento de verdade (isso já bloqueou acima
+        // via PAID). Exclusão limpa o lançamento órfão junto, em vez de travar nele.
         mockAuthenticatedUser(staffUser);
         Appointment apt = new Appointment();
         apt.setId(1L);
-        apt.setStatus(AppointmentStatus.CONFIRMED);
+        apt.setStatus(AppointmentStatus.CANCELLED);
         when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
-        when(cashFlowRepository.existsByAppointmentId(1L)).thenReturn(true);
+        com.cristiane.salon.models.cashflow.entity.CashFlow orphanedCashFlow =
+                new com.cristiane.salon.models.cashflow.entity.CashFlow();
+        when(cashFlowRepository.findByAppointmentId(1L)).thenReturn(Optional.of(orphanedCashFlow));
 
-        assertThatThrownBy(() -> appointmentService.delete(1L))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("lançamento financeiro");
-        verify(appointmentRepository, never()).delete(any(Appointment.class));
+        appointmentService.delete(1L);
+
+        verify(cashFlowRepository).delete(orphanedCashFlow);
+        verify(appointmentRepository).delete(eq(apt));
     }
 
     @Test
@@ -1461,10 +1487,10 @@ class AppointmentServiceTest {
         apt.setId(1L);
         apt.setStatus(AppointmentStatus.REQUESTED);
         when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
-        when(cashFlowRepository.existsByAppointmentId(1L)).thenReturn(false);
 
         appointmentService.delete(1L);
 
+        verify(cashFlowRepository, never()).delete(any(com.cristiane.salon.models.cashflow.entity.CashFlow.class));
         verify(appointmentRepository).delete(eq(apt));
     }
 
