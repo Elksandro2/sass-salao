@@ -65,6 +65,15 @@ public class SalonServiceController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{id}/permanent")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Auditable(action = "DELETE_PERMANENT", entityType = "SERVICE", captureArgs = true)
+    @Operation(summary = "Exclui definitivamente um serviço (Admin) — só se nunca foi realizado em atendimento")
+    public ResponseEntity<Void> deletePermanently(@PathVariable Long id) {
+        salonServiceManager.permanentlyDelete(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @PatchMapping("/{id}/reactivate")
     @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
     @Auditable(action = "RESTORE", entityType = "SERVICE", captureArgs = true)

@@ -1,7 +1,9 @@
 package com.cristiane.salon.models.service.service;
 
 import com.cristiane.salon.exception.BadRequestException;
+import com.cristiane.salon.exception.BusinessException;
 import com.cristiane.salon.exception.ResourceNotFoundException;
+import com.cristiane.salon.models.appointment.repository.AppointmentServiceItemRepository;
 import com.cristiane.salon.models.product.entity.Product;
 import com.cristiane.salon.models.product.repository.ProductRepository;
 import com.cristiane.salon.models.service.dto.SalonServiceFilter;
@@ -31,6 +33,7 @@ public class SalonServiceManager {
     private final SalonServiceRepository salonServiceRepository;
     private final SalonServiceProductUsageRepository serviceProductUsageRepository;
     private final ProductRepository productRepository;
+    private final AppointmentServiceItemRepository appointmentServiceItemRepository;
 
     private List<ServiceProductUsageResponse> loadUsages(Long serviceId) {
         return serviceProductUsageRepository.findBySalonServiceId(serviceId).stream()
@@ -133,6 +136,26 @@ public class SalonServiceManager {
                 .orElseThrow(() -> new ResourceNotFoundException("Serviço não encontrado"));
         service.setActive(false);
         salonServiceRepository.save(service);
+    }
+
+    /**
+     * Exclusão definitiva (some do banco de vez) — diferente de {@link #delete}, que só
+     * desativa e mantém o cadastro (reversível via {@link #reactivate}). Só permitida quando o
+     * serviço nunca foi realizado em nenhum atendimento: apagar de vez corromperia esse
+     * histórico. A própria receita do serviço (tb_salon_service_product_usage) cai sozinha via
+     * ON DELETE CASCADE — não precisa de limpeza manual aqui.
+     */
+    @Transactional
+    public void permanentlyDelete(Long id) {
+        SalonService service = salonServiceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Serviço não encontrado"));
+
+        if (appointmentServiceItemRepository.existsBySalonServiceId(id)) {
+            throw new BusinessException(
+                    "Não é possível excluir um serviço já realizado em algum atendimento — desative-o em vez de excluir.");
+        }
+
+        salonServiceRepository.delete(service);
     }
 
     @Transactional

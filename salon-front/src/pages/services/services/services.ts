@@ -66,6 +66,11 @@ export const salonServicesApi = {
     await api.delete(`/services/${id}`);
   },
 
+  /** Exclusão definitiva (some do banco de vez) — só funciona se o serviço nunca foi usado. */
+  deletePermanently: async (id: number) => {
+    await api.delete(`/services/${id}/permanent`);
+  },
+
   reactivate: async (id: number) => {
     const { data } = await api.patch<SalonServiceData>(`/services/${id}/reactivate`);
     return data;

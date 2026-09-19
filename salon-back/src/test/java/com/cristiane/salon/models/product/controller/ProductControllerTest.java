@@ -118,4 +118,14 @@ class ProductControllerTest extends BaseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNoContent());
     }
+
+    @Test
+    @WithMockUser
+    void deletePermanentlyReturnsNoContent() throws Exception {
+        doNothing().when(productService).permanentlyDelete(eq(3L));
+
+        mvc.perform(delete("/v1/products/3/permanent")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNoContent());
+    }
 }

@@ -60,6 +60,11 @@ export const productsApi = {
     await api.delete(`/products/${id}`);
   },
 
+  /** Exclusão definitiva (some do banco de vez) — só funciona se o produto nunca foi usado. */
+  deletePermanently: async (id: number) => {
+    await api.delete(`/products/${id}/permanent`);
+  },
+
   reactivate: async (id: number) => {
     const { data } = await api.patch<ProductData>(`/products/${id}/reactivate`);
     return data;

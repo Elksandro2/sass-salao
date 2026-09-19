@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Edit, Trash2, RotateCcw } from 'lucide-react';
+import { Plus, Edit, Trash2, RotateCcw, Ban } from 'lucide-react';
 import { DataTable } from '../../../components/table/DataTable';
 import type { FilterField } from '../../../components/table/DataTable';
 import { ModalForm } from '../../../components/modal/ModalForm';
@@ -41,7 +41,7 @@ export const AdminServices = () => {
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [serviceTargetId, setServiceTargetId] = useState<number | null>(null);
-  const [confirmAction, setConfirmAction] = useState<'delete' | 'reactivate'>('delete');
+  const [confirmAction, setConfirmAction] = useState<'delete' | 'reactivate' | 'permanent'>('delete');
 
   const [products, setProducts] = useState<ProductData[]>([]);
   const [usageRows, setUsageRows] = useState<UsageRow[]>([]);
@@ -139,6 +139,8 @@ export const AdminServices = () => {
     try {
       if (confirmAction === 'delete') {
         await salonServicesApi.delete(serviceTargetId);
+      } else if (confirmAction === 'permanent') {
+        await salonServicesApi.deletePermanently(serviceTargetId);
       } else {
         await salonServicesApi.reactivate(serviceTargetId);
       }
@@ -146,7 +148,11 @@ export const AdminServices = () => {
       setRefreshTrigger((prev) => prev + 1);
     } catch (err) {
       const fallbackMsg =
-        confirmAction === 'delete' ? 'Erro ao excluir serviço.' : 'Erro ao reativar serviço.';
+        confirmAction === 'delete'
+          ? 'Erro ao desativar serviço.'
+          : confirmAction === 'permanent'
+            ? 'Erro ao excluir serviço.'
+            : 'Erro ao reativar serviço.';
       const msg = getApiErrorMessage(err, fallbackMsg);
       await showError(msg);
     }
@@ -203,10 +209,10 @@ export const AdminServices = () => {
                     setConfirmAction('delete');
                     setShowConfirm(true);
                   }}
-                  className="p-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition-all cursor-pointer"
-                  title="Excluir Serviço"
+                  className="p-1.5 text-amber-600 hover:bg-amber-50 border border-amber-200 rounded-lg transition-all cursor-pointer"
+                  title="Desativar Serviço"
                 >
-                  <Trash2 size={15} />
+                  <Ban size={15} />
                 </button>
               </PermissionGate>
             </>
@@ -226,6 +232,19 @@ export const AdminServices = () => {
               </button>
             </PermissionGate>
           )}
+          <PermissionGate method="DELETE" endpoint={`/v1/services/${item.id}/permanent`}>
+            <button
+              onClick={() => {
+                setServiceTargetId(item.id!);
+                setConfirmAction('permanent');
+                setShowConfirm(true);
+              }}
+              className="p-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition-all cursor-pointer"
+              title="Excluir Serviço Definitivamente"
+            >
+              <Trash2 size={15} />
+            </button>
+          </PermissionGate>
         </div>
       ),
     },
@@ -429,14 +448,22 @@ export const AdminServices = () => {
         show={showConfirm}
         onHide={() => setShowConfirm(false)}
         onConfirm={handleConfirmAction}
-        title={confirmAction === 'delete' ? 'Excluir Serviço' : 'Reativar Serviço'}
+        title={
+          confirmAction === 'delete'
+            ? 'Desativar Serviço'
+            : confirmAction === 'permanent'
+              ? 'Excluir Serviço Definitivamente'
+              : 'Reativar Serviço'
+        }
         message={
           confirmAction === 'delete'
-            ? 'Tem certeza que deseja excluir este serviço? Esta ação não pode ser desfeita.'
-            : 'Tem certeza que deseja reativar este serviço? Ele aparecerá novamente nas listagens públicas.'
+            ? 'Tem certeza que deseja desativar este serviço? Ele some das listagens, mas pode ser reativado depois.'
+            : confirmAction === 'permanent'
+              ? 'Tem certeza que deseja excluir este serviço definitivamente? Esta ação não pode ser desfeita — só funciona se ele nunca foi realizado em nenhum atendimento.'
+              : 'Tem certeza que deseja reativar este serviço? Ele aparecerá novamente nas listagens públicas.'
         }
-        confirmLabel={confirmAction === 'delete' ? 'Excluir' : 'Reativar'}
-        variant={confirmAction === 'delete' ? 'danger' : 'primary'}
+        confirmLabel={confirmAction === 'delete' ? 'Desativar' : confirmAction === 'permanent' ? 'Excluir' : 'Reativar'}
+        variant={confirmAction === 'reactivate' ? 'primary' : 'danger'}
       />
     </div>
   );

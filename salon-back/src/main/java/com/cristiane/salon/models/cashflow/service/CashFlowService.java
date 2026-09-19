@@ -109,11 +109,16 @@ public class CashFlowService {
 
             String itemsSummary = String.join(", ", itemDescriptions);
             String desc = request.description();
+            String composedDescription;
             if (desc == null || desc.trim().isEmpty() || desc.equalsIgnoreCase("Venda de Produtos") || desc.equalsIgnoreCase("Venda de Produto")) {
-                cashFlow.setDescription("Venda de Produtos: " + itemsSummary);
+                composedDescription = "Venda de Produtos: " + itemsSummary;
             } else {
-                cashFlow.setDescription(desc + " (" + itemsSummary + ")");
+                composedDescription = desc + " (" + itemsSummary + ")";
             }
+            // Um carrinho com muitos itens (ou nomes de produto longos) pode passar do limite da
+            // coluna mesmo sem nenhum texto livre digitado pela pessoa — trunca em vez de deixar
+            // estourar a constraint do banco (ver V82, mesmo bug que afetava despesa manual).
+            cashFlow.setDescription(truncate(composedDescription, 500));
 
             cashFlow.setDate(request.date());
         } else {
@@ -178,5 +183,9 @@ public class CashFlowService {
             throw new ResourceNotFoundException("Registro não encontrado");
         }
         cashFlowRepository.deleteById(id);
+    }
+
+    private static String truncate(String value, int maxLength) {
+        return value.length() > maxLength ? value.substring(0, maxLength) : value;
     }
 }

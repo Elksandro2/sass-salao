@@ -1,13 +1,16 @@
 package com.cristiane.salon.models.product.service;
 
 import com.cristiane.salon.exception.BadRequestException;
+import com.cristiane.salon.exception.BusinessException;
 import com.cristiane.salon.exception.ResourceNotFoundException;
+import com.cristiane.salon.models.appointment.repository.AppointmentProductItemRepository;
 import com.cristiane.salon.models.product.dto.ProductFilter;
 import com.cristiane.salon.models.product.dto.ProductRequest;
 import com.cristiane.salon.models.product.dto.ProductResponse;
 import com.cristiane.salon.models.product.entity.Product;
 import com.cristiane.salon.models.product.repository.ProductRepository;
 import com.cristiane.salon.models.product.specification.ProductSpecifications;
+import com.cristiane.salon.models.service.repository.SalonServiceProductUsageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +24,8 @@ import java.math.BigDecimal;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final AppointmentProductItemRepository appointmentProductItemRepository;
+    private final SalonServiceProductUsageRepository serviceProductUsageRepository;
 
     @Transactional(readOnly = true)
     public Page<ProductResponse> findAll(ProductFilter filter, Pageable pageable) {
@@ -97,6 +102,29 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Produto não encontrado"));
         product.setActive(false);
         productRepository.save(product);
+    }
+
+    /**
+     * Exclusão definitiva (some do banco de vez) — diferente de {@link #delete}, que só
+     * desativa e mantém o cadastro (reversível via {@link #reactivate}). Só permitida quando o
+     * produto nunca foi vendido em nenhum atendimento nem consta na receita de nenhum serviço:
+     * apagar de vez um produto com histórico corromperia esses registros.
+     */
+    @Transactional
+    public void permanentlyDelete(Long id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Produto não encontrado"));
+
+        if (appointmentProductItemRepository.existsByProductId(id)) {
+            throw new BusinessException(
+                    "Não é possível excluir um produto já vendido em algum atendimento — desative-o em vez de excluir.");
+        }
+        if (serviceProductUsageRepository.existsByProductId(id)) {
+            throw new BusinessException(
+                    "Não é possível excluir um produto usado na receita de algum serviço — remova-o da receita primeiro.");
+        }
+
+        productRepository.delete(product);
     }
 
     @Transactional

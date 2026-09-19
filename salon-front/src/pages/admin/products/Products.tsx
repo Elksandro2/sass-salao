@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Edit, Trash2, RotateCcw } from 'lucide-react';
+import { Plus, Edit, Trash2, RotateCcw, Ban } from 'lucide-react';
 import { DataTable } from '../../../components/table/DataTable';
 import type { FilterField } from '../../../components/table/DataTable';
 import { ModalForm } from '../../../components/modal/ModalForm';
@@ -36,7 +36,7 @@ export const Products = ({ mode }: ProductsProps) => {
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [productTargetId, setProductTargetId] = useState<number | null>(null);
-  const [confirmAction, setConfirmAction] = useState<'delete' | 'reactivate'>('delete');
+  const [confirmAction, setConfirmAction] = useState<'delete' | 'reactivate' | 'permanent'>('delete');
 
 
   const {
@@ -115,6 +115,8 @@ export const Products = ({ mode }: ProductsProps) => {
     try {
       if (confirmAction === 'delete') {
         await productsApi.delete(productTargetId);
+      } else if (confirmAction === 'permanent') {
+        await productsApi.deletePermanently(productTargetId);
       } else {
         await productsApi.reactivate(productTargetId);
       }
@@ -122,7 +124,11 @@ export const Products = ({ mode }: ProductsProps) => {
       setRefreshTrigger((prev) => prev + 1);
     } catch (err) {
       const fallbackMsg =
-        confirmAction === 'delete' ? 'Erro ao excluir produto.' : 'Erro ao reativar produto.';
+        confirmAction === 'delete'
+          ? 'Erro ao desativar produto.'
+          : confirmAction === 'permanent'
+            ? 'Erro ao excluir produto.'
+            : 'Erro ao reativar produto.';
       const msg = getApiErrorMessage(err, fallbackMsg);
       await showError(msg);
     }
@@ -173,10 +179,10 @@ export const Products = ({ mode }: ProductsProps) => {
                     setConfirmAction('delete');
                     setShowConfirm(true);
                   }}
-                  className="p-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition-all cursor-pointer"
-                  title="Excluir Produto"
+                  className="p-1.5 text-amber-600 hover:bg-amber-50 border border-amber-200 rounded-lg transition-all cursor-pointer"
+                  title="Desativar Produto"
                 >
-                  <Trash2 size={15} />
+                  <Ban size={15} />
                 </button>
               </PermissionGate>
             </>
@@ -196,6 +202,19 @@ export const Products = ({ mode }: ProductsProps) => {
               </button>
             </PermissionGate>
           )}
+          <PermissionGate method="DELETE" endpoint={`/v1/products/${item.id}/permanent`}>
+            <button
+              onClick={() => {
+                setProductTargetId(item.id!);
+                setConfirmAction('permanent');
+                setShowConfirm(true);
+              }}
+              className="p-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition-all cursor-pointer"
+              title="Excluir Produto Definitivamente"
+            >
+              <Trash2 size={15} />
+            </button>
+          </PermissionGate>
         </div>
       ),
     },
@@ -369,14 +388,22 @@ export const Products = ({ mode }: ProductsProps) => {
         show={showConfirm}
         onHide={() => setShowConfirm(false)}
         onConfirm={handleConfirmAction}
-        title={confirmAction === 'delete' ? 'Excluir Produto' : 'Reativar Produto'}
+        title={
+          confirmAction === 'delete'
+            ? 'Desativar Produto'
+            : confirmAction === 'permanent'
+              ? 'Excluir Produto Definitivamente'
+              : 'Reativar Produto'
+        }
         message={
           confirmAction === 'delete'
-            ? 'Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.'
-            : 'Tem certeza que deseja reativar este produto? Ele aparecerá novamente nas listagens públicas.'
+            ? 'Tem certeza que deseja desativar este produto? Ele some das listagens, mas pode ser reativado depois.'
+            : confirmAction === 'permanent'
+              ? 'Tem certeza que deseja excluir este produto definitivamente? Esta ação não pode ser desfeita — só funciona se ele nunca foi usado em nenhum atendimento ou receita.'
+              : 'Tem certeza que deseja reativar este produto? Ele aparecerá novamente nas listagens públicas.'
         }
-        confirmLabel={confirmAction === 'delete' ? 'Excluir' : 'Reativar'}
-        variant={confirmAction === 'delete' ? 'danger' : 'primary'}
+        confirmLabel={confirmAction === 'delete' ? 'Desativar' : confirmAction === 'permanent' ? 'Excluir' : 'Reativar'}
+        variant={confirmAction === 'reactivate' ? 'primary' : 'danger'}
       />
     </div>
   );

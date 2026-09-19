@@ -1,11 +1,14 @@
 package com.cristiane.salon.models.product.service;
 
+import com.cristiane.salon.exception.BusinessException;
 import com.cristiane.salon.exception.ResourceNotFoundException;
+import com.cristiane.salon.models.appointment.repository.AppointmentProductItemRepository;
 import com.cristiane.salon.models.product.dto.ProductFilter;
 import com.cristiane.salon.models.product.dto.ProductRequest;
 import com.cristiane.salon.models.product.dto.ProductResponse;
 import com.cristiane.salon.models.product.entity.Product;
 import com.cristiane.salon.models.product.repository.ProductRepository;
+import com.cristiane.salon.models.service.repository.SalonServiceProductUsageRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -36,6 +39,12 @@ class ProductServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private AppointmentProductItemRepository appointmentProductItemRepository;
+
+    @Mock
+    private SalonServiceProductUsageRepository serviceProductUsageRepository;
 
     @Test
     void findAll_shouldReturnPageFromRepository() {
@@ -183,6 +192,55 @@ class ProductServiceTest {
         // Act & Assert
         assertThatThrownBy(() -> productService.delete(id))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void permanentlyDelete_whenNeverUsed_shouldRemoveFromDatabase() {
+        Long id = 1L;
+        Product product = new Product(id, "P", new BigDecimal("10.0"), true, null, null, null, null, null, null);
+        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(appointmentProductItemRepository.existsByProductId(id)).thenReturn(false);
+        when(serviceProductUsageRepository.existsByProductId(id)).thenReturn(false);
+
+        productService.permanentlyDelete(id);
+
+        verify(productRepository).delete(product);
+    }
+
+    @Test
+    void permanentlyDelete_whenNotFound_shouldThrowResourceNotFoundException() {
+        Long id = 1L;
+        when(productRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> productService.permanentlyDelete(id))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void permanentlyDelete_whenAlreadySoldInAppointment_shouldThrowBusinessException() {
+        Long id = 1L;
+        Product product = new Product(id, "P", new BigDecimal("10.0"), true, null, null, null, null, null, null);
+        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(appointmentProductItemRepository.existsByProductId(id)).thenReturn(true);
+
+        assertThatThrownBy(() -> productService.permanentlyDelete(id))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("já vendido");
+        verify(productRepository, never()).delete(any(Product.class));
+    }
+
+    @Test
+    void permanentlyDelete_whenUsedInServiceRecipe_shouldThrowBusinessException() {
+        Long id = 1L;
+        Product product = new Product(id, "P", new BigDecimal("10.0"), true, null, null, null, null, null, null);
+        when(productRepository.findById(id)).thenReturn(Optional.of(product));
+        when(appointmentProductItemRepository.existsByProductId(id)).thenReturn(false);
+        when(serviceProductUsageRepository.existsByProductId(id)).thenReturn(true);
+
+        assertThatThrownBy(() -> productService.permanentlyDelete(id))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("receita");
+        verify(productRepository, never()).delete(any(Product.class));
     }
 
     @Test

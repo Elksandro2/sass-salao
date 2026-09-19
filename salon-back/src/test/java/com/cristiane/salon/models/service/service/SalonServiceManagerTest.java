@@ -1,7 +1,9 @@
 package com.cristiane.salon.models.service.service;
 
 import com.cristiane.salon.exception.BadRequestException;
+import com.cristiane.salon.exception.BusinessException;
 import com.cristiane.salon.exception.ResourceNotFoundException;
+import com.cristiane.salon.models.appointment.repository.AppointmentServiceItemRepository;
 import com.cristiane.salon.models.service.dto.SalonServiceFilter;
 import com.cristiane.salon.models.service.dto.SalonServiceRequest;
 import com.cristiane.salon.models.service.dto.SalonServiceResponse;
@@ -44,6 +46,9 @@ class SalonServiceManagerTest {
 
     @Mock
     private com.cristiane.salon.models.product.repository.ProductRepository productRepository;
+
+    @Mock
+    private AppointmentServiceItemRepository appointmentServiceItemRepository;
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
@@ -330,6 +335,40 @@ class SalonServiceManagerTest {
         // Act & Assert
         assertThatThrownBy(() -> salonServiceManager.delete(id))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void permanentlyDelete_whenNeverPerformed_shouldRemoveFromDatabase() {
+        Long id = 1L;
+        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true, null);
+        when(salonServiceRepository.findById(id)).thenReturn(Optional.of(service));
+        when(appointmentServiceItemRepository.existsBySalonServiceId(id)).thenReturn(false);
+
+        salonServiceManager.permanentlyDelete(id);
+
+        verify(salonServiceRepository).delete(service);
+    }
+
+    @Test
+    void permanentlyDelete_whenNotFound_shouldThrowResourceNotFoundException() {
+        Long id = 1L;
+        when(salonServiceRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> salonServiceManager.permanentlyDelete(id))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void permanentlyDelete_whenAlreadyPerformedInAppointment_shouldThrowBusinessException() {
+        Long id = 1L;
+        SalonService service = new SalonService(id, "Corte", "Desc", new BigDecimal("50.0"), true, null);
+        when(salonServiceRepository.findById(id)).thenReturn(Optional.of(service));
+        when(appointmentServiceItemRepository.existsBySalonServiceId(id)).thenReturn(true);
+
+        assertThatThrownBy(() -> salonServiceManager.permanentlyDelete(id))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("já realizado");
+        verify(salonServiceRepository, never()).delete(any(SalonService.class));
     }
 
     @Test

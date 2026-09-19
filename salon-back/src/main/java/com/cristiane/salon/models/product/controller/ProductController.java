@@ -65,6 +65,15 @@ public class ProductController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{id}/permanent")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Auditable(action = "DELETE_PERMANENT", entityType = "PRODUCT", captureArgs = true)
+    @Operation(summary = "Exclui definitivamente um produto (Admin) — só se nunca foi usado em atendimento ou receita")
+    public ResponseEntity<Void> deletePermanently(@PathVariable Long id) {
+        productService.permanentlyDelete(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @PatchMapping("/{id}/reactivate")
     @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
     @Auditable(action = "RESTORE", entityType = "PRODUCT", captureArgs = true)

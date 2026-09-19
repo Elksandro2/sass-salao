@@ -9,4 +9,8 @@ public interface SalonServiceProductUsageRepository extends JpaRepository<SalonS
     List<SalonServiceProductUsage> findBySalonServiceId(Long salonServiceId);
 
     void deleteBySalonServiceId(Long salonServiceId);
+
+    // Usado pra bloquear exclusão definitiva de um produto que algum serviço ainda usa na
+    // receita (ver ProductService.permanentlyDelete) — precisa tirar da receita antes de excluir.
+    boolean existsByProductId(Long productId);
 }
