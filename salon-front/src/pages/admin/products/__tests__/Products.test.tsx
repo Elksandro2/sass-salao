@@ -7,6 +7,7 @@ vi.mock('../services/products', () => ({
   productsApi: {
     findAll: vi.fn(),
     delete: vi.fn(),
+    deletePermanently: vi.fn(),
     reactivate: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -109,31 +110,59 @@ describe('Products Page', () => {
     });
   });
 
-  it('triggers delete flow when delete button is clicked and confirmed', async () => {
+  it('triggers deactivate flow when deactivate button is clicked and confirmed', async () => {
     vi.mocked(productsApi.delete).mockResolvedValue(undefined);
 
     await act(async () => {
       customRender(<Products mode="sale" />);
     });
 
-    const deleteButtons = screen.getAllByTitle('Excluir Produto');
-    expect(deleteButtons).toHaveLength(1);
+    const deactivateButtons = screen.getAllByTitle('Desativar Produto');
+    expect(deactivateButtons).toHaveLength(1);
 
     await act(async () => {
-      fireEvent.click(deleteButtons[0]);
+      fireEvent.click(deactivateButtons[0]);
     });
 
-    expect(screen.getByText('Excluir Produto')).toBeInTheDocument();
+    expect(screen.getByText('Desativar Produto')).toBeInTheDocument();
     expect(
-      screen.getByText('Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.')
+      screen.getByText('Tem certeza que deseja desativar este produto? Ele some das listagens, mas pode ser reativado depois.')
     ).toBeInTheDocument();
+
+    const confirmButton = screen.getByRole('button', { name: 'Desativar' });
+    await act(async () => {
+      fireEvent.click(confirmButton);
+    });
+
+    expect(productsApi.delete).toHaveBeenCalledWith(1);
+    await waitFor(() => {
+      expect(productsApi.findAll).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('triggers permanent delete flow when permanent-delete button is clicked and confirmed', async () => {
+    vi.mocked(productsApi.deletePermanently).mockResolvedValue(undefined);
+
+    await act(async () => {
+      customRender(<Products mode="sale" />);
+    });
+
+    // Botão de exclusão definitiva aparece pra qualquer item, ativo ou não (2 produtos no mock).
+    const permanentButtons = screen.getAllByTitle('Excluir Produto Definitivamente');
+    expect(permanentButtons).toHaveLength(2);
+
+    await act(async () => {
+      fireEvent.click(permanentButtons[0]);
+    });
+
+    expect(screen.getByText('Excluir Produto Definitivamente')).toBeInTheDocument();
 
     const confirmButton = screen.getByRole('button', { name: 'Excluir' });
     await act(async () => {
       fireEvent.click(confirmButton);
     });
 
-    expect(productsApi.delete).toHaveBeenCalledWith(1);
+    expect(productsApi.deletePermanently).toHaveBeenCalledWith(1);
     await waitFor(() => {
       expect(productsApi.findAll).toHaveBeenCalledTimes(2);
     });

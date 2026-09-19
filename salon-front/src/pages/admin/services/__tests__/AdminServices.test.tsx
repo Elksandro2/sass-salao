@@ -8,6 +8,7 @@ vi.mock('../../../services/services/services', () => ({
   salonServicesApi: {
     findAll: vi.fn(),
     delete: vi.fn(),
+    deletePermanently: vi.fn(),
     reactivate: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -129,31 +130,59 @@ describe('AdminServices Page', () => {
     });
   });
 
-  it('triggers delete flow when delete button is clicked and confirmed', async () => {
+  it('triggers deactivate flow when deactivate button is clicked and confirmed', async () => {
     vi.mocked(salonServicesApi.delete).mockResolvedValue(undefined);
 
     await act(async () => {
       customRender(<AdminServices />);
     });
 
-    const deleteButtons = screen.getAllByTitle('Excluir Serviço');
-    expect(deleteButtons).toHaveLength(1);
+    const deactivateButtons = screen.getAllByTitle('Desativar Serviço');
+    expect(deactivateButtons).toHaveLength(1);
 
     await act(async () => {
-      fireEvent.click(deleteButtons[0]);
+      fireEvent.click(deactivateButtons[0]);
     });
 
-    expect(screen.getByText('Excluir Serviço')).toBeInTheDocument();
+    expect(screen.getByText('Desativar Serviço')).toBeInTheDocument();
     expect(
-      screen.getByText('Tem certeza que deseja excluir este serviço? Esta ação não pode ser desfeita.')
+      screen.getByText('Tem certeza que deseja desativar este serviço? Ele some das listagens, mas pode ser reativado depois.')
     ).toBeInTheDocument();
+
+    const confirmButton = screen.getByRole('button', { name: 'Desativar' });
+    await act(async () => {
+      fireEvent.click(confirmButton);
+    });
+
+    expect(salonServicesApi.delete).toHaveBeenCalledWith(1);
+    await waitFor(() => {
+      expect(salonServicesApi.findAll).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('triggers permanent delete flow when permanent-delete button is clicked and confirmed', async () => {
+    vi.mocked(salonServicesApi.deletePermanently).mockResolvedValue(undefined);
+
+    await act(async () => {
+      customRender(<AdminServices />);
+    });
+
+    // Botão de exclusão definitiva aparece pra qualquer item, ativo ou não (2 serviços no mock).
+    const permanentButtons = screen.getAllByTitle('Excluir Serviço Definitivamente');
+    expect(permanentButtons).toHaveLength(2);
+
+    await act(async () => {
+      fireEvent.click(permanentButtons[0]);
+    });
+
+    expect(screen.getByText('Excluir Serviço Definitivamente')).toBeInTheDocument();
 
     const confirmButton = screen.getByRole('button', { name: 'Excluir' });
     await act(async () => {
       fireEvent.click(confirmButton);
     });
 
-    expect(salonServicesApi.delete).toHaveBeenCalledWith(1);
+    expect(salonServicesApi.deletePermanently).toHaveBeenCalledWith(1);
     await waitFor(() => {
       expect(salonServicesApi.findAll).toHaveBeenCalledTimes(2);
     });
