@@ -128,11 +128,25 @@ export const AppointmentServicesEditor = ({ appointment, onSaved, isEditing }: A
               className={`${inputCls} mb-2`}
             />
           )}
-          <div className="space-y-2">
+          <div className="space-y-3">
             {rows.map((row, index) => (
-              <div key={index} className="flex items-center gap-2">
+              <div
+                key={index}
+                className="flex flex-col gap-2 p-2.5 bg-[#fcf9f9]/50 border border-[#eae1e1]/60 rounded-lg"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#7a7074]">Serviço {index + 1}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeRow(index)}
+                    className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                    title="Remover este serviço"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
                 <select
-                  className={`${inputCls} flex-1`}
+                  className={`${inputCls} block w-full`}
                   value={row.serviceId}
                   onChange={(e) => updateRow(index, { serviceId: e.target.value })}
                 >
@@ -150,21 +164,19 @@ export const AppointmentServicesEditor = ({ appointment, onSaved, isEditing }: A
                       </option>
                     ))}
                 </select>
-                <input
-                  type="number"
-                  step="0.01"
-                  className={`${inputCls} w-24`}
-                  placeholder="Preço custom."
-                  value={row.customPrice}
-                  onChange={(e) => updateRow(index, { customPrice: e.target.value })}
-                />
-                <button
-                  type="button"
-                  onClick={() => removeRow(index)}
-                  className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
-                >
-                  <Trash2 size={14} />
-                </button>
+                <div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className={`${inputCls} block w-full`}
+                    placeholder="Preço customizado (opcional)"
+                    value={row.customPrice}
+                    onChange={(e) => updateRow(index, { customPrice: e.target.value })}
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Deixe em branco pra cobrar o preço do serviço selecionado acima.
+                  </p>
+                </div>
               </div>
             ))}
           </div>
