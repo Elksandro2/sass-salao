@@ -576,6 +576,18 @@ export const AdminAppointments = () => {
       },
     },
     {
+      key: 'grandTotal',
+      label: 'Valor Total',
+      render: (item: AppointmentResponse) => {
+        const total = item.grandTotal ?? item.totalPrice;
+        return (
+          <span className="text-sm font-semibold text-[#3b3036] whitespace-nowrap">
+            {total != null ? `R$ ${total.toFixed(2)}` : '—'}
+          </span>
+        );
+      },
+    },
+    {
       key: 'notes',
       label: 'Obs.',
       render: (item: AppointmentResponse) => (
