@@ -2460,6 +2460,160 @@ class AppointmentServiceTest {
         verify(cashFlowRepository).save(argThat(cf -> cf.getAmount().compareTo(new BigDecimal("150.00")) == 0));
     }
 
+    // --- updateDetails tests ---
+
+    @Test
+    void updateDetails_whenValid_shouldUpdateEmployeeAndScheduledDatePeriod() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        apt.setScheduledAt(null);
+        Employee anotherEmployee = new Employee();
+        anotherEmployee.setId(6L);
+        anotherEmployee.setUser(new User());
+        anotherEmployee.getUser().setId(60L);
+        anotherEmployee.getUser().setName("Outra Profissional");
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(employeeRepository.findById(6L)).thenReturn(Optional.of(anotherEmployee));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(
+                6L, salonClock.today().plusDays(1), AppointmentPeriod.AFTERNOON);
+
+        AppointmentResponse result = appointmentService.updateDetails(1L, request);
+
+        assertThat(result.employeeId()).isEqualTo(6L);
+        assertThat(result.scheduledDate()).isEqualTo(salonClock.today().plusDays(1));
+        assertThat(result.scheduledPeriod()).isEqualTo(AppointmentPeriod.AFTERNOON);
+    }
+
+    @Test
+    void updateDetails_whenEditingLegacyScheduledAt_shouldClearItAndSwitchToBlock() {
+        // Agendamento antigo (hora exata) editado passa a usar o modelo de bloco — a equipe não
+        // cria nem edita mais com hora exata a partir daqui.
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        apt.setScheduledAt(salonClock.now().plusDays(2));
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(
+                5L, salonClock.today().plusDays(3), AppointmentPeriod.MORNING);
+
+        AppointmentResponse result = appointmentService.updateDetails(1L, request);
+
+        assertThat(result.scheduledAt()).isNull();
+        assertThat(result.scheduledDate()).isEqualTo(salonClock.today().plusDays(3));
+    }
+
+    @Test
+    void updateDetails_whenOnlyEmployeeProvided_shouldNotTouchDate() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        apt.setScheduledDate(salonClock.today().plusDays(1));
+        apt.setScheduledPeriod(AppointmentPeriod.MORNING);
+        Employee anotherEmployee = new Employee();
+        anotherEmployee.setId(6L);
+        anotherEmployee.setUser(new User());
+        anotherEmployee.getUser().setId(60L);
+        anotherEmployee.getUser().setName("Outra Profissional");
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(employeeRepository.findById(6L)).thenReturn(Optional.of(anotherEmployee));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(6L, null, null);
+
+        AppointmentResponse result = appointmentService.updateDetails(1L, request);
+
+        assertThat(result.employeeId()).isEqualTo(6L);
+        assertThat(result.scheduledDate()).isEqualTo(salonClock.today().plusDays(1));
+        assertThat(result.scheduledPeriod()).isEqualTo(AppointmentPeriod.MORNING);
+    }
+
+    @Test
+    void updateDetails_whenDateWithoutPeriod_shouldThrowBadRequestException() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(
+                5L, salonClock.today().plusDays(1), null);
+
+        assertThatThrownBy(() -> appointmentService.updateDetails(1L, request))
+                .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void updateDetails_whenDateInPast_shouldThrowBadRequestException() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(
+                5L, salonClock.today().minusDays(1), AppointmentPeriod.MORNING);
+
+        assertThatThrownBy(() -> appointmentService.updateDetails(1L, request))
+                .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void updateDetails_whenAppointmentCancelled_shouldThrowBusinessException() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CANCELLED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(5L, null, null);
+
+        assertThatThrownBy(() -> appointmentService.updateDetails(1L, request))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void updateDetails_whenAlreadyPaid_shouldThrowBusinessException() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.DONE);
+        apt.setPaymentStatus(com.cristiane.salon.models.appointment.enums.PaymentStatus.PAID);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(5L, null, null);
+
+        assertThatThrownBy(() -> appointmentService.updateDetails(1L, request))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void updateDetails_whenEmployeeNotFound_shouldThrowResourceNotFoundException() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(employeeRepository.findById(99L)).thenReturn(Optional.empty());
+
+        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(99L, null, null);
+
+        assertThatThrownBy(() -> appointmentService.updateDetails(1L, request))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void updateDetails_whenFuncionariaTriesToReassignToAnotherEmployee_shouldThrowUnauthorizedException() {
+        mockAuthenticatedUser(professionalUser); // dona do employee (id 5) do agendamento
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+
+        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(6L, null, null);
+
+        assertThatThrownBy(() -> appointmentService.updateDetails(1L, request))
+                .isInstanceOf(UnauthorizedException.class);
+        verify(appointmentRepository, never()).save(any(Appointment.class));
+    }
+
+    @Test
+    void updateDetails_whenFuncionariaEditsOwnAppointmentDateOnly_shouldSucceed() {
+        mockAuthenticatedUser(professionalUser); // dona do employee (id 5) do agendamento
+        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Mesmo employeeId de sempre (5L) — só reagenda o dia/período, não reatribui.
+        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(
+                5L, salonClock.today().plusDays(1), AppointmentPeriod.AFTERNOON);
+
+        AppointmentResponse result = appointmentService.updateDetails(1L, request);
+
+        assertThat(result.scheduledDate()).isEqualTo(salonClock.today().plusDays(1));
+    }
+
     @Test
     void updateProducts_whenValid_shouldReplaceProductsAndReturnUpdatedTotals() {
         Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);

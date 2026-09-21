@@ -205,6 +205,15 @@ export const appointmentsApi = {
     return data;
   },
 
+  /** Edita profissional e/ou dia+período de um agendamento já criado. */
+  updateDetails: async (
+    id: number,
+    payload: { employeeId?: number; scheduledDate?: string; scheduledPeriod?: AppointmentPeriod }
+  ) => {
+    const { data } = await api.patch<AppointmentResponse>(`/appointments/${id}/details`, payload);
+    return data;
+  },
+
   getMyAppointments: async () => {
     const { data } = await api.get<AppointmentResponse[]>('/appointments/my');
     return data;

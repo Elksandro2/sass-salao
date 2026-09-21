@@ -34,11 +34,14 @@ interface ExpenseRow {
 interface AppointmentProductsExpensesEditorProps {
   appointment: AppointmentResponse;
   onSaved: (updated: AppointmentResponse) => void;
+  /** Só mostra o formulário de edição quando o modal de detalhes está em modo "Editar". */
+  isEditing: boolean;
 }
 
 export const AppointmentProductsExpensesEditor = ({
   appointment,
   onSaved,
+  isEditing,
 }: AppointmentProductsExpensesEditorProps) => {
   const [catalog, setCatalog] = useState<ProductData[]>([]);
   const [productSearch, setProductSearch] = useState('');
@@ -176,7 +179,7 @@ export const AppointmentProductsExpensesEditor = ({
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className={labelCls}>Produtos vendidos</span>
-            {!readOnly && (
+            {isEditing && !readOnly && (
               <button
                 type="button"
                 onClick={addProductRow}
@@ -187,11 +190,11 @@ export const AppointmentProductsExpensesEditor = ({
             )}
           </div>
 
-          {readOnly && productRows.length === 0 && (
+          {(!isEditing || readOnly) && productRows.length === 0 && (
             <p className="text-xs text-gray-400">Nenhum produto vendido neste atendimento.</p>
           )}
 
-          {readOnly ? (
+          {(!isEditing || readOnly) ? (
             <ul className="text-sm text-[#3b3036] space-y-1">
               {(appointment.products ?? []).map((p) => (
                 <li key={p.productId} className="flex justify-between">
@@ -301,7 +304,7 @@ export const AppointmentProductsExpensesEditor = ({
         <div className="border-t border-[#eae1e1] pt-4">
           <div className="flex items-center justify-between mb-2">
             <span className={labelCls}>Despesas do atendimento</span>
-            {!readOnly && (
+            {isEditing && !readOnly && (
               <button
                 type="button"
                 onClick={addExpenseRow}
@@ -312,7 +315,7 @@ export const AppointmentProductsExpensesEditor = ({
             )}
           </div>
 
-          {readOnly ? (
+          {(!isEditing || readOnly) ? (
             <>
               {expenseRows.length === 0 && (
                 <p className="text-xs text-gray-400">Nenhuma despesa lançada neste atendimento.</p>

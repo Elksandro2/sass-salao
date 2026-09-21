@@ -24,9 +24,11 @@ interface ServiceRow {
 interface AppointmentServicesEditorProps {
   appointment: AppointmentResponse;
   onSaved: (updated: AppointmentResponse) => void;
+  /** Só mostra o formulário de edição quando o modal de detalhes está em modo "Editar". */
+  isEditing: boolean;
 }
 
-export const AppointmentServicesEditor = ({ appointment, onSaved }: AppointmentServicesEditorProps) => {
+export const AppointmentServicesEditor = ({ appointment, onSaved, isEditing }: AppointmentServicesEditorProps) => {
   const [catalog, setCatalog] = useState<SalonServiceData[]>([]);
   const [serviceSearch, setServiceSearch] = useState('');
   const [rows, setRows] = useState<ServiceRow[]>([]);
@@ -101,7 +103,7 @@ export const AppointmentServicesEditor = ({ appointment, onSaved }: AppointmentS
       endpoint={`/v1/appointments/${appointment.id}/services`}
       fallback={null}
     >
-      {!readOnly && (
+      {isEditing && !readOnly && (
         <div className="border-t border-[#eae1e1] pt-4">
           <div className="flex items-center justify-between mb-2">
             <span className={labelCls}>Editar serviços</span>

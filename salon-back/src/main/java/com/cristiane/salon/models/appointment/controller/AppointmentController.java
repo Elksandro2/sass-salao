@@ -6,6 +6,7 @@ import com.cristiane.salon.models.appointment.dto.AppointmentRequest;
 import com.cristiane.salon.models.appointment.dto.AppointmentResponse;
 import com.cristiane.salon.models.appointment.dto.ConfirmAppointmentRequest;
 import com.cristiane.salon.models.appointment.dto.GeneratePixRequest;
+import com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest;
 import com.cristiane.salon.models.appointment.dto.UpdateAppointmentExpensesRequest;
 import com.cristiane.salon.models.appointment.dto.UpdateAppointmentProductsRequest;
 import com.cristiane.salon.models.appointment.dto.UpdateAppointmentServicesRequest;
@@ -60,6 +61,16 @@ public class AppointmentController {
             @PathVariable Long id,
             @Valid @RequestBody UpdateInternalNotesRequest body) {
         return ResponseEntity.ok(appointmentService.updateInternalNotes(id, body.internalNotes()));
+    }
+
+    @PatchMapping("/{id}/details")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Auditable(action = "APPOINTMENT_DETAILS_UPDATED", entityType = "Appointment", captureArgs = true)
+    @Operation(summary = "Edita profissional e/ou dia+período de um agendamento (Admin/Gerente/Funcionária responsável)")
+    public ResponseEntity<AppointmentResponse> updateDetails(
+            @PathVariable Long id,
+            @RequestBody UpdateAppointmentDetailsRequest body) {
+        return ResponseEntity.ok(appointmentService.updateDetails(id, body));
     }
 
     @PatchMapping("/{id}/services")

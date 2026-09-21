@@ -14,6 +14,7 @@ import com.cristiane.salon.models.appointment.dto.AppointmentProductRequest;
 import com.cristiane.salon.models.appointment.dto.AppointmentRequest;
 import com.cristiane.salon.models.appointment.dto.AppointmentResponse;
 import com.cristiane.salon.models.appointment.dto.AppointmentServiceRequest;
+import com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest;
 import com.cristiane.salon.models.appointment.entity.Appointment;
 import com.cristiane.salon.models.appointment.entity.AppointmentExpenseItem;
 import com.cristiane.salon.models.appointment.entity.AppointmentProductItem;
@@ -413,6 +414,51 @@ public class AppointmentService {
             cashFlow.setAmount(appointment.getGrandTotal());
             cashFlowRepository.save(cashFlow);
         });
+    }
+
+    /**
+     * Edita os dados básicos de um agendamento já criado (profissional, dia/período) — corrige
+     * engano de cadastro ou reagenda sem precisar cancelar e criar outro. Mesma trava financeira
+     * de {@link #updateServices}: não dá pra editar depois de cancelado ou já pago.
+     */
+    @Transactional
+    public AppointmentResponse updateDetails(Long id, UpdateAppointmentDetailsRequest request) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
+        assertCanManage(appointment, "editar os dados de");
+        assertNotBilled(appointment, "editar os dados de");
+
+        if (request.employeeId() != null
+                && !request.employeeId().equals(appointment.getEmployee().getId())) {
+            // Reatribuir pra outra profissional é decisão de gestão — a funcionária pode editar
+            // seus próprios agendamentos (assertCanManage acima), mas não tirar um atendimento
+            // dela e jogar pra outra colega.
+            if (!isStaff(getAuthenticatedUser())) {
+                throw new UnauthorizedException("Você não pode reatribuir este agendamento para outra profissional");
+            }
+            Employee employee = employeeRepository.findById(request.employeeId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Profissional não encontrado"));
+            appointment.setEmployee(employee);
+        }
+
+        boolean hasDate = request.scheduledDate() != null;
+        boolean hasPeriod = request.scheduledPeriod() != null;
+        if (hasDate != hasPeriod) {
+            throw new BadRequestException("Informe a data e o período juntos, ou nenhum dos dois");
+        }
+        if (hasDate) {
+            if (request.scheduledDate().isBefore(salonClock.today())) {
+                throw new BadRequestException("Não é possível definir uma data no passado");
+            }
+            // Converte pro modelo de bloco (manhã/tarde) mesmo se o agendamento era antigo, com
+            // hora exata — a equipe não cria nem edita mais com hora exata a partir daqui.
+            appointment.setScheduledAt(null);
+            appointment.setScheduledDate(request.scheduledDate());
+            appointment.setScheduledPeriod(request.scheduledPeriod());
+        }
+
+        Appointment saved = appointmentRepository.save(appointment);
+        return AppointmentResponse.fromEntity(saved);
     }
 
     /**
