@@ -16,10 +16,6 @@ import { AppointmentProfitSection } from './AppointmentProfitSection';
 const labelCls = 'label-premium';
 const inputCls = 'input-premium';
 
-function formatMoney(value: number | null | undefined): string {
-  return value != null ? `R$ ${value.toFixed(2)}` : '—';
-}
-
 interface AppointmentDetailModalProps {
   appointment: AppointmentResponse | null;
   onClose: () => void;
@@ -51,8 +47,6 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
   }, [appointment?.id, appointment?.internalNotes]);
 
   if (!appointment) return null;
-
-  const services = appointment.services;
 
   // Mesma trava financeira usada nos editores de serviços/produtos/despesas: só bloqueia quando
   // o pagamento já aconteceu de verdade (PAID/MANUAL) ou o agendamento foi cancelado.
@@ -250,56 +244,6 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
                   </p>
                 </div>
               )}
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {services.map((svc) => {
-              const isCustomized = svc.customPrice != null || !!svc.customServiceNotes;
-              return (
-                <div
-                  key={svc.serviceId}
-                  className="border border-[#eae1e1] rounded-xl divide-y divide-[#eae1e1]/70"
-                >
-                  <div className="px-4 py-2.5 bg-[#fdf6f5]/60">
-                    <span className={labelCls}>Serviço</span>
-                    <p className="text-[#3b3036] font-semibold">{svc.serviceName}</p>
-                  </div>
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <span className="text-xs font-semibold text-[#7a7074]">Preço</span>
-                    <div className="text-right">
-                      {svc.customPrice != null && svc.catalogPrice != null && (
-                        <p className="text-xs text-gray-400 line-through">
-                          Catálogo: {formatMoney(svc.catalogPrice)}
-                        </p>
-                      )}
-                      <p className="font-semibold text-[#3b3036]">{formatMoney(svc.effectivePrice)}</p>
-                    </div>
-                  </div>
-                  {svc.customServiceNotes && (
-                    <div className="px-4 py-3">
-                      <span className="text-xs font-semibold text-[#7a7074]">Observações do serviço</span>
-                      <p className="text-sm text-[#3b3036] mt-1">{svc.customServiceNotes}</p>
-                    </div>
-                  )}
-                  {isCustomized && (
-                    <div className="px-4 py-2 bg-[#fdf6f5]">
-                      <p className="text-[11px] text-[#a6726b]">
-                        Personalizado para este agendamento — o cadastro do serviço não foi alterado.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {services.length > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border border-[#eae1e1] rounded-xl bg-[#fcf9f9]/50">
-              <span className="text-sm font-semibold text-[#3b3036]">Total</span>
-              <div className="text-right">
-                <p className="font-bold text-[#3b3036]">{formatMoney(appointment.totalPrice)}</p>
-              </div>
             </div>
           )}
 

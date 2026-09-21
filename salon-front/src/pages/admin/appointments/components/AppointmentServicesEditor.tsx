@@ -5,6 +5,7 @@ import type { AppointmentResponse, AppointmentServiceRequestItem } from '../../.
 import { salonServicesApi } from '../../../services/services/services';
 import type { SalonServiceData } from '../../../services/services/services';
 import { PermissionGate } from '../../../../components/permissions/PermissionGate';
+import { SearchableSelect } from '../../../../components/SearchableSelect';
 import { useAlert } from '../../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../../utils/apiError';
 
@@ -21,6 +22,61 @@ interface ServiceRow {
   customServiceNotes: string;
 }
 
+/** Cartões de leitura dos serviços já lançados — mesma exibição de antes, só que agora é a
+ * única exibição (a seção "Editar" troca pra este componente por dentro, sem duplicar). */
+const StaticServicesList = ({ appointment }: { appointment: AppointmentResponse }) => (
+  <>
+    <div className="space-y-3">
+      {appointment.services.map((svc) => {
+        const isCustomized = svc.customPrice != null || !!svc.customServiceNotes;
+        return (
+          <div
+            key={svc.serviceId}
+            className="border border-[#eae1e1] rounded-xl divide-y divide-[#eae1e1]/70"
+          >
+            <div className="px-4 py-2.5 bg-[#fdf6f5]/60">
+              <span className={labelCls}>Serviço</span>
+              <p className="text-[#3b3036] font-semibold">{svc.serviceName}</p>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-xs font-semibold text-[#7a7074]">Preço</span>
+              <div className="text-right">
+                {svc.customPrice != null && svc.catalogPrice != null && (
+                  <p className="text-xs text-gray-400 line-through">
+                    Catálogo: {formatMoney(svc.catalogPrice)}
+                  </p>
+                )}
+                <p className="font-semibold text-[#3b3036]">{formatMoney(svc.effectivePrice)}</p>
+              </div>
+            </div>
+            {svc.customServiceNotes && (
+              <div className="px-4 py-3">
+                <span className="text-xs font-semibold text-[#7a7074]">Observações do serviço</span>
+                <p className="text-sm text-[#3b3036] mt-1">{svc.customServiceNotes}</p>
+              </div>
+            )}
+            {isCustomized && (
+              <div className="px-4 py-2 bg-[#fdf6f5]">
+                <p className="text-[11px] text-[#a6726b]">
+                  Personalizado para este agendamento — o cadastro do serviço não foi alterado.
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+    {appointment.services.length > 1 && (
+      <div className="flex items-center justify-between px-4 py-3 border border-[#eae1e1] rounded-xl bg-[#fcf9f9]/50 mt-3">
+        <span className="text-sm font-semibold text-[#3b3036]">Total</span>
+        <div className="text-right">
+          <p className="font-bold text-[#3b3036]">{formatMoney(appointment.totalPrice)}</p>
+        </div>
+      </div>
+    )}
+  </>
+);
+
 interface AppointmentServicesEditorProps {
   appointment: AppointmentResponse;
   onSaved: (updated: AppointmentResponse) => void;
@@ -30,7 +86,6 @@ interface AppointmentServicesEditorProps {
 
 export const AppointmentServicesEditor = ({ appointment, onSaved, isEditing }: AppointmentServicesEditorProps) => {
   const [catalog, setCatalog] = useState<SalonServiceData[]>([]);
-  const [serviceSearch, setServiceSearch] = useState('');
   const [rows, setRows] = useState<ServiceRow[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const { error: showError, success: showSuccess } = useAlert();
@@ -97,13 +152,15 @@ export const AppointmentServicesEditor = ({ appointment, onSaved, isEditing }: A
     }
   };
 
+  const showEditForm = isEditing && !readOnly;
+
   return (
     <PermissionGate
       method="PATCH"
       endpoint={`/v1/appointments/${appointment.id}/services`}
-      fallback={null}
+      fallback={<StaticServicesList appointment={appointment} />}
     >
-      {isEditing && !readOnly && (
+      {showEditForm ? (
         <div className="border-t border-[#eae1e1] pt-4">
           <div className="flex items-center justify-between mb-2">
             <span className={labelCls}>Editar serviços</span>
@@ -116,18 +173,9 @@ export const AppointmentServicesEditor = ({ appointment, onSaved, isEditing }: A
             </button>
           </div>
           <p className="text-xs text-gray-400 mb-2">
-            A cliente decidiu fazer mais alguma coisa? Adicione aqui, mesmo com o agendamento já
-            confirmado.
+            Os serviços já lançados aparecem abaixo, prontos pra editar (inclusive o preço). A
+            cliente decidiu fazer mais alguma coisa? Use "Adicionar serviço".
           </p>
-          {catalog.length > 6 && (
-            <input
-              type="text"
-              value={serviceSearch}
-              onChange={(e) => setServiceSearch(e.target.value)}
-              placeholder="Buscar serviço por nome..."
-              className={`${inputCls} mb-2`}
-            />
-          )}
           <div className="space-y-3">
             {rows.map((row, index) => (
               <div
@@ -145,25 +193,17 @@ export const AppointmentServicesEditor = ({ appointment, onSaved, isEditing }: A
                     <Trash2 size={14} />
                   </button>
                 </div>
-                <select
-                  className={`${inputCls} block w-full`}
+                <SearchableSelect
                   value={row.serviceId}
-                  onChange={(e) => updateRow(index, { serviceId: e.target.value })}
-                >
-                  <option value="">Selecione o serviço...</option>
-                  {catalog
-                    .filter(
-                      (s) =>
-                        String(s.id) === row.serviceId ||
-                        s.name.toLowerCase().includes(serviceSearch.trim().toLowerCase())
-                    )
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                        {s.price != null ? ` — R$ ${s.price.toFixed(2)}` : ''}
-                      </option>
-                    ))}
-                </select>
+                  onSelect={(id) => updateRow(index, { serviceId: id })}
+                  options={catalog.map((s) => ({
+                    id: s.id!,
+                    label: s.name + (s.price != null ? ` — R$ ${s.price.toFixed(2)}` : ''),
+                  }))}
+                  placeholder="Buscar e selecionar o serviço..."
+                  noResultsLabel="Nenhum serviço encontrado"
+                  className={`${inputCls} block w-full`}
+                />
                 <div>
                   <input
                     type="number"
@@ -194,6 +234,8 @@ export const AppointmentServicesEditor = ({ appointment, onSaved, isEditing }: A
             </button>
           </div>
         </div>
+      ) : (
+        <StaticServicesList appointment={appointment} />
       )}
     </PermissionGate>
   );
