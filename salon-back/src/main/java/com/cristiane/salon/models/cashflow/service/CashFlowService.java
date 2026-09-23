@@ -2,6 +2,7 @@ package com.cristiane.salon.models.cashflow.service;
 
 import com.cristiane.salon.config.SalonClock;
 import com.cristiane.salon.exception.BadRequestException;
+import com.cristiane.salon.exception.BusinessException;
 import com.cristiane.salon.exception.ResourceNotFoundException;
 import com.cristiane.salon.models.appointment.entity.Appointment;
 import com.cristiane.salon.models.appointment.repository.AppointmentRepository;
@@ -175,6 +176,39 @@ public class CashFlowService {
         }
 
         return response;
+    }
+
+    /**
+     * Edita um lançamento manual (tipo, valor, descrição, data) — só o que foi cadastrado direto
+     * nesta tela. Lançamento gerado automaticamente por um agendamento (billAppointmentOnce)
+     * não pode ser editado por aqui: editar pelo próprio agendamento mantém os dois em dia
+     * (ver syncCashFlowAmountIfAlreadyBilled no AppointmentService), editar aqui os deixaria
+     * dessincronizados. Vendedor/comissão de venda avulsa também não mudam nesta edição — só
+     * corrige o essencial (valor, descrição, data, tipo).
+     */
+    @Transactional
+    public CashFlowResponse update(Long id, CashFlowRequest request) {
+        CashFlow cashFlow = cashFlowRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Registro não encontrado"));
+
+        if (cashFlow.getAppointment() != null) {
+            throw new BusinessException(
+                    "Este lançamento foi gerado automaticamente por um agendamento — edite os serviços, produtos ou despesas do agendamento em vez de editar aqui.");
+        }
+
+        CashFlowType type;
+        try {
+            type = CashFlowType.valueOf(request.type().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Tipo de fluxo de caixa inválido. Use INCOME ou EXPENSE.");
+        }
+
+        cashFlow.setType(type);
+        cashFlow.setAmount(request.amount());
+        cashFlow.setDescription(request.description());
+        cashFlow.setDate(request.date());
+
+        return CashFlowResponse.fromEntity(cashFlowRepository.save(cashFlow));
     }
 
     @Transactional

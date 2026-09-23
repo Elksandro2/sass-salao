@@ -36,6 +36,13 @@ export const cashFlowApi = {
     return data;
   },
 
+  /** Só funciona pra lançamento manual (sem appointmentId) — o gerado por agendamento se edita
+   * pelo próprio agendamento. */
+  update: async (id: number, cashFlowData: CashFlowData) => {
+    const { data } = await api.put<CashFlowData>(`/cashflow/${id}`, cashFlowData);
+    return data;
+  },
+
   delete: async (id: number) => {
     await api.delete(`/cashflow/${id}`);
   },

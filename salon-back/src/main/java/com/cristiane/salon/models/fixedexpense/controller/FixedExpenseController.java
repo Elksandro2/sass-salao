@@ -46,6 +46,14 @@ public class FixedExpenseController {
         return ResponseEntity.status(HttpStatus.CREATED).body(fixedExpenseService.create(request));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Auditable(action = "FIXED_EXPENSE_UPDATED", entityType = "FixedExpense", captureArgs = true)
+    @Operation(summary = "Edita um gasto fixo (Admin/Gerente)")
+    public ResponseEntity<FixedExpenseResponse> update(@PathVariable Long id, @Valid @RequestBody FixedExpenseRequest request) {
+        return ResponseEntity.ok(fixedExpenseService.update(id, request));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
     @Auditable(action = "FIXED_EXPENSE_DELETED", entityType = "FixedExpense", captureArgs = true)

@@ -23,6 +23,11 @@ export const fixedExpensesApi = {
     return data;
   },
 
+  update: async (id: number, expense: FixedExpenseData) => {
+    const { data } = await api.put<FixedExpenseData>(`/fixed-expenses/${id}`, expense);
+    return data;
+  },
+
   delete: async (id: number) => {
     await api.delete(`/fixed-expenses/${id}`);
   },

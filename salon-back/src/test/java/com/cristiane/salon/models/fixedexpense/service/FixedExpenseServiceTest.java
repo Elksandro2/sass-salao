@@ -121,6 +121,34 @@ class FixedExpenseServiceTest {
     }
 
     @Test
+    void update_whenFound_shouldReplaceFields() {
+        FixedExpense existing = new FixedExpense();
+        existing.setId(5L);
+        existing.setDescription("Água");
+        existing.setAmount(new BigDecimal("80.00"));
+        existing.setDate(LocalDate.of(2026, 8, 5));
+        when(fixedExpenseRepository.findById(5L)).thenReturn(Optional.of(existing));
+        when(fixedExpenseRepository.save(any(FixedExpense.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        FixedExpenseResponse result = fixedExpenseService.update(
+                5L, new FixedExpenseRequest("Água (corrigido)", new BigDecimal("95.50"), LocalDate.of(2026, 8, 6)));
+
+        assertThat(result.description()).isEqualTo("Água (corrigido)");
+        assertThat(result.amount()).isEqualByComparingTo("95.50");
+        assertThat(result.date()).isEqualTo(LocalDate.of(2026, 8, 6));
+    }
+
+    @Test
+    void update_whenNotFound_shouldThrowResourceNotFoundException() {
+        when(fixedExpenseRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> fixedExpenseService.update(
+                99L, new FixedExpenseRequest("X", new BigDecimal("1.00"), LocalDate.of(2026, 8, 6))))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Gasto fixo não encontrado");
+    }
+
+    @Test
     void delete_whenFound_shouldDelete() {
         when(fixedExpenseRepository.existsById(5L)).thenReturn(true);
 

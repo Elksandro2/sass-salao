@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Pencil } from 'lucide-react';
 import { Table } from '../../../components/table/Table';
 import { ModalForm } from '../../../components/modal/ModalForm';
 import { ConfirmDialog } from '../../../components/modal/ConfirmDialog';
@@ -29,6 +29,7 @@ export const CashFlow = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<number | null>(null);
 
@@ -127,6 +128,7 @@ export const CashFlow = () => {
   };
 
   const handleOpenForm = () => {
+    setEditingId(null);
     reset({ type: 'INCOME', date: getLocalDateString(), amount: '0', description: '' });
     setSourceType('OTHER');
     setCart([]);
@@ -134,6 +136,16 @@ export const CashFlow = () => {
     setServiceSearch('');
     setSellerEmployeeId('');
     loadSuggestions(); // Refresh product/service suggestions from backend
+    setShowForm(true);
+  };
+
+  /** Só entradas manuais (sem appointmentId) têm essa opção — a origem (venda de produto/
+   * serviço, comissão etc.) não é reeditável aqui, só o essencial: tipo, valor, descrição e data. */
+  const handleOpenEditForm = (item: CashFlowData) => {
+    setEditingId(item.id!);
+    reset({ type: item.type, date: item.date, amount: String(item.amount), description: item.description });
+    setSourceType('OTHER');
+    setCart([]);
     setShowForm(true);
   };
 
@@ -189,6 +201,18 @@ export const CashFlow = () => {
 
   const onSubmit = async (data: CashFlowFormValues) => {
     try {
+      if (editingId != null) {
+        await cashFlowApi.update(editingId, {
+          type: data.type,
+          amount: Number(data.amount),
+          description: data.description,
+          date: data.date,
+        });
+        setShowForm(false);
+        loadCashFlows();
+        return;
+      }
+
       let payload: CashFlowData = {
         type: data.type,
         amount: Number(data.amount),
@@ -309,18 +333,38 @@ export const CashFlow = () => {
       key: 'actions',
       label: 'Ações',
       render: (item: CashFlowData) => (
-        <PermissionGate method="DELETE" endpoint={`/v1/cashflow/${item.id}`}>
-          <button
-            onClick={() => {
-              setItemToDelete(item.id!);
-              setShowConfirm(true);
-            }}
-            className="p-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 border border-[#eae1e1] hover:border-rose-200 rounded-xl transition-all cursor-pointer"
-            title="Excluir Registro"
-          >
-            <Trash2 size={15} />
-          </button>
-        </PermissionGate>
+        <div className="flex gap-2">
+          {item.appointmentId == null ? (
+            <PermissionGate method="PUT" endpoint={`/v1/cashflow/${item.id}`}>
+              <button
+                onClick={() => handleOpenEditForm(item)}
+                className="p-2 text-indigo-600 hover:bg-indigo-50 border border-[#eae1e1] hover:border-indigo-200 rounded-xl transition-all cursor-pointer"
+                title="Editar Registro"
+              >
+                <Pencil size={15} />
+              </button>
+            </PermissionGate>
+          ) : (
+            <span
+              className="p-2 text-gray-300 border border-[#eae1e1] rounded-xl cursor-not-allowed"
+              title="Gerado automaticamente por um agendamento — edite pelo próprio agendamento"
+            >
+              <Pencil size={15} />
+            </span>
+          )}
+          <PermissionGate method="DELETE" endpoint={`/v1/cashflow/${item.id}`}>
+            <button
+              onClick={() => {
+                setItemToDelete(item.id!);
+                setShowConfirm(true);
+              }}
+              className="p-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 border border-[#eae1e1] hover:border-rose-200 rounded-xl transition-all cursor-pointer"
+              title="Excluir Registro"
+            >
+              <Trash2 size={15} />
+            </button>
+          </PermissionGate>
+        </div>
       ),
     },
   ];
@@ -399,7 +443,7 @@ export const CashFlow = () => {
       <ModalForm
         show={showForm}
         onHide={() => setShowForm(false)}
-        title="Novo Registro"
+        title={editingId != null ? 'Editar Registro' : 'Novo Registro'}
         onSubmit={handleSubmit(onSubmit)}
       >
         <div className="space-y-4">
@@ -411,7 +455,14 @@ export const CashFlow = () => {
             </select>
           </div>
 
-          {watchedType === 'INCOME' && (
+          {editingId != null && (
+            <p className="text-xs text-gray-400 -mt-2">
+              Editando só o essencial (tipo, valor, descrição e data) — vendedor e comissão, se
+              houver, continuam como foram lançados originalmente.
+            </p>
+          )}
+
+          {editingId == null && watchedType === 'INCOME' && (
             <div>
               <label className={labelCls}>Origem do Lançamento</label>
               <div className="grid grid-cols-3 gap-2 mt-1">

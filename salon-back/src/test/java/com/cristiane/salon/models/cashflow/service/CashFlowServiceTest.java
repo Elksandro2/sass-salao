@@ -1,6 +1,7 @@
 package com.cristiane.salon.models.cashflow.service;
 
 import com.cristiane.salon.exception.BadRequestException;
+import com.cristiane.salon.exception.BusinessException;
 import com.cristiane.salon.exception.ResourceNotFoundException;
 import com.cristiane.salon.models.appointment.entity.Appointment;
 import com.cristiane.salon.models.appointment.repository.AppointmentRepository;
@@ -424,6 +425,73 @@ class CashFlowServiceTest {
         CashFlowResponse response = cashFlowService.create(request);
         assertThat(response).isNotNull();
         assertThat(response.id()).isEqualTo(60L);
+    }
+
+    // --- update ---
+
+    @Test
+    void update_whenManualEntry_shouldReplaceFields() {
+        CashFlow existing = new CashFlow();
+        existing.setId(7L);
+        existing.setType(CashFlowType.EXPENSE);
+        existing.setAmount(BigDecimal.TEN);
+        existing.setDescription("Antiga descrição");
+        existing.setDate(salonClock.today());
+        when(cashFlowRepository.findById(7L)).thenReturn(Optional.of(existing));
+        when(cashFlowRepository.save(any(CashFlow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CashFlowRequest request = new CashFlowRequest(
+                "INCOME", new BigDecimal("123.45"), "Nova descrição", salonClock.today().plusDays(1), null, null, null);
+
+        CashFlowResponse result = cashFlowService.update(7L, request);
+
+        assertThat(result.type()).isEqualTo("INCOME");
+        assertThat(result.amount()).isEqualByComparingTo("123.45");
+        assertThat(result.description()).isEqualTo("Nova descrição");
+        assertThat(result.date()).isEqualTo(salonClock.today().plusDays(1));
+    }
+
+    @Test
+    void update_whenNotFound_shouldThrowResourceNotFoundException() {
+        when(cashFlowRepository.findById(99L)).thenReturn(Optional.empty());
+
+        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.TEN, "desc", salonClock.today(), null, null, null);
+
+        assertThatThrownBy(() -> cashFlowService.update(99L, request))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void update_whenLinkedToAppointment_shouldThrowBusinessException() {
+        // Lançamento gerado automaticamente por um agendamento — edição tem que passar pelo
+        // próprio agendamento, senão desincroniza (ver syncCashFlowAmountIfAlreadyBilled).
+        CashFlow existing = new CashFlow();
+        existing.setId(7L);
+        existing.setType(CashFlowType.INCOME);
+        existing.setAmount(BigDecimal.TEN);
+        Appointment linkedAppointment = new Appointment();
+        linkedAppointment.setId(50L);
+        existing.setAppointment(linkedAppointment);
+        when(cashFlowRepository.findById(7L)).thenReturn(Optional.of(existing));
+
+        CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.TEN, "desc", salonClock.today(), null, null, null);
+
+        assertThatThrownBy(() -> cashFlowService.update(7L, request))
+                .isInstanceOf(BusinessException.class);
+        verify(cashFlowRepository, never()).save(any(CashFlow.class));
+    }
+
+    @Test
+    void update_whenTypeInvalid_shouldThrowBadRequestException() {
+        CashFlow existing = new CashFlow();
+        existing.setId(7L);
+        existing.setType(CashFlowType.EXPENSE);
+        when(cashFlowRepository.findById(7L)).thenReturn(Optional.of(existing));
+
+        CashFlowRequest request = new CashFlowRequest("INVALID", BigDecimal.TEN, "desc", salonClock.today(), null, null, null);
+
+        assertThatThrownBy(() -> cashFlowService.update(7L, request))
+                .isInstanceOf(BadRequestException.class);
     }
 
     // --- delete ---

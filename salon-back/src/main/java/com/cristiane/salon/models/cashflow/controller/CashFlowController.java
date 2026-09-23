@@ -45,6 +45,14 @@ public class CashFlowController {
         return ResponseEntity.status(HttpStatus.CREATED).body(cashFlowService.create(request));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Auditable(action = "CASHFLOW_ENTRY_UPDATED", entityType = "CashFlow", captureArgs = true)
+    @Operation(summary = "Edita um registro manual do fluxo de caixa (Admin/Gerente) — só se não vier de um agendamento")
+    public ResponseEntity<CashFlowResponse> update(@PathVariable Long id, @Valid @RequestBody CashFlowRequest request) {
+        return ResponseEntity.ok(cashFlowService.update(id, request));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
     @Auditable(action = "CASHFLOW_ENTRY_DELETED", entityType = "CashFlow", captureArgs = true)

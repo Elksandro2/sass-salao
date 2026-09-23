@@ -66,6 +66,16 @@ public class FixedExpenseService {
     }
 
     @Transactional
+    public FixedExpenseResponse update(Long id, FixedExpenseRequest request) {
+        FixedExpense expense = fixedExpenseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Gasto fixo não encontrado"));
+        expense.setDescription(request.description().trim());
+        expense.setAmount(request.amount());
+        expense.setDate(request.date());
+        return FixedExpenseResponse.fromEntity(fixedExpenseRepository.save(expense));
+    }
+
+    @Transactional
     public void delete(Long id) {
         if (!fixedExpenseRepository.existsById(id)) {
             throw new ResourceNotFoundException("Gasto fixo não encontrado");

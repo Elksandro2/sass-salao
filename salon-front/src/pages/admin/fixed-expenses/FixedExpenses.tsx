@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Pencil, X } from 'lucide-react';
 import { Table } from '../../../components/table/Table';
 import { ConfirmDialog } from '../../../components/modal/ConfirmDialog';
 import { PermissionGate } from '../../../components/permissions/PermissionGate';
@@ -32,6 +32,7 @@ export const FixedExpenses = () => {
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(getLocalDateString());
   const [isSaving, setIsSaving] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
@@ -62,7 +63,21 @@ export const FixedExpenses = () => {
 
   const totalInPage = expenses.reduce((sum, e) => sum + e.amount, 0);
 
-  const handleCreate = async () => {
+  const resetForm = () => {
+    setEditingId(null);
+    setDescription('');
+    setAmount('');
+    setDate(getLocalDateString());
+  };
+
+  const handleStartEdit = (item: FixedExpenseData) => {
+    setEditingId(item.id!);
+    setDescription(item.description);
+    setAmount(String(item.amount));
+    setDate(item.date);
+  };
+
+  const handleSave = async () => {
     const amountNum = Number(amount);
     if (!description.trim() || !amount || Number.isNaN(amountNum) || amountNum < 0 || !date) {
       await showError('Preencha a descrição, um valor válido e a data.');
@@ -70,15 +85,19 @@ export const FixedExpenses = () => {
     }
     setIsSaving(true);
     try {
-      await fixedExpensesApi.create({ description: description.trim(), amount: amountNum, date });
-      setDescription('');
-      setAmount('');
-      setDate(getLocalDateString());
-      await showSuccess('Gasto fixo adicionado');
-      setCurrentPage(1);
+      const payload = { description: description.trim(), amount: amountNum, date };
+      if (editingId != null) {
+        await fixedExpensesApi.update(editingId, payload);
+        await showSuccess('Gasto fixo atualizado');
+      } else {
+        await fixedExpensesApi.create(payload);
+        await showSuccess('Gasto fixo adicionado');
+        setCurrentPage(1);
+      }
+      resetForm();
       load();
     } catch (err) {
-      await showError(getApiErrorMessage(err, 'Erro ao adicionar gasto fixo'));
+      await showError(getApiErrorMessage(err, 'Erro ao salvar gasto fixo'));
     } finally {
       setIsSaving(false);
     }
@@ -113,15 +132,26 @@ export const FixedExpenses = () => {
       key: 'actions',
       label: 'Ações',
       render: (item: FixedExpenseData) => (
-        <PermissionGate method="DELETE" endpoint={`/v1/fixed-expenses/${item.id}`}>
-          <button
-            onClick={() => setDeleteTargetId(item.id!)}
-            title="Apagar"
-            className="p-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition-all cursor-pointer"
-          >
-            <Trash2 size={15} />
-          </button>
-        </PermissionGate>
+        <div className="flex gap-2">
+          <PermissionGate method="PUT" endpoint={`/v1/fixed-expenses/${item.id}`}>
+            <button
+              onClick={() => handleStartEdit(item)}
+              title="Editar"
+              className="p-1.5 text-indigo-600 hover:bg-indigo-50 border border-indigo-200 rounded-lg transition-all cursor-pointer"
+            >
+              <Pencil size={15} />
+            </button>
+          </PermissionGate>
+          <PermissionGate method="DELETE" endpoint={`/v1/fixed-expenses/${item.id}`}>
+            <button
+              onClick={() => setDeleteTargetId(item.id!)}
+              title="Apagar"
+              className="p-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition-all cursor-pointer"
+            >
+              <Trash2 size={15} />
+            </button>
+          </PermissionGate>
+        </div>
       ),
     },
   ];
@@ -138,6 +168,18 @@ export const FixedExpenses = () => {
 
       <PermissionGate method="POST" endpoint="/v1/fixed-expenses">
         <div className="p-4 bg-white border border-[#eae1e1] rounded-2xl grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+          {editingId != null && (
+            <div className="md:col-span-4 flex items-center justify-between -mb-1">
+              <span className="text-xs font-semibold text-[#be8a83]">Editando gasto fixo</span>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <X size={13} /> Cancelar edição
+              </button>
+            </div>
+          )}
           <div className="md:col-span-2">
             <label className={labelCls}>Descrição</label>
             <input
@@ -171,11 +213,19 @@ export const FixedExpenses = () => {
           </div>
           <div className="md:col-span-4 flex justify-end">
             <button
-              onClick={handleCreate}
+              onClick={handleSave}
               disabled={isSaving}
               className="btn-premium disabled:opacity-50"
             >
-              <Plus size={18} /> Adicionar gasto
+              {editingId != null ? (
+                <>
+                  <Pencil size={18} /> Salvar alteração
+                </>
+              ) : (
+                <>
+                  <Plus size={18} /> Adicionar gasto
+                </>
+              )}
             </button>
           </div>
         </div>
