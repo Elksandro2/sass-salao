@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
+import { CurrencyInput } from '../../../components/CurrencyInput';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import { Table } from '../../../components/table/Table';
@@ -44,6 +45,7 @@ export const CashFlow = () => {
     reset,
     setValue,
     watch,
+    control,
     formState: { errors },
   } = useForm<CashFlowFormValues>({ resolver: zodResolver(cashFlowFormSchema) });
   const { error: showError } = useAlert();
@@ -695,12 +697,17 @@ export const CashFlow = () => {
 
           <div>
             <label className={labelCls}>Valor (R$) *</label>
-            <input
-              type="number"
-              step="0.01"
-              disabled={sourceType === 'PRODUCT'}
-              className={`${inputCls} ${errors.amount ? 'border-rose-300 focus:ring-rose-500/10 focus:border-rose-400' : ''}`}
-              {...register('amount')}
+            <Controller
+              name="amount"
+              control={control}
+              render={({ field }) => (
+                <CurrencyInput
+                  value={field.value ?? ''}
+                  onValueChange={field.onChange}
+                  disabled={sourceType === 'PRODUCT'}
+                  className={`${inputCls} ${errors.amount ? 'border-rose-300 focus:ring-rose-500/10 focus:border-rose-400' : ''}`}
+                />
+              )}
             />
             {errors.amount && (
               <span className="text-xs text-rose-500 font-semibold mt-1 block">

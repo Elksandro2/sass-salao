@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Edit, Trash2, Eye, Search } from 'lucide-react';
 import { DataTable } from '../../../components/table/DataTable';
@@ -7,6 +7,7 @@ import type { FilterField } from '../../../components/table/DataTable';
 import { ModalForm } from '../../../components/modal/ModalForm';
 import { ConfirmDialog } from '../../../components/modal/ConfirmDialog';
 import { PermissionGate } from '../../../components/permissions/PermissionGate';
+import { CurrencyInput } from '../../../components/CurrencyInput';
 import { employeesApi } from './services/employees';
 import type { EmployeeData, EmployeeFilter } from './services/employees';
 import { MercadoPagoConnectionCell } from './components/MercadoPagoConnectionCell';
@@ -65,6 +66,7 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
     setValue,
     watch,
     clearErrors,
+    control,
     formState: { errors },
   } = useForm<EmployeeFormValues>({ resolver: zodResolver(employeeFormSchema) });
   const remunerationType = watch('remunerationType');
@@ -380,11 +382,16 @@ export const Employees = ({ embedded = false }: EmployeesProps = {}) => {
               {remunerationNeedsValue(remunerationType) && (
                 <div>
                   <label className={labelCls}>{remunerationValueFieldLabel(remunerationType)} *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className={`${inputCls} ${errors.remunerationValue ? 'border-rose-300' : ''}`}
-                    {...register('remunerationValue')}
+                  <Controller
+                    name="remunerationValue"
+                    control={control}
+                    render={({ field }) => (
+                      <CurrencyInput
+                        value={field.value ?? ''}
+                        onValueChange={field.onChange}
+                        className={`${inputCls} ${errors.remunerationValue ? 'border-rose-300' : ''}`}
+                      />
+                    )}
                   />
                   {errors.remunerationValue && (
                     <span className="text-xs text-rose-500 font-semibold">

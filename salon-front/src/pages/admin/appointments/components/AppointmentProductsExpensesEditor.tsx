@@ -9,6 +9,7 @@ import type {
 import { productsApi } from '../../products/services/products';
 import type { ProductData } from '../../products/services/products';
 import { PermissionGate } from '../../../../components/permissions/PermissionGate';
+import { CurrencyInput } from '../../../../components/CurrencyInput';
 import { useAlert } from '../../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../../utils/apiError';
 
@@ -247,13 +248,11 @@ export const AppointmentProductsExpensesEditor = ({
                     value={row.quantity}
                     onChange={(e) => updateProductRow(index, { quantity: e.target.value })}
                   />
-                  <input
-                    type="number"
-                    step="0.01"
-                    className={`${inputCls} w-24`}
+                  <CurrencyInput
+                    className={`${inputCls} w-28`}
                     placeholder="Preço custom."
                     value={row.customPrice}
-                    onChange={(e) => updateProductRow(index, { customPrice: e.target.value })}
+                    onValueChange={(v) => updateProductRow(index, { customPrice: v })}
                   />
                   <button
                     type="button"
@@ -353,14 +352,24 @@ export const AppointmentProductsExpensesEditor = ({
                     <option value="FIXED">R$</option>
                     <option value="PERCENTAGE">%</option>
                   </select>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className={`${inputCls} w-20`}
-                    placeholder="Valor"
-                    value={row.value}
-                    onChange={(e) => updateExpenseRow(index, { value: e.target.value })}
-                  />
+                  {row.valueType === 'FIXED' ? (
+                    <CurrencyInput
+                      className={`${inputCls} w-28`}
+                      placeholder="Valor"
+                      value={row.value}
+                      onValueChange={(v) => updateExpenseRow(index, { value: v })}
+                    />
+                  ) : (
+                    <input
+                      type="number"
+                      step="0.01"
+                      max="100"
+                      className={`${inputCls} w-20`}
+                      placeholder="Valor (%)"
+                      value={row.value}
+                      onChange={(e) => updateExpenseRow(index, { value: e.target.value })}
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={() => removeExpenseRow(index)}

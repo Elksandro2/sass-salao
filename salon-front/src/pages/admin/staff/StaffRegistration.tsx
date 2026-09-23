@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Plus,
@@ -24,6 +24,7 @@ import type { StaffProfileResponse, StaffRoleName, StaffPixQrCodeResponse } from
 import { staffFormSchema, BRAZILIAN_STATES } from './staff.schema';
 import type { StaffFormValues } from './staff.schema';
 import { RoleSelector } from './components/RoleSelector';
+import { CurrencyInput } from '../../../components/CurrencyInput';
 import {
   REMUNERATION_TYPES,
   remunerationLabel,
@@ -79,6 +80,7 @@ export const StaffRegistration = () => {
     setValue,
     setError,
     reset,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<StaffFormValues>({ resolver: zodResolver(staffFormSchema) });
 
@@ -462,7 +464,18 @@ export const StaffRegistration = () => {
                             <label htmlFor="staff-remunerationValue" className={labelCls}>
                               {remunerationValueFieldLabel(remunerationType)}
                             </label>
-                            <input id="staff-remunerationValue" type="number" step="0.01" min="0" className={inputCls} {...register('remunerationValue')} />
+                            <Controller
+                              name="remunerationValue"
+                              control={control}
+                              render={({ field }) => (
+                                <CurrencyInput
+                                  id="staff-remunerationValue"
+                                  value={field.value ?? ''}
+                                  onValueChange={field.onChange}
+                                  className={inputCls}
+                                />
+                              )}
+                            />
                             {errors.remunerationValue && (
                               <span className="text-xs text-rose-500 font-semibold">{errors.remunerationValue.message}</span>
                             )}
@@ -599,13 +612,10 @@ export const StaffRegistration = () => {
                     </div>
                   ) : (
                     <div className="flex gap-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
+                      <CurrencyInput
                         placeholder="Valor (R$)"
                         value={pixAmount}
-                        onChange={(e) => setPixAmount(e.target.value)}
+                        onValueChange={setPixAmount}
                         className={inputCls}
                       />
                       <button

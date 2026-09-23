@@ -153,7 +153,7 @@ describe('StaffRegistration', () => {
     fireEvent.change(screen.getByLabelText('Cidade'), { target: { value: 'Recife' } });
     fireEvent.change(screen.getByLabelText('UF'), { target: { value: 'PE' } });
     fireEvent.change(screen.getByLabelText('Tipo de remuneração'), { target: { value: 'SALARIO_FIXO' } });
-    fireEvent.change(screen.getByLabelText('Valor do salário fixo (R$)'), { target: { value: '2000' } });
+    fireEvent.change(screen.getByLabelText('Valor do salário fixo (R$)'), { target: { value: '200000' } }); // máscara: dígitos = centavos (R$ 2000,00)
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Criar Cadastro/i }));
@@ -201,7 +201,7 @@ describe('StaffRegistration', () => {
     fireEvent.change(screen.getByLabelText('Cidade'), { target: { value: 'Recife' } });
     fireEvent.change(screen.getByLabelText('UF'), { target: { value: 'PE' } });
     fireEvent.change(screen.getByLabelText('Tipo de remuneração'), { target: { value: 'SALARIO_FIXO' } });
-    fireEvent.change(screen.getByLabelText('Valor do salário fixo (R$)'), { target: { value: '3000' } });
+    fireEvent.change(screen.getByLabelText('Valor do salário fixo (R$)'), { target: { value: '300000' } }); // máscara: dígitos = centavos (R$ 3000,00)
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Criar Cadastro/i }));

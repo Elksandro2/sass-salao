@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Pencil, X } from 'lucide-react';
+import { CurrencyInput } from '../../../components/CurrencyInput';
 import { Table } from '../../../components/table/Table';
 import { ConfirmDialog } from '../../../components/modal/ConfirmDialog';
 import { PermissionGate } from '../../../components/permissions/PermissionGate';
@@ -193,14 +194,7 @@ export const FixedExpenses = () => {
           </div>
           <div>
             <label className={labelCls}>Valor (R$)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              className={inputCls}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
+            <CurrencyInput className={inputCls} value={amount} onValueChange={setAmount} />
           </div>
           <div>
             <label className={labelCls}>Data</label>

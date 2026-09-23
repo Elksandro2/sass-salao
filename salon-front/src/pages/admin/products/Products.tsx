@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Edit, Trash2, RotateCcw, Ban } from 'lucide-react';
 import { DataTable } from '../../../components/table/DataTable';
@@ -7,6 +7,7 @@ import type { FilterField } from '../../../components/table/DataTable';
 import { ModalForm } from '../../../components/modal/ModalForm';
 import { ConfirmDialog } from '../../../components/modal/ConfirmDialog';
 import { PermissionGate } from '../../../components/permissions/PermissionGate';
+import { CurrencyInput } from '../../../components/CurrencyInput';
 import { productsApi } from './services/products';
 import type { ProductData, ProductFilter } from './services/products';
 import { productFormSchema } from './product.schema';
@@ -45,6 +46,7 @@ export const Products = ({ mode }: ProductsProps) => {
     reset,
     setValue,
     watch,
+    control,
     formState: { errors },
   } = useForm<ProductFormValues>({ resolver: zodResolver(productFormSchema) });
   const { error: showError } = useAlert();
@@ -288,11 +290,16 @@ export const Products = ({ mode }: ProductsProps) => {
               <label className={labelCls}>
                 Preço de Venda (R$) {isSaleMode && '*'}
               </label>
-              <input
-                type="number"
-                step="0.01"
-                className={`${inputCls} ${errors.price ? 'border-rose-300' : ''}`}
-                {...register('price')}
+              <Controller
+                name="price"
+                control={control}
+                render={({ field }) => (
+                  <CurrencyInput
+                    value={field.value ?? ''}
+                    onValueChange={field.onChange}
+                    className={`${inputCls} ${errors.price ? 'border-rose-300' : ''}`}
+                  />
+                )}
               />
               <p className="text-xs text-gray-400 mt-1">
                 Este é o valor cobrado da cliente — aparece no Fluxo de Caixa e no seletor de
@@ -324,12 +331,16 @@ export const Products = ({ mode }: ProductsProps) => {
               </div>
               <div>
                 <label className={labelCls}>Quanto o salão pagou (R$)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className={`${inputCls} ${errors.costPrice ? 'border-rose-300' : ''}`}
-                  {...register('costPrice')}
+                <Controller
+                  name="costPrice"
+                  control={control}
+                  render={({ field }) => (
+                    <CurrencyInput
+                      value={field.value ?? ''}
+                      onValueChange={field.onChange}
+                      className={`${inputCls} ${errors.costPrice ? 'border-rose-300' : ''}`}
+                    />
+                  )}
                 />
                 {errors.costPrice && (
                   <span className="text-xs text-rose-500 font-semibold">{errors.costPrice.message}</span>

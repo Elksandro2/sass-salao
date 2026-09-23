@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Edit, Trash2, RotateCcw, Ban } from 'lucide-react';
 import { DataTable } from '../../../components/table/DataTable';
@@ -22,6 +22,7 @@ import { getApiErrorMessage } from '../../../utils/apiError';
 import { productUnitSymbol, productUnitLabel, PRODUCT_UNITS } from '../../../utils/productUnit';
 import type { ProductUnitValue } from '../../../utils/productUnit';
 import { SearchableSelect } from '../../../components/SearchableSelect';
+import { CurrencyInput } from '../../../components/CurrencyInput';
 
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
@@ -58,6 +59,7 @@ export const AdminServices = () => {
     handleSubmit,
     reset,
     setValue,
+    control,
     formState: { errors },
   } = useForm<SalonServiceFormValues>({ resolver: zodResolver(salonServiceFormSchema) });
   const { error: showError } = useAlert();
@@ -305,16 +307,17 @@ export const AdminServices = () => {
           </div>
           <div>
             <label className={labelCls}>Valor de referência — "a partir de" (opcional)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="Deixe em branco se o valor for combinado"
-              className={inputCls}
-              {...register('price', {
-                setValueAs: (v) =>
-                  v === '' || v === undefined || v === null ? undefined : Number(v),
-              })}
+            <Controller
+              name="price"
+              control={control}
+              render={({ field }) => (
+                <CurrencyInput
+                  value={field.value != null ? String(field.value) : ''}
+                  onValueChange={(v) => field.onChange(v === '' ? undefined : Number(v))}
+                  placeholder="Deixe em branco se o valor for combinado"
+                  className={inputCls}
+                />
+              )}
             />
             <p className="text-xs text-gray-400 mt-1">
               O preço final pode ser registrado no fluxo de caixa ao concluir o atendimento.

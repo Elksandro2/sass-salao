@@ -21,7 +21,7 @@ describe('ServiceCustomizationPanel', () => {
 
     fireEvent.click(screen.getByText('Personalizar para este cliente'));
 
-    expect(screen.getByPlaceholderText('100.00')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('R$ 100,00')).toBeInTheDocument();
     expect(screen.getByText('Padrão: R$ 100.00')).toBeInTheDocument();
   });
 
@@ -32,9 +32,10 @@ describe('ServiceCustomizationPanel', () => {
     );
 
     fireEvent.click(screen.getByText('Personalizar para este cliente'));
-    fireEvent.change(screen.getByPlaceholderText('100.00'), { target: { value: '200' } });
+    // Máscara monetária: os dígitos digitados são lidos como centavos (200,00 -> "20000").
+    fireEvent.change(screen.getByPlaceholderText('R$ 100,00'), { target: { value: '20000' } });
 
-    expect(handleChange).toHaveBeenCalledWith({ ...emptyValues, price: '200' });
+    expect(handleChange).toHaveBeenCalledWith({ ...emptyValues, price: '200.00' });
   });
 
   it('calls onChange with the updated notes when the notes textarea changes', () => {

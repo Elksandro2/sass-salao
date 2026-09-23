@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, PencilLine } from 'lucide-react';
+import { CurrencyInput } from '../../../../components/CurrencyInput';
 
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
@@ -42,13 +43,10 @@ export const ServiceCustomizationPanel = ({
         <div className="p-4 space-y-4 bg-white">
           <div>
             <label className={labelCls}>Preço (R$)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder={defaultPrice != null ? defaultPrice.toFixed(2) : '—'}
+            <CurrencyInput
               value={values.price}
-              onChange={(e) => onChange({ ...values, price: e.target.value })}
+              onValueChange={(v) => onChange({ ...values, price: v })}
+              placeholder={defaultPrice != null ? `R$ ${defaultPrice.toFixed(2).replace('.', ',')}` : undefined}
               className={inputCls}
             />
             <p className="text-xs text-gray-400 mt-1">

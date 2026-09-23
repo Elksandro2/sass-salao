@@ -6,6 +6,7 @@ import { salonServicesApi } from '../../../services/services/services';
 import type { SalonServiceData } from '../../../services/services/services';
 import { PermissionGate } from '../../../../components/permissions/PermissionGate';
 import { SearchableSelect } from '../../../../components/SearchableSelect';
+import { CurrencyInput } from '../../../../components/CurrencyInput';
 import { useAlert } from '../../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../../utils/apiError';
 
@@ -205,13 +206,11 @@ export const AppointmentServicesEditor = ({ appointment, onSaved, isEditing }: A
                   className={`${inputCls} block w-full`}
                 />
                 <div>
-                  <input
-                    type="number"
-                    step="0.01"
+                  <CurrencyInput
                     className={`${inputCls} block w-full`}
                     placeholder="Preço customizado (opcional)"
                     value={row.customPrice}
-                    onChange={(e) => updateRow(index, { customPrice: e.target.value })}
+                    onValueChange={(v) => updateRow(index, { customPrice: v })}
                   />
                   <p className="text-[11px] text-gray-400 mt-1">
                     Deixe em branco pra cobrar o preço do serviço selecionado acima.
