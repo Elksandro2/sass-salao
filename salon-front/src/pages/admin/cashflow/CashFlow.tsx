@@ -54,7 +54,9 @@ export const CashFlow = () => {
   const [products, setProducts] = useState<ProductData[]>([]);
   const [services, setServices] = useState<SalonServiceData[]>([]);
   const [sourceType, setSourceType] = useState<'OTHER' | 'PRODUCT' | 'SERVICE'>('OTHER');
-  const [cart, setCart] = useState<{ product: ProductData; quantity: number }[]>([]);
+  const [cart, setCart] = useState<
+    { product: ProductData; quantity: number; customPrice: string }[]
+  >([]);
   const [productSearch, setProductSearch] = useState('');
   const [showProdDropdown, setShowProdDropdown] = useState(false);
 
@@ -161,7 +163,7 @@ export const CashFlow = () => {
           item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product, quantity: 1, customPrice: '' }];
     });
     setProductSearch('');
     setShowProdDropdown(false);
@@ -183,6 +185,13 @@ export const CashFlow = () => {
     );
   };
 
+  /** Preço especial só nesta venda (ex.: cliente fiel) — em branco = usa o preço de catálogo. */
+  const updateCartCustomPrice = (productId: number, customPrice: string) => {
+    setCart((prev) =>
+      prev.map((item) => (item.product.id === productId ? { ...item, customPrice } : item))
+    );
+  };
+
   const handleSelectService = (service: SalonServiceData) => {
     setValue('amount', String(service.price || 0));
     setValue('description', `Serviço: ${service.name}`);
@@ -190,7 +199,10 @@ export const CashFlow = () => {
     setShowSvcDropdown(false);
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + (item.product.price ?? 0) * item.quantity, 0);
+  const cartItemUnitPrice = (item: { product: ProductData; customPrice: string }): number =>
+    item.customPrice !== '' ? Number(item.customPrice) : (item.product.price ?? 0);
+
+  const cartTotal = cart.reduce((sum, item) => sum + cartItemUnitPrice(item) * item.quantity, 0);
 
   // Sync React Hook Form values reactively when product cart updates
   useEffect(() => {
@@ -237,6 +249,7 @@ export const CashFlow = () => {
           items: cart.map((item) => ({
             productId: item.product.id!,
             quantity: item.quantity,
+            customPrice: item.customPrice !== '' ? Number(item.customPrice) : undefined,
           })),
           employeeId: sellerEmployeeId ? Number(sellerEmployeeId) : undefined,
         };
@@ -543,24 +556,49 @@ export const CashFlow = () => {
               {/* Cart List */}
               {cart.length > 0 ? (
                 <div className="space-y-3">
-                  <label className={labelCls}>Produtos Selecionados</label>
+                  <div>
+                    <label className={labelCls}>Produtos Selecionados</label>
+                    <p className="text-xs text-gray-400 -mt-0.5">
+                      O preço unitário de cada item pode ser ajustado — ex.: um produto de R$ 100
+                      vendido por R$ 85 pra esta cliente específica.
+                    </p>
+                  </div>
                   <div className="border border-[#eae1e1]/80 rounded-xl overflow-hidden bg-[#fcf9f9]/50">
                     <div className="divide-y divide-[#eae1e1]/60">
                       {cart.map((item) => (
-                        <div
-                          key={item.product.id}
-                          className="p-3.5 flex justify-between items-center bg-white"
-                        >
-                          <div className="min-w-0 flex-1 pr-4">
+                        <div key={item.product.id} className="p-3.5 flex flex-col gap-2.5 bg-white">
+                          <div className="flex justify-between items-start gap-2">
                             <div className="font-semibold text-sm text-[#3b3036] truncate">
                               {item.product.name}
                             </div>
-                            <div className="text-xs text-[#7a7074] mt-0.5">
-                              Preço Unit.: R$ {(item.product.price ?? 0).toFixed(2)}
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeFromCart(item.product.id!)}
+                              className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-100 shrink-0"
+                              title="Remover produto"
+                            >
+                              <Trash2 size={15} />
+                            </button>
                           </div>
 
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-end gap-3 flex-wrap">
+                            <div className="w-32">
+                              <label className="text-[10px] font-semibold text-[#7a7074] uppercase tracking-wide">
+                                Preço unit.
+                              </label>
+                              <CurrencyInput
+                                value={item.customPrice}
+                                onValueChange={(v) => updateCartCustomPrice(item.product.id!, v)}
+                                placeholder={`R$ ${(item.product.price ?? 0).toFixed(2).replace('.', ',')}`}
+                                className={`${inputCls} py-1.5 text-sm`}
+                              />
+                              {item.customPrice !== '' && (
+                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                  Catálogo: R$ {(item.product.price ?? 0).toFixed(2)}
+                                </p>
+                              )}
+                            </div>
+
                             <div className="flex items-center gap-1.5 bg-[#fcf9f9] border border-[#eae1e1] rounded-lg p-1">
                               <button
                                 type="button"
@@ -587,17 +625,9 @@ export const CashFlow = () => {
                               </button>
                             </div>
 
-                            <div className="text-sm font-bold text-[#3b3036] min-w-[70px] text-right">
-                              R$ {((item.product.price ?? 0) * item.quantity).toFixed(2)}
+                            <div className="text-sm font-bold text-[#3b3036] ml-auto">
+                              R$ {(cartItemUnitPrice(item) * item.quantity).toFixed(2)}
                             </div>
-
-                            <button
-                              type="button"
-                              onClick={() => removeFromCart(item.product.id!)}
-                              className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-100"
-                            >
-                              <Trash2 size={15} />
-                            </button>
                           </div>
                         </div>
                       ))}

@@ -85,11 +85,20 @@ public class CashFlowService {
                 if (product.getActive() == null || !product.getActive()) {
                     throw new BadRequestException("Produto '" + product.getName() + "' não está ativo.");
                 }
+                if (item.customPrice() != null && item.customPrice().compareTo(BigDecimal.ZERO) < 0) {
+                    throw new BadRequestException("O preço customizado não pode ser negativo");
+                }
 
-                BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(item.quantity()));
+                // Preço especial pra essa venda (ex.: cliente fiel, negociação) sobrescreve o do
+                // catálogo — só nesta venda, o cadastro do produto não muda.
+                BigDecimal unitPrice = item.customPrice() != null ? item.customPrice() : product.getPrice();
+                BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(item.quantity()));
                 totalAmount = totalAmount.add(itemTotal);
 
-                itemDescriptions.add(item.quantity() + "x " + product.getName());
+                boolean isCustomPrice = item.customPrice() != null
+                        && item.customPrice().compareTo(product.getPrice()) != 0;
+                itemDescriptions.add(item.quantity() + "x " + product.getName()
+                        + (isCustomPrice ? " (a R$ " + unitPrice.setScale(2, java.math.RoundingMode.HALF_UP) + " cada)" : ""));
             }
 
             cashFlow.setAmount(totalAmount);

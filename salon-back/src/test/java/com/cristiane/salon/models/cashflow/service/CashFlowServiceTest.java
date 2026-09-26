@@ -194,7 +194,7 @@ class CashFlowServiceTest {
     @Test
     void create_whenSaleAndTypeIsNotIncome_shouldThrowBadRequestException() {
         // Arrange
-        CashFlowItemRequest item = new CashFlowItemRequest(1L, 2);
+        CashFlowItemRequest item = new CashFlowItemRequest(1L, 2, null);
         CashFlowRequest request = new CashFlowRequest("EXPENSE", BigDecimal.ZERO, "desc", salonClock.today(), null, List.of(item), null);
 
         // Act & Assert
@@ -206,7 +206,7 @@ class CashFlowServiceTest {
     @Test
     void create_whenSaleAndProductNotFound_shouldThrowResourceNotFoundException() {
         // Arrange
-        CashFlowItemRequest item = new CashFlowItemRequest(99L, 2);
+        CashFlowItemRequest item = new CashFlowItemRequest(99L, 2, null);
         CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "desc", salonClock.today(), null, List.of(item), null);
         when(productRepository.findById(99L)).thenReturn(Optional.empty());
 
@@ -219,7 +219,7 @@ class CashFlowServiceTest {
     @Test
     void create_whenSaleAndProductInactive_shouldThrowBadRequestException() {
         // Arrange
-        CashFlowItemRequest item = new CashFlowItemRequest(2L, 2);
+        CashFlowItemRequest item = new CashFlowItemRequest(2L, 2, null);
         CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "desc", salonClock.today(), null, List.of(item), null);
         when(productRepository.findById(2L)).thenReturn(Optional.of(inactiveProduct));
 
@@ -232,7 +232,7 @@ class CashFlowServiceTest {
     @Test
     void create_whenSaleSuccessAndDefaultDescription_shouldSaveAndAudit() {
         // Arrange
-        CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2); // 2 * 50 = 100
+        CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2, null); // 2 * 50 = 100
         CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "Venda de Produtos", salonClock.today(), null, List.of(item1), null);
         when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
 
@@ -280,7 +280,7 @@ class CashFlowServiceTest {
     @Test
     void create_whenSaleWithEmployee_shouldCalculateAndPersistCommission() {
         // Arrange: venda de 2x Shampoo (R$50 cada = R$100), funcionária com 20% de comissão em produtos
-        CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2);
+        CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2, null);
         CashFlowRequest request = new CashFlowRequest(
                 "INCOME", BigDecimal.ZERO, "Venda de Produtos", salonClock.today(), null, List.of(item1), 7L);
         when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
@@ -307,8 +307,52 @@ class CashFlowServiceTest {
     }
 
     @Test
+    void create_whenSaleWithCustomPrice_shouldUseCustomPriceInsteadOfCatalog() {
+        // Cliente fiel, negociação etc.: produto de R$50 de catálogo vendido a R$40 nesta venda.
+        CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2, new BigDecimal("40.00")); // 2 * 40 = 80
+        CashFlowRequest request = new CashFlowRequest(
+                "INCOME", BigDecimal.ZERO, "Venda de Produtos", salonClock.today(), null, List.of(item1), null);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
+        when(cashFlowRepository.save(any(CashFlow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CashFlowResponse response = cashFlowService.create(request);
+
+        assertThat(response.amount()).isEqualByComparingTo("80.00");
+        assertThat(response.description()).contains("2x Shampoo (a R$ 40.00 cada)");
+    }
+
+    @Test
+    void create_whenSaleWithCustomPriceEqualToCatalog_shouldNotAnnotateDescription() {
+        // Preço customizado igual ao do catálogo não é "de verdade" customizado — não precisa
+        // poluir a descrição com "(a R$ 50,00 cada)" quando é o valor óbvio.
+        CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2, new BigDecimal("50.00"));
+        CashFlowRequest request = new CashFlowRequest(
+                "INCOME", BigDecimal.ZERO, "Venda de Produtos", salonClock.today(), null, List.of(item1), null);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
+        when(cashFlowRepository.save(any(CashFlow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CashFlowResponse response = cashFlowService.create(request);
+
+        assertThat(response.amount()).isEqualByComparingTo("100.00");
+        assertThat(response.description()).doesNotContain("a R$");
+    }
+
+    @Test
+    void create_whenSaleWithNegativeCustomPrice_shouldThrowBadRequestException() {
+        CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2, new BigDecimal("-5.00"));
+        CashFlowRequest request = new CashFlowRequest(
+                "INCOME", BigDecimal.ZERO, "Venda de Produtos", salonClock.today(), null, List.of(item1), null);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
+
+        assertThatThrownBy(() -> cashFlowService.create(request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("O preço customizado não pode ser negativo");
+        verify(cashFlowRepository, never()).save(any(CashFlow.class));
+    }
+
+    @Test
     void create_whenSaleWithUnknownEmployee_shouldThrowResourceNotFoundException() {
-        CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2);
+        CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2, null);
         CashFlowRequest request = new CashFlowRequest(
                 "INCOME", BigDecimal.ZERO, "Venda de Produtos", salonClock.today(), null, List.of(item1), 99L);
         when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
@@ -322,7 +366,7 @@ class CashFlowServiceTest {
     @Test
     void create_whenSaleSuccessAndCustomDescription_shouldConcatenateItemsDescription() {
         // Arrange
-        CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 1);
+        CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 1, null);
         CashFlowRequest request = new CashFlowRequest("INCOME", BigDecimal.ZERO, "Venda especial", salonClock.today(), null, List.of(item1), null);
         when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
 

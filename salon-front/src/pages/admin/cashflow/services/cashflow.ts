@@ -5,6 +5,8 @@ export type { PageResponse } from '../../../../utils/pagination';
 export interface CashFlowItemData {
   productId: number;
   quantity: number;
+  /** Sobrescreve o preço unitário do produto só nesta venda (opcional; padrão = preço de catálogo). */
+  customPrice?: number;
 }
 
 export interface CashFlowData {
