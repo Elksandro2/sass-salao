@@ -73,7 +73,8 @@ export interface PayrollEmployeeSummary {
   totalDays: number;
   paidInPeriod: number;
   outstanding: number;
-  paidUntil: string | null;
+  /** Pagamento mais recente (null = nunca pago) — não depende do filtro de datas. */
+  lastPayment: { paidAt: string; periodStart: string; periodEnd: string; amountPaid: number } | null;
   hasPaymentGaps: boolean;
 }
 
@@ -85,8 +86,6 @@ export interface PayrollSummary {
   totalNetPayable: number;
   totalPaidInPeriod: number;
   totalOutstanding: number;
-  payrollPaidUntil: string | null;
-  behindEmployees: string[];
 }
 
 export interface PayrollAppointmentLine {

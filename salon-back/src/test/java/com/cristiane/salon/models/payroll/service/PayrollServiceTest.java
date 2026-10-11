@@ -95,7 +95,7 @@ class PayrollServiceTest {
     }
 
     @Test
-    void getSummary_marksPeriodPaid_whenPaymentsCoverEveryDay_andComputesPaidUntilForEveryone() {
+    void getSummary_marksPeriodPaid_whenPaymentsCoverEveryDay_andShowsTheLastPayment() {
         Employee emp = employee(RemunerationType.SALARIO_FIXO, "1000.00");
         when(reportService.computePayroll(APR_1, APR_30)).thenReturn(List.of(
                 new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("1000.00"))));
@@ -108,8 +108,8 @@ class PayrollServiceTest {
         var item = summary.items().get(0);
         assertThat(item.periodStatus()).isEqualTo(PayrollDtos.PeriodStatus.PAGO);
         assertThat(item.outstanding()).isEqualByComparingTo("0");
-        assertThat(item.paidUntil()).isEqualTo(APR_30);
-        assertThat(summary.payrollPaidUntil()).isEqualTo(APR_30);
+        assertThat(item.lastPayment().paidAt()).isEqualTo(APR_30); // o mais recente dos dois
+        assertThat(item.lastPayment().periodStart()).isEqualTo(LocalDate.of(2026, 4, 16));
     }
 
     @Test
@@ -128,7 +128,7 @@ class PayrollServiceTest {
     }
 
     @Test
-    void getSummary_whenSomeoneWasNeverPaid_hasNoGlobalPaidUntil_andNamesWhoIsBehind() {
+    void getSummary_whenNeverPaid_hasNoLastPayment() {
         Employee emp = employee(RemunerationType.SALARIO_FIXO, "1000.00");
         when(reportService.computePayroll(APR_1, APR_30)).thenReturn(List.of(
                 new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("1000.00"))));
@@ -136,8 +136,7 @@ class PayrollServiceTest {
 
         var summary = payrollService.getSummary(APR_1, APR_30);
 
-        assertThat(summary.payrollPaidUntil()).isNull();
-        assertThat(summary.behindEmployees()).containsExactly("Maria");
+        assertThat(summary.items().get(0).lastPayment()).isNull();
     }
 
     @Test

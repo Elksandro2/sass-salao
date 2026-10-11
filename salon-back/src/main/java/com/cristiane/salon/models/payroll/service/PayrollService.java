@@ -13,6 +13,7 @@ import com.cristiane.salon.models.payroll.dto.PayrollDtos.AppointmentLine;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.BreakdownResponse;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.EmployeeDetailResponse;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.EmployeeSummary;
+import com.cristiane.salon.models.payroll.dto.PayrollDtos.LastPayment;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.PaymentRequest;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.PaymentResponse;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.PeriodStatus;
@@ -86,29 +87,7 @@ public class PayrollService {
         BigDecimal totalPaid = sum(items, EmployeeSummary::paidInPeriod);
         BigDecimal totalOutstanding = sum(items, EmployeeSummary::outstanding);
 
-        // "Folha quitada até": a menor data "pago até" entre as colaboradoras ativas que têm
-        // remuneração cadastrada — é a data até a qual NINGUÉM está com salário atrasado.
-        List<EmployeeSummary> considered = items.stream()
-                .filter(s -> s.active() && s.remunerationType() != null)
-                .toList();
-        LocalDate paidUntilAll = null;
-        List<String> behind = new ArrayList<>();
-        if (!considered.isEmpty()) {
-            boolean someoneNeverPaid = considered.stream().anyMatch(s -> s.paidUntil() == null);
-            if (someoneNeverPaid) {
-                behind = considered.stream().filter(s -> s.paidUntil() == null)
-                        .map(EmployeeSummary::employeeName).toList();
-            } else {
-                paidUntilAll = considered.stream().map(EmployeeSummary::paidUntil)
-                        .min(Comparator.naturalOrder()).orElse(null);
-                LocalDate min = paidUntilAll;
-                behind = considered.stream().filter(s -> s.paidUntil().equals(min))
-                        .map(EmployeeSummary::employeeName).toList();
-            }
-        }
-
-        return new SummaryResponse(from, to, items, totalCost, totalNet, totalPaid, totalOutstanding,
-                paidUntilAll, behind);
+        return new SummaryResponse(from, to, items, totalCost, totalNet, totalPaid, totalOutstanding);
     }
 
     @Transactional(readOnly = true)
@@ -197,7 +176,13 @@ public class PayrollService {
                 ? BigDecimal.ZERO
                 : netPayable.subtract(paidInPeriod).max(BigDecimal.ZERO);
 
-        LocalDate paidUntil = merged.isEmpty() ? null : merged.get(0)[1];
+        // Cada colaboradora pode ser paga num dia diferente — o que importa é quando foi o último
+        // pagamento dela, não uma data única pra folha toda.
+        LastPayment lastPayment = payments.stream()
+                .max(Comparator.comparing(PayrollPayment::getPaidAt)
+                        .thenComparing(PayrollPayment::getPeriodEnd))
+                .map(p -> new LastPayment(p.getPaidAt(), p.getPeriodStart(), p.getPeriodEnd(), p.getAmountPaid()))
+                .orElse(null);
         boolean hasGaps = merged.size() > 1;
 
         RemunerationType type = employee.getRemunerationType();
@@ -209,11 +194,11 @@ public class PayrollService {
                 data.active(),
                 data.doneAppointments().size(),
                 BreakdownResponse.of(data.breakdown()),
-                status, covered, totalDays, paidInPeriod, outstanding, paidUntil, hasGaps);
+                status, covered, totalDays, paidInPeriod, outstanding, lastPayment, hasGaps);
     }
 
-    /** Une períodos pagos que se encostam ou se sobrepõem — o primeiro intervalo resultante
-     *  termina no "pago até" (o resto, se houver, está depois de um buraco). */
+    /** Une períodos pagos que se encostam ou se sobrepõem — mais de um intervalo resultante
+     *  significa que ficou um buraco sem pagamento entre eles. */
     static List<LocalDate[]> mergeIntervals(List<PayrollPayment> payments) {
         List<PayrollPayment> sorted = new ArrayList<>(payments);
         sorted.sort(Comparator.comparing(PayrollPayment::getPeriodStart));

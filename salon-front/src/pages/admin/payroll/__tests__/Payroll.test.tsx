@@ -72,7 +72,7 @@ const summary: PayrollSummary = {
       totalDays: 30,
       paidInPeriod: 0,
       outstanding: 265,
-      paidUntil: null,
+      lastPayment: null,
       hasPaymentGaps: false,
     },
   ],
@@ -80,8 +80,6 @@ const summary: PayrollSummary = {
   totalNetPayable: 265,
   totalPaidInPeriod: 0,
   totalOutstanding: 265,
-  payrollPaidUntil: null,
-  behindEmployees: ['Ella'],
 };
 
 const firstDay = from;
@@ -125,15 +123,15 @@ describe('Payroll page', () => {
     vi.mocked(payrollApi.getEmployeeDetail).mockResolvedValue(detail);
   });
 
-  it('shows the summary cards and who has never been paid', async () => {
+  it('shows the summary and the last payment column', async () => {
     await act(async () => {
       customRender(<Payroll />);
     });
 
     expect(payrollApi.getSummary).toHaveBeenCalledWith(from, to);
     expect(screen.getByText('Ella')).toBeInTheDocument();
-    expect(screen.getByText('Sem pagamentos')).toBeInTheDocument();
-    expect(screen.getByText('Nunca pagas: Ella')).toBeInTheDocument();
+    expect(screen.getByText('Último pagamento')).toBeInTheDocument();
+    expect(screen.getByText('nenhum pagamento')).toBeInTheDocument();
     expect(screen.getByText('Em aberto')).toBeInTheDocument();
   });
 

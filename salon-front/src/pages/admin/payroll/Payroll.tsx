@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CalendarCheck2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info, Wallet } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info, Wallet } from 'lucide-react';
 import { payrollApi, type PayrollEmployeeSummary, type PayrollSummary, type PeriodStatus } from './services/payroll';
 import { PayrollEmployeeDetail } from './components/PayrollEmployeeDetail';
 import {
@@ -85,8 +85,6 @@ export const Payroll = () => {
   };
   const handlePayModalOpened = useCallback(() => setPayNowId(null), []);
 
-  const paidUntil = summary?.payrollPaidUntil;
-
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div>
@@ -137,23 +135,7 @@ export const Payroll = () => {
 
       {/* Indicadores */}
       {summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-2xl border border-[#eae1e1]/80 p-5 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#be8a83] to-[#e5a49c]" />
-            <p className="text-[10px] font-bold text-[#7a7074] uppercase tracking-wider mb-1 flex items-center gap-1">
-              <CalendarCheck2 size={12} /> Folha quitada até
-            </p>
-            <p className="text-xl font-extrabold text-[#3b3036]">
-              {paidUntil ? formatShortDate(paidUntil) : 'Sem pagamentos'}
-            </p>
-            <p className="text-[11px] text-[#7a7074] mt-1">
-              {paidUntil
-                ? summary.behindEmployees.length > 0 && `Mais atrasada: ${summary.behindEmployees.join(', ')}`
-                : summary.behindEmployees.length > 0
-                  ? `Nunca pagas: ${summary.behindEmployees.join(', ')}`
-                  : 'Registre os pagamentos pra acompanhar aqui'}
-            </p>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatCard
             label="A pagar no período"
             value={formatBRL(summary.totalNetPayable)}
@@ -171,7 +153,7 @@ export const Payroll = () => {
           <table className="w-full text-left border-collapse min-w-[860px]">
             <thead>
               <tr className="bg-[#fcf9f9]/50 border-b border-[#eae1e1]">
-                {['Colaboradora', 'Regime', 'Composição', 'A pagar', 'Situação do período', ''].map((h, i) => (
+                {['Colaboradora', 'Regime', 'Composição', 'A pagar', 'Situação do período', 'Último pagamento', ''].map((h, i) => (
                   <th
                     key={i}
                     className={`px-5 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider ${h === 'A pagar' ? 'text-right' : ''}`}
@@ -184,7 +166,7 @@ export const Payroll = () => {
             <tbody className="divide-y divide-[#eae1e1]/40">
               {isLoading && !summary ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-sm text-[#7a7074]">Carregando...</td>
+                  <td colSpan={7} className="px-6 py-10 text-center text-sm text-[#7a7074]">Carregando...</td>
                 </tr>
               ) : summary && summary.items.length > 0 ? (
                 summary.items.map((item) => {
@@ -219,13 +201,23 @@ export const Payroll = () => {
                         </td>
                         <td className="px-5 py-4 text-sm">
                           <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${status.cls}`}>{status.label}</span>
-                          <span className="block text-[11px] text-[#7a7074] mt-1">
-                            {item.paidUntil ? `pago até ${formatShortDate(item.paidUntil)}` : 'nenhum pagamento registrado'}
-                          </span>
                           {item.hasPaymentGaps && (
-                            <span className="flex items-center gap-1 text-[11px] text-amber-700">
+                            <span className="flex items-center gap-1 text-[11px] text-amber-700 mt-1">
                               <AlertTriangle size={11} /> tem período sem pagamento no meio
                             </span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4 text-sm whitespace-nowrap">
+                          {item.lastPayment ? (
+                            <>
+                              <span className="font-semibold text-[#3b3036]">{formatShortDate(item.lastPayment.paidAt)}</span>
+                              <span className="block text-[11px] text-[#7a7074]">
+                                {formatBRL(item.lastPayment.amountPaid)} · ref. {formatShortDate(item.lastPayment.periodStart)} a{' '}
+                                {formatShortDate(item.lastPayment.periodEnd)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-[11px] text-[#7a7074]">nenhum pagamento</span>
                           )}
                         </td>
                         <td className="px-5 py-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
@@ -250,7 +242,7 @@ export const Payroll = () => {
                       </tr>
                       {expanded && (
                         <tr>
-                          <td colSpan={6} className="p-0">
+                          <td colSpan={7} className="p-0">
                             <PayrollEmployeeDetail
                               employeeId={item.employeeId}
                               from={from}
@@ -267,7 +259,7 @@ export const Payroll = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-sm text-[#7a7074]">
+                  <td colSpan={7} className="px-6 py-10 text-center text-sm text-[#7a7074]">
                     Nenhuma colaboradora com remuneração no período.
                   </td>
                 </tr>

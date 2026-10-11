@@ -159,11 +159,14 @@ public final class PayrollDtos {
             BigDecimal paidInPeriod,
             /** Quanto ainda falta pagar deste período (zero se quitado). */
             BigDecimal outstanding,
-            /** Último dia de uma sequência contínua de períodos pagos (null = nunca pago). */
-            LocalDate paidUntil,
+            /** Pagamento mais recente da colaboradora (null = nunca pago) — independe do filtro. */
+            LastPayment lastPayment,
             /** Há um buraco entre pagamentos registrados (algum período no meio ficou sem pagar). */
             boolean hasPaymentGaps
     ) {}
+
+    /** Data em que foi pago, a que período se refere e quanto. */
+    public record LastPayment(LocalDate paidAt, LocalDate periodStart, LocalDate periodEnd, BigDecimal amountPaid) {}
 
     public record SummaryResponse(
             LocalDate periodStart,
@@ -172,11 +175,7 @@ public final class PayrollDtos {
             BigDecimal totalSalonCost,
             BigDecimal totalNetPayable,
             BigDecimal totalPaidInPeriod,
-            BigDecimal totalOutstanding,
-            /** Até quando a folha de TODAS as colaboradoras ativas está quitada (null = alguém nunca foi pago). */
-            LocalDate payrollPaidUntil,
-            /** Nomes de quem está com o "pago até" mais atrasado (quem segura a data acima). */
-            List<String> behindEmployees
+            BigDecimal totalOutstanding
     ) {}
 
     public record AppointmentLine(
