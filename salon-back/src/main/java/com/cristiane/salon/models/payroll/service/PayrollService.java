@@ -11,6 +11,8 @@ import com.cristiane.salon.models.payroll.dto.PayrollDtos.AdjustmentRequest;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.AdjustmentResponse;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.AppointmentLine;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.BreakdownResponse;
+import com.cristiane.salon.models.payroll.dto.PayrollDtos.CoverageRange;
+import com.cristiane.salon.models.payroll.dto.PayrollDtos.PaymentPreview;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.EmployeeDetailResponse;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.EmployeeSummary;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.LastPayment;
@@ -24,6 +26,7 @@ import com.cristiane.salon.models.payroll.dto.PayrollDtos.WorkDayRequest;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.WorkDayResponse;
 import com.cristiane.salon.models.payroll.entity.EmployeeWorkDay;
 import com.cristiane.salon.models.payroll.entity.PayrollAdjustment;
+import com.cristiane.salon.models.payroll.entity.PayrollAdjustmentType;
 import com.cristiane.salon.models.payroll.entity.PayrollPayment;
 import com.cristiane.salon.models.payroll.repository.EmployeeWorkDayRepository;
 import com.cristiane.salon.models.payroll.repository.PayrollAdjustmentRepository;
@@ -140,7 +143,7 @@ public class PayrollService {
                     ? reportService.computeEmployeePayroll(employee, p.getPeriodStart(), p.getPeriodEnd())
                             .breakdown().netPayable()
                     : null;
-            paymentResponses.add(toResponse(p, recalculated));
+            paymentResponses.add(toResponse(p, recalculated, employeeName(employee)));
         }
 
         return new EmployeeDetailResponse(summary, from, to, appointments, sales, workDays, unmarked,
@@ -150,31 +153,41 @@ public class PayrollService {
     private EmployeeSummary summarize(EmployeePayrollData data, List<PayrollPayment> payments,
                                       LocalDate from, LocalDate to) {
         Employee employee = data.employee();
-        List<LocalDate[]> merged = mergeIntervals(payments);
+
+        List<PaymentCoverage.Range> paid = PaymentCoverage.paidRanges(payments, from, to);
+        List<PaymentCoverage.Range> unpaid = PaymentCoverage.unpaidRanges(payments, from, to);
 
         long totalDays = ChronoUnit.DAYS.between(from, to) + 1;
-        long covered = 0;
-        for (LocalDate[] interval : merged) {
-            LocalDate start = interval[0].isAfter(from) ? interval[0] : from;
-            LocalDate end = interval[1].isBefore(to) ? interval[1] : to;
-            if (!start.isAfter(end)) {
-                covered += ChronoUnit.DAYS.between(start, end) + 1;
-            }
-        }
+        long uncoveredDays = unpaid.stream().mapToLong(r -> ChronoUnit.DAYS.between(r.start(), r.end()) + 1).sum();
+        long covered = totalDays - uncoveredDays;
         PeriodStatus status = covered >= totalDays ? PeriodStatus.PAGO
                 : covered > 0 ? PeriodStatus.PARCIAL : PeriodStatus.EM_ABERTO;
 
-        LocalDate finalFrom = from;
-        LocalDate finalTo = to;
-        BigDecimal paidInPeriod = payments.stream()
-                .filter(p -> !p.getPeriodEnd().isBefore(finalFrom) && !p.getPeriodStart().isAfter(finalTo))
+        List<PayrollPayment> touching = payments.stream()
+                .filter(p -> !p.getPeriodEnd().isBefore(from) && !p.getPeriodStart().isAfter(to))
+                .toList();
+        BigDecimal paidInPeriod = touching.stream()
                 .map(PayrollPayment::getAmountPaid)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal netPayable = data.breakdown().netPayable();
-        BigDecimal outstanding = status == PeriodStatus.PAGO
-                ? BigDecimal.ZERO
-                : netPayable.subtract(paidInPeriod).max(BigDecimal.ZERO);
+        // Dias sem pagamento: estimativa do sistema pra exatamente esses dias. Dias pagos: o que
+        // foi registrado — mais a diferença, se algo do período mudou depois de pago.
+        BigDecimal unpaidEstimate = BigDecimal.ZERO;
+        if (unpaid.size() == 1 && unpaid.get(0).start().equals(from) && unpaid.get(0).end().equals(to)) {
+            unpaidEstimate = data.breakdown().netPayable();
+        } else {
+            for (PaymentCoverage.Range gap : unpaid) {
+                unpaidEstimate = unpaidEstimate.add(reportService
+                        .computeEmployeePayroll(employee, gap.start(), gap.end()).breakdown().netPayable());
+            }
+        }
+        BigDecimal pendingDifference = BigDecimal.ZERO;
+        for (PayrollPayment payment : touching) {
+            BigDecimal now = reportService.computeEmployeePayroll(employee, payment.getPeriodStart(), payment.getPeriodEnd())
+                    .breakdown().netPayable();
+            pendingDifference = pendingDifference.add(now.subtract(payment.getAmountPaid()));
+        }
+        BigDecimal outstanding = unpaidEstimate.max(BigDecimal.ZERO).add(pendingDifference.max(BigDecimal.ZERO));
 
         // Cada colaboradora pode ser paga num dia diferente — o que importa é quando foi o último
         // pagamento dela, não uma data única pra folha toda.
@@ -183,18 +196,27 @@ public class PayrollService {
                         .thenComparing(PayrollPayment::getPeriodEnd))
                 .map(p -> new LastPayment(p.getPaidAt(), p.getPeriodStart(), p.getPeriodEnd(), p.getAmountPaid()))
                 .orElse(null);
-        boolean hasGaps = merged.size() > 1;
+        boolean hasGaps = mergeIntervals(payments).size() > 1;
 
         RemunerationType type = employee.getRemunerationType();
         return new EmployeeSummary(
                 employee.getId(),
-                employee.getUser() != null ? employee.getUser().getName() : "—",
+                employeeName(employee),
                 type != null ? type.name() : null,
                 employee.getRemunerationValue(),
                 data.active(),
                 data.doneAppointments().size(),
                 BreakdownResponse.of(data.breakdown()),
-                status, covered, totalDays, paidInPeriod, outstanding, lastPayment, hasGaps);
+                status, covered, totalDays, paidInPeriod, outstanding, lastPayment,
+                toRanges(paid), toRanges(unpaid), pendingDifference, hasGaps);
+    }
+
+    private static List<CoverageRange> toRanges(List<PaymentCoverage.Range> ranges) {
+        return ranges.stream().map(r -> new CoverageRange(r.start(), r.end(), r.amount())).toList();
+    }
+
+    private static String employeeName(Employee employee) {
+        return employee.getUser() != null ? employee.getUser().getName() : "—";
     }
 
     /** Une períodos pagos que se encostam ou se sobrepõem — mais de um intervalo resultante
@@ -358,6 +380,10 @@ public class PayrollService {
     }
 
     private void applyAdjustment(PayrollAdjustment adjustment, AdjustmentRequest request) {
+        // Vale saiu das opções (simplificação): só continua existindo nos lançamentos antigos.
+        if (request.type() == PayrollAdjustmentType.VALE && adjustment.getType() != PayrollAdjustmentType.VALE) {
+            throw new BadRequestException("Vale não é mais usado. Para pagar a menos, lance um Desconto.");
+        }
         adjustment.setDate(request.date());
         adjustment.setType(request.type());
         adjustment.setAmount(request.amount());
@@ -367,17 +393,58 @@ public class PayrollService {
 
     // --- Pagamentos -----------------------------------------------------------------------------
 
+    /** Maior período aceito num único pagamento — evita erro de digitação de ano (2026 → 2062). */
+    private static final long MAX_PAYMENT_DAYS = 366;
+
+    /** Pagamentos registrados que tocam [from, to] (todos se o período vier vazio), mais recentes primeiro. */
+    @Transactional(readOnly = true)
+    public List<PaymentResponse> listPayments(LocalDate from, LocalDate to, Long employeeId) {
+        DateRangeValidator.validate(from, to);
+        List<PayrollPayment> payments = (employeeId != null
+                ? paymentRepository.findByEmployeeIdOrderByPeriodStartAsc(employeeId)
+                : paymentRepository.findAllByOrderByPeriodStartAsc()).stream()
+                .filter(p -> from == null || !p.getPeriodEnd().isBefore(from))
+                .filter(p -> to == null || !p.getPeriodStart().isAfter(to))
+                .sorted(Comparator.comparing(PayrollPayment::getPeriodStart).reversed())
+                .toList();
+        Map<Long, Employee> employees = employeeRepository.findAllById(
+                        payments.stream().map(PayrollPayment::getEmployeeId).collect(Collectors.toSet())).stream()
+                .collect(Collectors.toMap(Employee::getId, e -> e));
+        List<PaymentResponse> result = new ArrayList<>();
+        for (PayrollPayment p : payments) {
+            Employee employee = employees.get(p.getEmployeeId());
+            BigDecimal recalculated = employee != null
+                    ? reportService.computeEmployeePayroll(employee, p.getPeriodStart(), p.getPeriodEnd()).breakdown().netPayable()
+                    : null;
+            result.add(toResponse(p, recalculated, employee != null ? employeeName(employee) : "—"));
+        }
+        return result;
+    }
+
+    /** O que seria registrado ao marcar [start, end] como pago, e o conflito de datas, se houver. */
+    @Transactional(readOnly = true)
+    public PaymentPreview previewPayment(Long employeeId, LocalDate start, LocalDate end, Long ignorePaymentId) {
+        Employee employee = findEmployee(employeeId);
+        String conflict = periodProblem(employeeId, start, end, ignorePaymentId);
+        BigDecimal amount = start.isAfter(end) ? BigDecimal.ZERO
+                : reportService.computeEmployeePayroll(employee, start, end).breakdown().netPayable();
+        return new PaymentPreview(amount, conflict);
+    }
+
     @Transactional
     public PaymentResponse createPayment(PaymentRequest request) {
         Employee employee = findEmployee(request.employeeId());
-        validatePaymentPeriod(request, null);
+        assertValidPeriod(request.employeeId(), request.periodStart(), request.periodEnd(), null);
         PayrollPayment payment = new PayrollPayment();
         payment.setEmployeeId(employee.getId());
         applyPayment(payment, employee, request);
-        return toResponse(paymentRepository.save(payment), null);
+        return toResponse(paymentRepository.save(payment), null, employeeName(employee));
     }
 
-    /** Editar um pagamento recalcula e recongela o valor calculado do período. */
+    /**
+     * Edita um pagamento (datas, forma, observação) e recalcula o valor do período com os dados
+     * de hoje — é também o jeito de "atualizar" um pagamento depois que algo do período mudou.
+     */
     @Transactional
     public PaymentResponse updatePayment(Long id, PaymentRequest request) {
         PayrollPayment payment = paymentRepository.findById(id)
@@ -386,9 +453,9 @@ public class PayrollService {
             throw new BadRequestException("Não é possível mudar a colaboradora de um pagamento já registrado.");
         }
         Employee employee = findEmployee(payment.getEmployeeId());
-        validatePaymentPeriod(request, id);
+        assertValidPeriod(payment.getEmployeeId(), request.periodStart(), request.periodEnd(), id);
         applyPayment(payment, employee, request);
-        return toResponse(paymentRepository.save(payment), null);
+        return toResponse(paymentRepository.save(payment), null, employeeName(employee));
     }
 
     @Transactional
@@ -399,38 +466,56 @@ public class PayrollService {
         paymentRepository.deleteById(id);
     }
 
-    private void validatePaymentPeriod(PaymentRequest request, Long ignoreId) {
-        if (request.periodStart().isAfter(request.periodEnd())) {
-            throw new BadRequestException("O início do período deve ser antes do fim.");
+    private void assertValidPeriod(Long employeeId, LocalDate start, LocalDate end, Long ignoreId) {
+        String problem = periodProblem(employeeId, start, end, ignoreId);
+        if (problem != null) {
+            throw new BadRequestException(problem);
         }
-        for (PayrollPayment other : paymentRepository.findByEmployeeIdOrderByPeriodStartAsc(request.employeeId())) {
-            if (other.getId().equals(ignoreId)) continue;
-            boolean overlaps = !other.getPeriodEnd().isBefore(request.periodStart())
-                    && !other.getPeriodStart().isAfter(request.periodEnd());
-            if (overlaps) {
-                throw new BadRequestException("Já existe um pagamento registrado de " + br(other.getPeriodStart())
-                        + " a " + br(other.getPeriodEnd()) + " que cobre parte deste período. "
-                        + "Edite aquele pagamento ou escolha outro período.");
-            }
+    }
+
+    /** Mensagem explicando por que o período não pode ser pago, ou null se está tudo certo. */
+    private String periodProblem(Long employeeId, LocalDate start, LocalDate end, Long ignoreId) {
+        if (start == null || end == null) {
+            return "Informe o início e o fim do período.";
         }
+        if (start.isAfter(end)) {
+            return "O início do período deve ser antes do fim.";
+        }
+        if (ChronoUnit.DAYS.between(start, end) + 1 > MAX_PAYMENT_DAYS) {
+            return "Um pagamento pode cobrir no máximo 1 ano. Confira as datas.";
+        }
+        List<PayrollPayment> overlapping = paymentRepository.findByEmployeeIdOrderByPeriodStartAsc(employeeId).stream()
+                .filter(other -> !other.getId().equals(ignoreId))
+                .filter(other -> !other.getPeriodEnd().isBefore(start) && !other.getPeriodStart().isAfter(end))
+                .toList();
+        if (overlapping.isEmpty()) {
+            return null;
+        }
+        String which = overlapping.stream()
+                .map(o -> br(o.getPeriodStart()) + " a " + br(o.getPeriodEnd()) + " (pago em " + br(o.getPaidAt()) + ")")
+                .collect(Collectors.joining("; "));
+        return "Parte deste período já foi paga: " + which + ". Escolha dias que ainda não foram pagos "
+                + "ou edite aquele pagamento.";
     }
 
     private void applyPayment(PayrollPayment payment, Employee employee, PaymentRequest request) {
         payment.setPeriodStart(request.periodStart());
         payment.setPeriodEnd(request.periodEnd());
-        payment.setCalculatedAmount(reportService
+        // Valor travado: sempre o calculado pelo sistema pra esse período.
+        BigDecimal calculated = reportService
                 .computeEmployeePayroll(employee, request.periodStart(), request.periodEnd())
-                .breakdown().netPayable());
-        payment.setAmountPaid(request.amountPaid());
+                .breakdown().netPayable();
+        payment.setCalculatedAmount(calculated);
+        payment.setAmountPaid(calculated);
         payment.setPaidAt(request.paidAt());
         payment.setPaymentMethod(request.paymentMethod() != null && !request.paymentMethod().isBlank()
                 ? request.paymentMethod().trim().toUpperCase() : null);
         payment.setNotes(request.notes() != null && !request.notes().isBlank() ? request.notes().trim() : null);
     }
 
-    private static PaymentResponse toResponse(PayrollPayment p, BigDecimal recalculated) {
-        boolean changed = recalculated != null && recalculated.compareTo(p.getCalculatedAmount()) != 0;
-        return new PaymentResponse(p.getId(), p.getEmployeeId(), p.getPeriodStart(), p.getPeriodEnd(),
+    private static PaymentResponse toResponse(PayrollPayment p, BigDecimal recalculated, String employeeName) {
+        boolean changed = recalculated != null && recalculated.compareTo(p.getAmountPaid()) != 0;
+        return new PaymentResponse(p.getId(), p.getEmployeeId(), employeeName, p.getPeriodStart(), p.getPeriodEnd(),
                 p.getCalculatedAmount(), p.getAmountPaid(), p.getPaidAt(), p.getPaymentMethod(), p.getNotes(),
                 recalculated, changed);
     }

@@ -17,7 +17,7 @@ export const ADJUSTMENT_LABELS: Record<PayrollAdjustmentType, string> = {
   FERIAS: 'Férias',
   HORA_EXTRA: 'Hora extra',
   OUTRO_ACRESCIMO: 'Outro acréscimo',
-  VALE: 'Vale / adiantamento (já pago antes)',
+  VALE: 'Vale (lançamento antigo)',
   DESCONTO: 'Desconto (ela deixa de receber)',
 };
 
@@ -28,12 +28,12 @@ export const ADJUSTMENT_HINTS: Record<PayrollAdjustmentType, string> = {
   HORA_EXTRA: 'Soma no valor a pagar.',
   OUTRO_ACRESCIMO: 'Soma no valor a pagar.',
   VALE:
-    'Dinheiro que ela JÁ recebeu antes do dia do pagamento (ex.: pediu R$ 200 adiantado no dia 10). '
-    + 'Sai do valor a pagar pra ela não receber duas vezes. O custo da folha não muda: o salão gastou '
-    + 'esse dinheiro do mesmo jeito, só que antes.',
+    'Dinheiro que ela JÁ recebeu antes do dia do pagamento (ex.: pediu R$ 200 adiantado no dia 10). ' +
+    'Sai do valor a pagar pra ela não receber duas vezes. O custo da folha não muda: o salão gastou ' +
+    'esse dinheiro do mesmo jeito, só que antes.',
   DESCONTO:
-    'Valor que ela deixa de receber de fato (ex.: falta não justificada, produto quebrado). Diminui o '
-    + 'valor a pagar e também o custo da folha, porque esse dinheiro nunca sai do salão.',
+    'Valor que ela deixa de receber de fato (ex.: falta não justificada, produto quebrado). Diminui o ' +
+    'valor a pagar e também o custo da folha, porque esse dinheiro nunca sai do salão.',
 };
 
 export const PAYMENT_METHODS: Record<string, string> = {
@@ -74,7 +74,18 @@ export interface PayrollEmployeeSummary {
   paidInPeriod: number;
   outstanding: number;
   /** Pagamento mais recente (null = nunca pago) — não depende do filtro de datas. */
-  lastPayment: { paidAt: string; periodStart: string; periodEnd: string; amountPaid: number } | null;
+  lastPayment: {
+    paidAt: string;
+    periodStart: string;
+    periodEnd: string;
+    amountPaid: number;
+  } | null;
+  /** Pagamentos que tocam o filtro, com o período real de cada um (contíguos unidos). */
+  paidRanges: CoverageRange[];
+  /** Dias do filtro sem nenhum pagamento. */
+  unpaidRanges: CoverageRange[];
+  /** Diferença entre o recalculado de hoje e o registrado nos pagamentos do filtro. Positivo = falta pagar. */
+  pendingDifference: number;
   hasPaymentGaps: boolean;
 }
 
@@ -131,9 +142,17 @@ export interface PayrollAdjustment {
   addition: boolean;
 }
 
+export interface CoverageRange {
+  start: string;
+  end: string;
+  /** Soma paga na faixa (null em faixa sem pagamento). */
+  amount: number | null;
+}
+
 export interface PayrollPayment {
   id: number;
   employeeId: number;
+  employeeName: string;
   periodStart: string;
   periodEnd: string;
   calculatedAmount: number;
@@ -177,7 +196,6 @@ export interface PaymentInput {
   employeeId: number;
   periodStart: string;
   periodEnd: string;
-  amountPaid: number;
   paidAt: string;
   paymentMethod?: string | null;
   notes?: string | null;
@@ -244,6 +262,31 @@ export const payrollApi = {
 
   updatePayment: async (id: number, input: PaymentInput) => {
     const { data } = await api.put<PayrollPayment>(`/payroll/payments/${id}`, input);
+    return data;
+  },
+
+  listPayments: async (filter: { from?: string; to?: string; employeeId?: number }) => {
+    const params: Record<string, string | number> = {};
+    if (filter.from) params.from = filter.from;
+    if (filter.to) params.to = filter.to;
+    if (filter.employeeId) params.employeeId = filter.employeeId;
+    const { data } = await api.get<PayrollPayment[]>('/payroll/payments', { params });
+    return data;
+  },
+
+  /** Valor que será registrado ao marcar [periodStart, periodEnd] como pago, e conflito de datas. */
+  previewPayment: async (
+    employeeId: number,
+    periodStart: string,
+    periodEnd: string,
+    ignorePaymentId?: number
+  ) => {
+    const params: Record<string, string | number> = { employeeId, periodStart, periodEnd };
+    if (ignorePaymentId) params.ignorePaymentId = ignorePaymentId;
+    const { data } = await api.get<{ calculatedAmount: number; conflict: string | null }>(
+      '/payroll/payments/preview',
+      { params }
+    );
     return data;
   },
 

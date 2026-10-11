@@ -19,6 +19,8 @@ vi.mock('../services/payroll', async (importOriginal) => {
       updateAdjustment: vi.fn(),
       deleteAdjustment: vi.fn(),
       createPayment: vi.fn(),
+      previewPayment: vi.fn(),
+      listPayments: vi.fn(),
       updatePayment: vi.fn(),
       deletePayment: vi.fn(),
     },
@@ -73,6 +75,9 @@ const summary: PayrollSummary = {
       paidInPeriod: 0,
       outstanding: 265,
       lastPayment: null,
+      paidRanges: [],
+      unpaidRanges: [{ start: from, end: to, amount: null }],
+      pendingDifference: 0,
       hasPaymentGaps: false,
     },
   ],
@@ -105,11 +110,33 @@ const detail: PayrollEmployeeDetail = {
     },
   ],
   productSales: [
-    { cashFlowId: 3, date: firstDay, description: 'Venda de Produtos: 1x Óleo', amount: 50, commission: 5 },
+    {
+      cashFlowId: 3,
+      date: firstDay,
+      description: 'Venda de Produtos: 1x Óleo',
+      amount: 50,
+      commission: 5,
+    },
   ],
   workDays: [
-    { id: 1, employeeId: 7, date: firstDay, amount: 120, justification: null, defaultRate: 120, automatic: false },
-    { id: 2, employeeId: 7, date: secondDay, amount: 120, justification: null, defaultRate: 120, automatic: false },
+    {
+      id: 1,
+      employeeId: 7,
+      date: firstDay,
+      amount: 120,
+      justification: null,
+      defaultRate: 120,
+      automatic: false,
+    },
+    {
+      id: 2,
+      employeeId: 7,
+      date: secondDay,
+      amount: 120,
+      justification: null,
+      defaultRate: 120,
+      automatic: false,
+    },
   ],
   unmarkedAppointmentDates: [thirdDay],
   adjustments: [],
@@ -121,6 +148,7 @@ describe('Payroll page', () => {
     vi.clearAllMocks();
     vi.mocked(payrollApi.getSummary).mockResolvedValue(summary);
     vi.mocked(payrollApi.getEmployeeDetail).mockResolvedValue(detail);
+    vi.mocked(payrollApi.previewPayment).mockResolvedValue({ calculatedAmount: 265, conflict: null });
   });
 
   it('shows the summary and the last payment column', async () => {
@@ -153,7 +181,13 @@ describe('Payroll page', () => {
 
   it('marks again a day with appointment that had been unmarked when it is clicked', async () => {
     vi.mocked(payrollApi.createWorkDay).mockResolvedValue({
-      id: 3, employeeId: 7, date: thirdDay, amount: 120, justification: null, defaultRate: 120, automatic: false,
+      id: 3,
+      employeeId: 7,
+      date: thirdDay,
+      amount: 120,
+      justification: null,
+      defaultRate: 120,
+      automatic: false,
     });
     await act(async () => {
       customRender(<Payroll />);
@@ -178,7 +212,15 @@ describe('Payroll page', () => {
       ...detail,
       workDays: [
         ...detail.workDays,
-        { id: null, employeeId: 7, date: thirdDay, amount: 120, justification: null, defaultRate: 120, automatic: true },
+        {
+          id: null,
+          employeeId: 7,
+          date: thirdDay,
+          amount: 120,
+          justification: null,
+          defaultRate: 120,
+          automatic: true,
+        },
       ],
       unmarkedAppointmentDates: [],
     });
@@ -217,7 +259,7 @@ describe('Payroll page', () => {
     await waitFor(() => expect(screen.getByText('modal-agendamento-11')).toBeInTheDocument());
   });
 
-  it('opens the payment modal prefilled with the outstanding value from "Marcar como pago"', async () => {
+  it('opens the payment modal with the calculated (locked) value and the suggested period', async () => {
     await act(async () => {
       customRender(<Payroll />);
     });
@@ -226,7 +268,14 @@ describe('Payroll page', () => {
       fireEvent.click(screen.getByText('Marcar como pago'));
     });
 
-    await waitFor(() => expect(screen.getByText('Marcar período como pago', { selector: 'h3' })).toBeInTheDocument());
-    expect((screen.getByLabelText('Valor pago') as HTMLInputElement).value).toContain('265,00');
+    await waitFor(() =>
+      expect(screen.getByText('Marcar período como pago', { selector: 'h3' })).toBeInTheDocument()
+    );
+    // valor travado: vem da prévia do sistema, não é um campo editável
+    await waitFor(() => expect(screen.getByTestId('payment-preview-amount').textContent).toContain('265,00'));
+    expect(screen.queryByLabelText('Valor pago')).not.toBeInTheDocument();
+    // nunca pago: sugere o mês inteiro
+    expect((screen.getByLabelText('De', { selector: '#pay-start' }) as HTMLInputElement).value).toBe(from);
+    expect((screen.getByLabelText('Até', { selector: '#pay-end' }) as HTMLInputElement).value).toBe(to);
   });
 });

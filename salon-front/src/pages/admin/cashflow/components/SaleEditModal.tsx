@@ -27,7 +27,8 @@ interface SaleEditModalProps {
   onSaved: (updated: CashFlowRecord) => void;
 }
 
-const money = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+const money = (v: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
 /**
  * Edição completa de uma venda avulsa de produto (Fluxo de Caixa): itens, quantidade, preço,
@@ -69,8 +70,14 @@ export const SaleEditModal = ({ sale, onClose, onSaved }: SaleEditModalProps) =>
     setAmount(sale.amount.toFixed(2));
     // Descrição automática ("Venda de Produtos: ...") é remontada pelo backend — só texto livre
     // vira observação editável.
-    setNote(sale.description?.toLowerCase().startsWith('venda de produto') ? '' : sale.description ?? '');
-    setManualCommission(sale.commissionManual && sale.commissionAmount != null ? sale.commissionAmount.toFixed(2) : null);
+    setNote(
+      sale.description?.toLowerCase().startsWith('venda de produto') ? '' : (sale.description ?? '')
+    );
+    setManualCommission(
+      sale.commissionManual && sale.commissionAmount != null
+        ? sale.commissionAmount.toFixed(2)
+        : null
+    );
     setRows(
       (sale.items ?? []).map((item, i) => ({
         key: i,
@@ -109,7 +116,10 @@ export const SaleEditModal = ({ sale, onClose, onSaved }: SaleEditModalProps) =>
   };
 
   const addRow = () =>
-    setRows((prev) => [...prev, { key: Date.now(), productId: '', productName: '', quantity: 1, unitPrice: '' }]);
+    setRows((prev) => [
+      ...prev,
+      { key: Date.now(), productId: '', productName: '', quantity: 1, unitPrice: '' },
+    ]);
 
   const save = async () => {
     if (hasItems) {
@@ -134,7 +144,8 @@ export const SaleEditModal = ({ sale, onClose, onSaved }: SaleEditModalProps) =>
         })),
         amount: hasItems ? null : Number(amount || 0),
         description: note.trim() || null,
-        commissionAmount: employeeId && manualCommission != null ? Number(manualCommission || 0) : null,
+        commissionAmount:
+          employeeId && manualCommission != null ? Number(manualCommission || 0) : null,
       });
       onSaved(updated);
     } catch (err) {
@@ -162,15 +173,32 @@ export const SaleEditModal = ({ sale, onClose, onSaved }: SaleEditModalProps) =>
         <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="sale-date" className={labelCls}>Data</label>
-              <input id="sale-date" type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} />
+              <label htmlFor="sale-date" className={labelCls}>
+                Data
+              </label>
+              <input
+                id="sale-date"
+                type="date"
+                className={inputCls}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
             </div>
             <div>
-              <label htmlFor="sale-seller" className={labelCls}>Vendido por</label>
-              <select id="sale-seller" className={inputCls} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+              <label htmlFor="sale-seller" className={labelCls}>
+                Vendido por
+              </label>
+              <select
+                id="sale-seller"
+                className={inputCls}
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+              >
                 <option value="">Não informar</option>
                 {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                  <option key={emp.id} value={emp.id}>
+                    {emp.name}
+                  </option>
                 ))}
                 {sale.employeeId != null && !employees.some((e) => e.id === sale.employeeId) && (
                   <option value={sale.employeeId}>{sale.employeeName}</option>
@@ -190,8 +218,12 @@ export const SaleEditModal = ({ sale, onClose, onSaved }: SaleEditModalProps) =>
                         value={row.productId}
                         onSelect={(id) => selectProduct(row.key, id)}
                         options={
-                          row.productId && !productOptions.some((o) => String(o.id) === row.productId)
-                            ? [...productOptions, { id: Number(row.productId), label: row.productName }]
+                          row.productId &&
+                          !productOptions.some((o) => String(o.id) === row.productId)
+                            ? [
+                                ...productOptions,
+                                { id: Number(row.productId), label: row.productName },
+                              ]
                             : productOptions
                         }
                         placeholder="Buscar produto..."
@@ -209,18 +241,26 @@ export const SaleEditModal = ({ sale, onClose, onSaved }: SaleEditModalProps) =>
                   </div>
                   <div className="grid grid-cols-3 gap-2 items-end">
                     <div>
-                      <label className="text-[11px] text-[#7a7074]" htmlFor={`qty-${row.key}`}>Qtd.</label>
+                      <label className="text-[11px] text-[#7a7074]" htmlFor={`qty-${row.key}`}>
+                        Qtd.
+                      </label>
                       <input
                         id={`qty-${row.key}`}
                         type="number"
                         min={1}
                         className={inputCls}
                         value={row.quantity}
-                        onChange={(e) => updateRow(row.key, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
+                        onChange={(e) =>
+                          updateRow(row.key, {
+                            quantity: Math.max(1, parseInt(e.target.value) || 1),
+                          })
+                        }
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] text-[#7a7074]" htmlFor={`price-${row.key}`}>Preço unit.</label>
+                      <label className="text-[11px] text-[#7a7074]" htmlFor={`price-${row.key}`}>
+                        Preço unit.
+                      </label>
                       <CurrencyInput
                         id={`price-${row.key}`}
                         className={inputCls}
@@ -244,8 +284,15 @@ export const SaleEditModal = ({ sale, onClose, onSaved }: SaleEditModalProps) =>
             </div>
           ) : (
             <div>
-              <label htmlFor="sale-amount" className={labelCls}>Valor total</label>
-              <CurrencyInput id="sale-amount" className={inputCls} value={amount} onValueChange={setAmount} />
+              <label htmlFor="sale-amount" className={labelCls}>
+                Valor total
+              </label>
+              <CurrencyInput
+                id="sale-amount"
+                className={inputCls}
+                value={amount}
+                onValueChange={setAmount}
+              />
               <p className="text-[11px] text-[#7a7074] mt-1">
                 Venda registrada antes da edição por produto existir — só o total pode ser ajustado.
               </p>
@@ -263,7 +310,9 @@ export const SaleEditModal = ({ sale, onClose, onSaved }: SaleEditModalProps) =>
               className={inputCls}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder={hasItems ? 'Ex.: cliente fiel, combinado preço especial' : sale.description}
+              placeholder={
+                hasItems ? 'Ex.: cliente fiel, combinado preço especial' : sale.description
+              }
             />
           </div>
 

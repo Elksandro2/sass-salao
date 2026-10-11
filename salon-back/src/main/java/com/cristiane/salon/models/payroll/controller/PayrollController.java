@@ -4,6 +4,7 @@ import com.cristiane.salon.annotation.Auditable;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.AdjustmentRequest;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.AdjustmentResponse;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.EmployeeDetailResponse;
+import com.cristiane.salon.models.payroll.dto.PayrollDtos.PaymentPreview;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.PaymentRequest;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.PaymentResponse;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.SummaryResponse;
@@ -128,6 +129,27 @@ public class PayrollController {
     }
 
     // --- Pagamentos -----------------------------------------------------------------------------
+
+    @GetMapping("/payments")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Operation(summary = "Pagamentos registrados que cobrem o período, mais recentes primeiro (Admin)")
+    public ResponseEntity<List<PaymentResponse>> listPayments(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) Long employeeId) {
+        return ResponseEntity.ok(payrollService.listPayments(from, to, employeeId));
+    }
+
+    @GetMapping("/payments/preview")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Operation(summary = "Valor que será registrado ao marcar o período como pago e conflito de datas (Admin)")
+    public ResponseEntity<PaymentPreview> previewPayment(
+            @RequestParam Long employeeId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodStart,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodEnd,
+            @RequestParam(required = false) Long ignorePaymentId) {
+        return ResponseEntity.ok(payrollService.previewPayment(employeeId, periodStart, periodEnd, ignorePaymentId));
+    }
 
     @PostMapping("/payments")
     @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")

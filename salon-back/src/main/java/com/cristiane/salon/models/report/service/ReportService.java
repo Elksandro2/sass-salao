@@ -17,6 +17,10 @@ import com.cristiane.salon.models.employee.repository.EmployeeRepository;
 import com.cristiane.salon.models.fixedexpense.repository.FixedExpenseRepository;
 import com.cristiane.salon.models.payroll.dto.EmployeePayrollData;
 import com.cristiane.salon.models.payroll.dto.PayrollBreakdown;
+import com.cristiane.salon.models.payroll.dto.PayrollDtos;
+import com.cristiane.salon.models.payroll.entity.PayrollPayment;
+import com.cristiane.salon.models.payroll.repository.PayrollPaymentRepository;
+import com.cristiane.salon.models.payroll.service.PaymentCoverage;
 import com.cristiane.salon.models.payroll.dto.WorkDayEntry;
 import com.cristiane.salon.models.payroll.entity.EmployeeWorkDay;
 import com.cristiane.salon.models.payroll.entity.PayrollAdjustment;
@@ -77,6 +81,7 @@ public class ReportService {
     private final EmployeeWorkDayRepository workDayRepository;
     private final PayrollAdjustmentRepository adjustmentRepository;
     private final StaffProfileRepository staffProfileRepository;
+    private final PayrollPaymentRepository paymentRepository;
     private final SalonClock salonClock;
 
     /** Padrão de todos os filtros de período: o mês corrente inteiro (do dia 1 ao último dia). */
@@ -362,6 +367,8 @@ public class ReportService {
         BigDecimal totalFixedExpenses = fixedExpenseRepository.sumAmountByDateBetween(from, to);
 
         List<EmployeePayrollData> payroll = computePayroll(from, to);
+        Map<Long, List<PayrollPayment>> paymentsByEmployee = paymentRepository.findAllByOrderByPeriodStartAsc().stream()
+                .collect(Collectors.groupingBy(PayrollPayment::getEmployeeId));
         List<EmployeeFinanceResponse> employeeFinanceDetails = new ArrayList<>();
 
         // "Salários" aqui é tudo que não é comissão: salário fixo proporcional, diárias e os
@@ -386,7 +393,10 @@ public class ReportService {
                     sumServices(data.doneAppointments()),
                     sumProducts(data.doneAppointments()),
                     breakdown.salonCost(),
-                    showDays ? breakdown.workDaysCount() : null
+                    showDays ? breakdown.workDaysCount() : null,
+                    breakdown.netPayable(),
+                    coverage(PaymentCoverage.paidRanges(paymentsByEmployee.getOrDefault(employee.getId(), List.of()), from, to)),
+                    coverage(PaymentCoverage.unpaidRanges(paymentsByEmployee.getOrDefault(employee.getId(), List.of()), from, to))
             ));
         }
 
@@ -411,6 +421,10 @@ public class ReportService {
 
         return new FinancialReportResponse(income, expense, totalSalaryPaid, totalCommissionPaid,
                 totalFixedExpenses, netProfit, employeeFinanceDetails, period);
+    }
+
+    private static List<PayrollDtos.CoverageRange> coverage(List<PaymentCoverage.Range> ranges) {
+        return ranges.stream().map(r -> new PayrollDtos.CoverageRange(r.start(), r.end(), r.amount())).toList();
     }
 
     private static BigDecimal sumServices(List<Appointment> appointments) {

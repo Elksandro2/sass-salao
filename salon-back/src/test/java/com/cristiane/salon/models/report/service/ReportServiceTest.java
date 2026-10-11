@@ -71,6 +71,9 @@ class ReportServiceTest {
     @Mock
     private com.cristiane.salon.models.staff.repository.StaffProfileRepository staffProfileRepository;
 
+    @Mock
+    private com.cristiane.salon.models.payroll.repository.PayrollPaymentRepository paymentRepository;
+
     // SalonClock real, não mock: os testes dependem do "hoje"/"agora" de verdade no fuso
     // do salão, e um mock devolveria null silenciosamente.
     @Spy

@@ -9,7 +9,9 @@ vi.mock('../../services/cashflow', async (importOriginal) => {
 });
 vi.mock('../../../products/services/products', () => ({
   productsApi: {
-    findAll: vi.fn().mockResolvedValue({ content: [{ id: 1, name: 'Shampoo', price: 50, active: true }] }),
+    findAll: vi
+      .fn()
+      .mockResolvedValue({ content: [{ id: 1, name: 'Shampoo', price: 50, active: true }] }),
   },
 }));
 vi.mock('../../../employees/services/employees', () => ({

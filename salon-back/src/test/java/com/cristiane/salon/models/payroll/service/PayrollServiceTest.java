@@ -97,6 +97,8 @@ class PayrollServiceTest {
     @Test
     void getSummary_marksPeriodPaid_whenPaymentsCoverEveryDay_andShowsTheLastPayment() {
         Employee emp = employee(RemunerationType.SALARIO_FIXO, "1000.00");
+        when(reportService.computeEmployeePayroll(any(), any(), any())).thenReturn(
+                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("500.00")));
         when(reportService.computePayroll(APR_1, APR_30)).thenReturn(List.of(
                 new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("1000.00"))));
         when(paymentRepository.findAllByOrderByPeriodStartAsc()).thenReturn(List.of(
@@ -110,6 +112,29 @@ class PayrollServiceTest {
         assertThat(item.outstanding()).isEqualByComparingTo("0");
         assertThat(item.lastPayment().paidAt()).isEqualTo(APR_30); // o mais recente dos dois
         assertThat(item.lastPayment().periodStart()).isEqualTo(LocalDate.of(2026, 4, 16));
+        // 1–15 e 16–30 se encostam: viram uma faixa só, com os valores somados
+        assertThat(item.paidRanges()).hasSize(1);
+        assertThat(item.paidRanges().get(0).start()).isEqualTo(APR_1);
+        assertThat(item.paidRanges().get(0).end()).isEqualTo(APR_30);
+        assertThat(item.paidRanges().get(0).amount()).isEqualByComparingTo("1000");
+        assertThat(item.unpaidRanges()).isEmpty();
+    }
+
+    @Test
+    void getSummary_whenSomethingChangedAfterPayment_showsTheDifferenceToPay() {
+        Employee emp = employee(RemunerationType.SALARIO_FIXO, "1000.00");
+        when(reportService.computePayroll(APR_1, APR_30)).thenReturn(List.of(
+                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("1100.00"))));
+        when(paymentRepository.findAllByOrderByPeriodStartAsc()).thenReturn(List.of(payment(1, APR_1, APR_30, "1000")));
+        // um bônus de 100 lançado depois de pago: o mês agora calcula 1100
+        when(reportService.computeEmployeePayroll(emp, APR_1, APR_30)).thenReturn(
+                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("1100.00")));
+
+        var item = payrollService.getSummary(APR_1, APR_30).items().get(0);
+
+        assertThat(item.periodStatus()).isEqualTo(PayrollDtos.PeriodStatus.PAGO);
+        assertThat(item.pendingDifference()).isEqualByComparingTo("100.00");
+        assertThat(item.outstanding()).isEqualByComparingTo("100.00");
     }
 
     @Test
@@ -119,12 +144,19 @@ class PayrollServiceTest {
                 new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("1000.00"))));
         when(paymentRepository.findAllByOrderByPeriodStartAsc()).thenReturn(List.of(
                 payment(1, APR_1, LocalDate.of(2026, 4, 15), "500")));
+        // 1–15 pago (nada mudou) e 16–30 sem pagamento: estimativa só desses dias
+        when(reportService.computeEmployeePayroll(emp, APR_1, LocalDate.of(2026, 4, 15))).thenReturn(
+                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("500.00")));
+        when(reportService.computeEmployeePayroll(emp, LocalDate.of(2026, 4, 16), APR_30)).thenReturn(
+                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("500.00")));
 
         var item = payrollService.getSummary(APR_1, APR_30).items().get(0);
 
         assertThat(item.periodStatus()).isEqualTo(PayrollDtos.PeriodStatus.PARCIAL);
         assertThat(item.coveredDays()).isEqualTo(15);
         assertThat(item.outstanding()).isEqualByComparingTo("500.00");
+        assertThat(item.unpaidRanges()).hasSize(1);
+        assertThat(item.unpaidRanges().get(0).start()).isEqualTo(LocalDate.of(2026, 4, 16));
     }
 
     @Test
@@ -147,14 +179,16 @@ class PayrollServiceTest {
                 payment(1, APR_1, APR_30, "1000")));
 
         var request = new PayrollDtos.PaymentRequest(1L, LocalDate.of(2026, 4, 20), LocalDate.of(2026, 5, 20),
-                new BigDecimal("1000"), LocalDate.of(2026, 5, 20), "PIX", null);
+                LocalDate.of(2026, 5, 20), "PIX", null);
 
-        assertThatThrownBy(() -> payrollService.createPayment(request)).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> payrollService.createPayment(request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("01/04/2026 a 30/04/2026");
         verify(paymentRepository, never()).save(any());
     }
 
     @Test
-    void createPayment_freezesTheCalculatedAmountOfThePeriod() {
+    void createPayment_valueIsAlwaysTheCalculatedAmount() {
         Employee emp = employee(RemunerationType.SALARIO_FIXO, "1000.00");
         when(employeeRepository.findById(1L)).thenReturn(Optional.of(emp));
         when(paymentRepository.findByEmployeeIdOrderByPeriodStartAsc(1L)).thenReturn(List.of());
@@ -167,10 +201,10 @@ class PayrollServiceTest {
         });
 
         var response = payrollService.createPayment(new PayrollDtos.PaymentRequest(1L, APR_1, APR_30,
-                new BigDecimal("1000.00"), APR_30, "pix", null));
+                APR_30, "pix", null));
 
         assertThat(response.calculatedAmount()).isEqualByComparingTo("980.00");
-        assertThat(response.amountPaid()).isEqualByComparingTo("1000.00");
+        assertThat(response.amountPaid()).isEqualByComparingTo("980.00");
         assertThat(response.paymentMethod()).isEqualTo("PIX");
     }
 
@@ -253,5 +287,57 @@ class PayrollServiceTest {
 
         assertThat(created).hasSize(1);
         verify(workDayRepository).save(argThat(d -> d.getWorkDate().equals(LocalDate.of(2026, 4, 2))));
+    }
+
+    @Test
+    void updatePayment_rejectsExtendingIntoDaysOfAnotherPayment() {
+        Employee emp = employee(RemunerationType.SALARIO_FIXO, "1000.00");
+        PayrollPayment first = payment(1, APR_1, LocalDate.of(2026, 4, 15), "500");
+        PayrollPayment second = payment(2, LocalDate.of(2026, 4, 16), APR_30, "500");
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(first));
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(emp));
+        when(paymentRepository.findByEmployeeIdOrderByPeriodStartAsc(1L)).thenReturn(List.of(first, second));
+
+        // aumentar o 1º pagamento até 16/04 invade o 2º
+        var request = new PayrollDtos.PaymentRequest(1L, APR_1, LocalDate.of(2026, 4, 16), APR_30, null, null);
+
+        assertThatThrownBy(() -> payrollService.updatePayment(1L, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("16/04/2026 a 30/04/2026");
+    }
+
+    @Test
+    void createPayment_rejectsPeriodLongerThanOneYear() {
+        Employee emp = employee(RemunerationType.SALARIO_FIXO, "1000.00");
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(emp));
+
+        var request = new PayrollDtos.PaymentRequest(1L, APR_1, LocalDate.of(2028, 4, 1), APR_30, null, null);
+
+        assertThatThrownBy(() -> payrollService.createPayment(request)).isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void createAdjustment_rejectsNewVale() {
+        Employee emp = employee(RemunerationType.SALARIO_FIXO, "1000.00");
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(emp));
+
+        assertThatThrownBy(() -> payrollService.createAdjustment(new PayrollDtos.AdjustmentRequest(
+                1L, APR_1, com.cristiane.salon.models.payroll.entity.PayrollAdjustmentType.VALE, new BigDecimal("100"), null)))
+                .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void previewPayment_returnsCalculatedValueAndConflictWithoutThrowing() {
+        Employee emp = employee(RemunerationType.SALARIO_FIXO, "1000.00");
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(emp));
+        when(paymentRepository.findByEmployeeIdOrderByPeriodStartAsc(1L)).thenReturn(List.of(
+                payment(1, APR_1, LocalDate.of(2026, 4, 15), "500")));
+        when(reportService.computeEmployeePayroll(emp, APR_1, APR_30)).thenReturn(
+                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("1000.00")));
+
+        var preview = payrollService.previewPayment(1L, APR_1, APR_30, null);
+
+        assertThat(preview.calculatedAmount()).isEqualByComparingTo("1000.00");
+        assertThat(preview.conflict()).contains("01/04/2026 a 15/04/2026");
     }
 }

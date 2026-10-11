@@ -90,12 +90,14 @@ public final class PayrollDtos {
 
     // --- Pagamentos (período quitado) ---------------------------------------------------------
 
+    /**
+     * Registro de "período pago". O valor NÃO vem daqui: é sempre o que o sistema calcula pro
+     * período — pagar diferente se faz com um lançamento (bônus/desconto) antes.
+     */
     public record PaymentRequest(
             @NotNull(message = "A colaboradora é obrigatória") Long employeeId,
             @NotNull(message = "O início do período é obrigatório") LocalDate periodStart,
             @NotNull(message = "O fim do período é obrigatório") LocalDate periodEnd,
-            @NotNull(message = "O valor pago é obrigatório")
-            @DecimalMin(value = "0", message = "O valor pago não pode ser negativo") BigDecimal amountPaid,
             @NotNull(message = "A data do pagamento é obrigatória") LocalDate paidAt,
             @Size(max = 20) String paymentMethod,
             @Size(max = 1000, message = "A observação deve ter no máximo 1000 caracteres") String notes
@@ -104,6 +106,7 @@ public final class PayrollDtos {
     public record PaymentResponse(
             Long id,
             Long employeeId,
+            String employeeName,
             LocalDate periodStart,
             LocalDate periodEnd,
             /** Valor que o sistema calculou quando o pagamento foi registrado. */
@@ -161,9 +164,22 @@ public final class PayrollDtos {
             BigDecimal outstanding,
             /** Pagamento mais recente da colaboradora (null = nunca pago) — independe do filtro. */
             LastPayment lastPayment,
+            /** Pagamentos que tocam o filtro, com o período REAL de cada um (contíguos unidos). */
+            List<CoverageRange> paidRanges,
+            /** Dias do filtro sem nenhum pagamento. */
+            List<CoverageRange> unpaidRanges,
+            /** Quanto o recalculado de hoje difere do valor registrado nos pagamentos que tocam o
+             *  filtro (algo foi editado depois de pago). Positivo = falta pagar. */
+            BigDecimal pendingDifference,
             /** Há um buraco entre pagamentos registrados (algum período no meio ficou sem pagar). */
             boolean hasPaymentGaps
     ) {}
+
+    /** Faixa de dias; {@code amount} = soma paga na faixa (null em faixa sem pagamento). */
+    public record CoverageRange(LocalDate start, LocalDate end, BigDecimal amount) {}
+
+    /** Prévia do "marcar como pago": valor que será registrado e, se houver, o conflito de datas. */
+    public record PaymentPreview(BigDecimal calculatedAmount, String conflict) {}
 
     /** Data em que foi pago, a que período se refere e quanto. */
     public record LastPayment(LocalDate paidAt, LocalDate periodStart, LocalDate periodEnd, BigDecimal amountPaid) {}

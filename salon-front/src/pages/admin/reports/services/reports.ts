@@ -15,6 +15,19 @@ export interface EmployeeFinanceResponse {
   calculatedPayout: number;
   /** Dias trabalhados no período — só para Diarista/Diária+Comissão. */
   daysWorked?: number | null;
+  /** O que a plataforma calcula que ela tem a receber no período filtrado. */
+  estimatedPayment: number;
+  /** Pagamentos que cobrem o filtro, com o período real de cada um (contíguos unidos). */
+  paidRanges: PaidRange[];
+  /** Dias do filtro sem nenhum pagamento registrado. */
+  unpaidRanges: PaidRange[];
+}
+
+export interface PaidRange {
+  start: string;
+  end: string;
+  /** Soma paga na faixa (null nas faixas sem pagamento). */
+  amount: number | null;
 }
 
 export interface FinancialReportResponse {

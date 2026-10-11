@@ -112,7 +112,9 @@ export const WorkDaysCalendar = ({
           let cls = 'bg-white text-[#3b3036] border-[#eae1e1] hover:border-[#be8a83]';
           if (day) cls = 'bg-[#be8a83] text-white border-[#be8a83] hover:bg-[#a6726b]';
           if (day && custom) cls = 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600';
-          if (wasUnmarked) cls = 'bg-white text-[#7a7074] border-dashed border-[#be8a83]/60 line-through hover:border-[#be8a83]';
+          if (wasUnmarked)
+            cls =
+              'bg-white text-[#7a7074] border-dashed border-[#be8a83]/60 line-through hover:border-[#be8a83]';
           if (!inPeriod) cls = 'bg-transparent text-[#7a7074]/40 border-transparent cursor-default';
 
           const title = day
@@ -154,7 +156,8 @@ export const WorkDaysCalendar = ({
           <span className="h-3 w-3 rounded bg-amber-500" /> valor diferente
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#be8a83]" /> teve atendimento (conta sozinho)
+          <span className="h-1.5 w-1.5 rounded-full bg-[#be8a83]" /> teve atendimento (conta
+          sozinho)
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded border border-dashed border-[#be8a83]" /> desmarcado

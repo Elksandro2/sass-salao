@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, CalendarCheck, Pencil, Plus, Trash2, Wallet } from 'lucide-react';
-import { appointmentsApi, type AppointmentResponse } from '../../../appointments/services/appointments';
+import {
+  appointmentsApi,
+  type AppointmentResponse,
+} from '../../../appointments/services/appointments';
 import { AppointmentDetailModal } from '../../appointments/components/AppointmentDetailModal';
 import { cashFlowApi, type CashFlowRecord } from '../../cashflow/services/cashflow';
 import { SaleEditModal } from '../../cashflow/components/SaleEditModal';
@@ -13,7 +16,7 @@ import {
   type PayrollPayment,
   type WorkDay,
 } from '../services/payroll';
-import { formatBRL, formatShortDate } from '../payrollUtils';
+import { formatBRL, formatShortDate, suggestPaymentPeriod } from '../payrollUtils';
 import { remunerationIsDaily } from '../../../../utils/remuneration';
 import { useAlert } from '../../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../../utils/apiError';
@@ -38,7 +41,15 @@ interface PayrollEmployeeDetailProps {
   onPaymentModalHandled?: () => void;
 }
 
-const Section = ({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) => (
+const Section = ({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) => (
   <section className="space-y-2">
     <div className="flex items-center justify-between gap-2">
       <h5 className="text-xs font-bold uppercase tracking-wider text-[#7a7074]">{title}</h5>
@@ -48,7 +59,15 @@ const Section = ({ title, action, children }: { title: string; action?: ReactNod
   </section>
 );
 
-const SmallButton = ({ onClick, children, disabled }: { onClick: () => void; children: ReactNode; disabled?: boolean }) => (
+const SmallButton = ({
+  onClick,
+  children,
+  disabled,
+}: {
+  onClick: () => void;
+  children: ReactNode;
+  disabled?: boolean;
+}) => (
   <button
     type="button"
     onClick={onClick}
@@ -59,7 +78,17 @@ const SmallButton = ({ onClick, children, disabled }: { onClick: () => void; chi
   </button>
 );
 
-const IconButton = ({ onClick, label, danger, children }: { onClick: () => void; label: string; danger?: boolean; children: ReactNode }) => (
+const IconButton = ({
+  onClick,
+  label,
+  danger,
+  children,
+}: {
+  onClick: () => void;
+  label: string;
+  danger?: boolean;
+  children: ReactNode;
+}) => (
   <button
     type="button"
     onClick={onClick}
@@ -71,8 +100,22 @@ const IconButton = ({ onClick, label, danger, children }: { onClick: () => void;
   </button>
 );
 
-const Line = ({ label, value, negative, strong, hint }: { label: string; value: number; negative?: boolean; strong?: boolean; hint?: string }) => (
-  <div className={`flex justify-between gap-4 text-sm ${strong ? 'font-bold pt-2 border-t border-[#eae1e1]' : ''}`}>
+const Line = ({
+  label,
+  value,
+  negative,
+  strong,
+  hint,
+}: {
+  label: string;
+  value: number;
+  negative?: boolean;
+  strong?: boolean;
+  hint?: string;
+}) => (
+  <div
+    className={`flex justify-between gap-4 text-sm ${strong ? 'font-bold pt-2 border-t border-[#eae1e1]' : ''}`}
+  >
     <span className={strong ? 'text-[#3b3036]' : 'text-[#7a7074]'}>
       {label}
       {hint && <span className="block text-[11px] font-normal text-[#7a7074]/80">{hint}</span>}
@@ -98,8 +141,13 @@ export const PayrollEmployeeDetail = ({
   const [busyDate, setBusyDate] = useState<string | null>(null);
 
   const [paymentModal, setPaymentModal] = useState<{ payment: PayrollPayment | null } | null>(null);
-  const [adjustmentModal, setAdjustmentModal] = useState<{ adjustment: PayrollAdjustment | null } | null>(null);
-  const [workDayModal, setWorkDayModal] = useState<{ date: string; workDay: WorkDay | null } | null>(null);
+  const [adjustmentModal, setAdjustmentModal] = useState<{
+    adjustment: PayrollAdjustment | null;
+  } | null>(null);
+  const [workDayModal, setWorkDayModal] = useState<{
+    date: string;
+    workDay: WorkDay | null;
+  } | null>(null);
   // Mesmo modal de detalhes/edição da tela de Agendamentos. appointmentChanged: houve edição
   // enquanto estava aberto — ao fechar, a folha recarrega (comissão, diária, valores mudam).
   const [appointmentTarget, setAppointmentTarget] = useState<AppointmentResponse | null>(null);
@@ -190,9 +238,10 @@ export const PayrollEmployeeDetail = ({
       justification: values.justification.trim() || null,
     };
     const ok = await run(
-      () => (workDayModal.workDay?.id != null
-        ? payrollApi.updateWorkDay(workDayModal.workDay.id, input)
-        : payrollApi.createWorkDay(input)),
+      () =>
+        workDayModal.workDay?.id != null
+          ? payrollApi.updateWorkDay(workDayModal.workDay.id, input)
+          : payrollApi.createWorkDay(input),
       'Erro ao salvar a diária'
     );
     if (ok) setWorkDayModal(null);
@@ -201,7 +250,10 @@ export const PayrollEmployeeDetail = ({
   const removeWorkDay = async () => {
     if (!workDayModal?.workDay) return;
     const { date } = workDayModal;
-    const ok = await run(() => payrollApi.unmarkWorkDay(employeeId, date), 'Erro ao desmarcar o dia');
+    const ok = await run(
+      () => payrollApi.unmarkWorkDay(employeeId, date),
+      'Erro ao desmarcar o dia'
+    );
     if (ok) setWorkDayModal(null);
   };
 
@@ -226,9 +278,10 @@ export const PayrollEmployeeDetail = ({
       description: values.description.trim() || null,
     };
     const ok = await run(
-      () => (adjustmentModal.adjustment
-        ? payrollApi.updateAdjustment(adjustmentModal.adjustment.id, input)
-        : payrollApi.createAdjustment(input)),
+      () =>
+        adjustmentModal.adjustment
+          ? payrollApi.updateAdjustment(adjustmentModal.adjustment.id, input)
+          : payrollApi.createAdjustment(input),
       'Erro ao salvar o lançamento'
     );
     if (ok) setAdjustmentModal(null);
@@ -254,15 +307,15 @@ export const PayrollEmployeeDetail = ({
       employeeId,
       periodStart: values.periodStart,
       periodEnd: values.periodEnd,
-      amountPaid: Number(values.amountPaid || 0),
       paidAt: values.paidAt,
       paymentMethod: values.paymentMethod || null,
       notes: values.notes.trim() || null,
     };
     const ok = await run(
-      () => (paymentModal.payment
-        ? payrollApi.updatePayment(paymentModal.payment.id, input)
-        : payrollApi.createPayment(input)),
+      () =>
+        paymentModal.payment
+          ? payrollApi.updatePayment(paymentModal.payment.id, input)
+          : payrollApi.createPayment(input),
       'Erro ao registrar o pagamento'
     );
     if (ok) setPaymentModal(null);
@@ -305,7 +358,23 @@ export const PayrollEmployeeDetail = ({
     }
   };
 
+  /** "Atualizar valor": re-salva o pagamento com as mesmas datas — o valor é recalculado. */
+  const refreshPayment = (p: PayrollPayment) =>
+    run(
+      () =>
+        payrollApi.updatePayment(p.id, {
+          employeeId,
+          periodStart: p.periodStart,
+          periodEnd: p.periodEnd,
+          paidAt: p.paidAt,
+          paymentMethod: p.paymentMethod,
+          notes: p.notes,
+        }),
+      'Erro ao atualizar o pagamento'
+    );
+
   const changedPayments = detail.payments.filter((p) => p.changedSincePayment);
+  const suggested = suggestPaymentPeriod(detail.payments, from);
 
   return (
     <div className="px-4 sm:px-6 py-5 bg-[#fcf9f9]/50 border-t border-[#eae1e1] space-y-6">
@@ -313,9 +382,12 @@ export const PayrollEmployeeDetail = ({
         <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
           <AlertTriangle size={16} className="shrink-0" />
           <span>
-            {changedPayments.length === 1 ? 'Um pagamento já registrado mudou' : `${changedPayments.length} pagamentos já registrados mudaram`}{' '}
-            de valor depois de pago (algum atendimento, diária ou lançamento do período foi editado). Confira
-            em "Pagamentos" — pode haver diferença a acertar.
+            {changedPayments.length === 1
+              ? 'Um pagamento já registrado mudou'
+              : `${changedPayments.length} pagamentos já registrados mudaram`}{' '}
+            de valor depois de pago (algum atendimento, diária ou lançamento do período foi
+            editado). Se você acertou a diferença com ela, use "Atualizar valor" no pagamento
+            abaixo.
           </span>
         </div>
       )}
@@ -325,14 +397,26 @@ export const PayrollEmployeeDetail = ({
         <Section title="De onde vem o valor">
           <div className="rounded-xl border border-[#eae1e1] bg-white p-4 space-y-1.5">
             {b.fixedSalary > 0 && (
-              <Line label="Salário fixo" value={b.fixedSalary} hint="Proporcional aos dias do período" />
+              <Line
+                label="Salário fixo"
+                value={b.fixedSalary}
+                hint="Proporcional aos dias do período"
+              />
             )}
             {(isDaily || b.workDaysCount > 0) && (
-              <Line label={`Diárias (${b.workDaysCount} dia${b.workDaysCount === 1 ? '' : 's'})`} value={b.dailyTotal} />
+              <Line
+                label={`Diárias (${b.workDaysCount} dia${b.workDaysCount === 1 ? '' : 's'})`}
+                value={b.dailyTotal}
+              />
             )}
-            {b.serviceCommission > 0 && <Line label="Comissão sobre serviços" value={b.serviceCommission} />}
+            {b.serviceCommission > 0 && (
+              <Line label="Comissão sobre serviços" value={b.serviceCommission} />
+            )}
             {b.appointmentProductCommission > 0 && (
-              <Line label="Comissão sobre produtos (em atendimentos)" value={b.appointmentProductCommission} />
+              <Line
+                label="Comissão sobre produtos (em atendimentos)"
+                value={b.appointmentProductCommission}
+              />
             )}
             {b.saleProductCommission > 0 && (
               <Line label="Comissão sobre vendas avulsas" value={b.saleProductCommission} />
@@ -341,12 +425,17 @@ export const PayrollEmployeeDetail = ({
             {b.discounts > 0 && <Line label="Descontos" value={b.discounts} negative />}
             <Line label="Custo da folha no período" value={b.salonCost} strong />
             {b.advances > 0 && <Line label="Vales já entregues" value={b.advances} negative />}
-            <Line label="Valor a pagar" value={b.netPayable} strong />
+            <Line label="Valor do período" value={b.netPayable} strong />
             {summary.paidInPeriod > 0 && (
-              <>
-                <Line label="Pagamentos registrados no período" value={summary.paidInPeriod} negative />
-                <Line label="Falta pagar" value={summary.outstanding} strong />
-              </>
+              <Line
+                label={
+                  summary.pendingDifference > 0
+                    ? 'Falta pagar (inclui diferença após pagamento)'
+                    : 'Falta pagar'
+                }
+                value={summary.outstanding}
+                strong
+              />
             )}
           </div>
         </Section>
@@ -357,7 +446,10 @@ export const PayrollEmployeeDetail = ({
             title="Dias trabalhados"
             action={
               detail.unmarkedAppointmentDates.length > 0 && (
-                <SmallButton onClick={markAppointmentDays} disabled={isSaving || defaultRate == null}>
+                <SmallButton
+                  onClick={markAppointmentDays}
+                  disabled={isSaving || defaultRate == null}
+                >
                   <CalendarCheck size={14} />
                   Remarcar {detail.unmarkedAppointmentDates.length} dia(s) desmarcado(s)
                 </SmallButton>
@@ -381,9 +473,9 @@ export const PayrollEmployeeDetail = ({
               onOpenDay={(day) => setWorkDayModal({ date: day.date, workDay: day })}
             />
             <p className="text-[11px] text-[#7a7074]">
-              Dia com atendimento já conta como diária sozinho. Clique num dia marcado pra mudar o valor
-              (com justificativa) ou desmarcar; clique num dia vazio pra marcar um dia trabalhado sem
-              atendimento.
+              Dia com atendimento já conta como diária sozinho. Clique num dia marcado pra mudar o
+              valor (com justificativa) ou desmarcar; clique num dia vazio pra marcar um dia
+              trabalhado sem atendimento.
             </p>
           </Section>
         ) : (
@@ -447,15 +539,23 @@ export const PayrollEmployeeDetail = ({
                     className="cursor-pointer hover:bg-[#fdf6f5] transition-colors"
                     title="Abrir e editar o agendamento"
                   >
-                    <td className="px-3 py-2 text-[#7a7074] whitespace-nowrap">{formatShortDate(a.date)}</td>
+                    <td className="px-3 py-2 text-[#7a7074] whitespace-nowrap">
+                      {formatShortDate(a.date)}
+                    </td>
                     <td className="px-3 py-2 text-[#3b3036]">{a.clientName ?? '—'}</td>
                     <td className="px-3 py-2 text-[#7a7074]">{a.serviceNames}</td>
-                    <td className="px-3 py-2 text-right text-[#3b3036]">{formatBRL(a.servicesValue)}</td>
-                    <td className="px-3 py-2 text-right text-[#3b3036]">{a.productsValue > 0 ? formatBRL(a.productsValue) : '—'}</td>
+                    <td className="px-3 py-2 text-right text-[#3b3036]">
+                      {formatBRL(a.servicesValue)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-[#3b3036]">
+                      {a.productsValue > 0 ? formatBRL(a.productsValue) : '—'}
+                    </td>
                     <td className="px-3 py-2 text-right font-semibold text-[#be8a83] whitespace-nowrap">
                       {formatBRL(a.serviceCommission + a.productCommission)}
                       {a.commissionManual && (
-                        <span className="block text-[10px] font-normal text-amber-600">valor manual</span>
+                        <span className="block text-[10px] font-normal text-amber-600">
+                          valor manual
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
@@ -494,10 +594,14 @@ export const PayrollEmployeeDetail = ({
                     className="cursor-pointer hover:bg-[#fdf6f5] transition-colors"
                     title="Abrir e editar a venda"
                   >
-                    <td className="px-3 py-2 text-[#7a7074] whitespace-nowrap">{formatShortDate(s.date)}</td>
+                    <td className="px-3 py-2 text-[#7a7074] whitespace-nowrap">
+                      {formatShortDate(s.date)}
+                    </td>
                     <td className="px-3 py-2 text-[#3b3036]">{s.description}</td>
                     <td className="px-3 py-2 text-right text-[#3b3036]">{formatBRL(s.amount)}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-[#be8a83]">{formatBRL(s.commission)}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-[#be8a83]">
+                      {formatBRL(s.commission)}
+                    </td>
                     <td className="px-3 py-2 text-right">
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#be8a83]">
                         <Pencil size={12} />
@@ -530,8 +634,7 @@ export const PayrollEmployeeDetail = ({
                 <tr className="border-b border-[#eae1e1] text-[11px] uppercase tracking-wider text-[#7a7074]">
                   <th className="px-3 py-2 font-semibold">Período</th>
                   <th className="px-3 py-2 font-semibold">Pago em</th>
-                  <th className="px-3 py-2 font-semibold text-right">Valor pago</th>
-                  <th className="px-3 py-2 font-semibold text-right">Calculado</th>
+                  <th className="px-3 py-2 font-semibold text-right">Valor</th>
                   <th className="px-3 py-2" />
                 </tr>
               </thead>
@@ -540,23 +643,38 @@ export const PayrollEmployeeDetail = ({
                   <tr key={p.id} className={p.changedSincePayment ? 'bg-amber-50/60' : undefined}>
                     <td className="px-3 py-2 text-[#3b3036] whitespace-nowrap">
                       {formatShortDate(p.periodStart)} a {formatShortDate(p.periodEnd)}
-                      {p.notes && <span className="block text-[11px] text-[#7a7074]">{p.notes}</span>}
+                      {p.notes && (
+                        <span className="block text-[11px] text-[#7a7074]">{p.notes}</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-[#7a7074] whitespace-nowrap">
                       {formatShortDate(p.paidAt)}
-                      {p.paymentMethod && ` · ${PAYMENT_METHODS[p.paymentMethod] ?? p.paymentMethod}`}
+                      {p.paymentMethod &&
+                        ` · ${PAYMENT_METHODS[p.paymentMethod] ?? p.paymentMethod}`}
                     </td>
-                    <td className="px-3 py-2 text-right font-semibold text-[#3b3036]">{formatBRL(p.amountPaid)}</td>
-                    <td className="px-3 py-2 text-right text-[#7a7074] whitespace-nowrap">
-                      {formatBRL(p.calculatedAmount)}
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <span className="font-semibold text-[#3b3036]">
+                        {formatBRL(p.amountPaid)}
+                      </span>
                       {p.changedSincePayment && p.recalculatedAmount != null && (
                         <span className="block text-[11px] font-semibold text-amber-700">
-                          hoje: {formatBRL(p.recalculatedAmount)}
+                          recalculado hoje: {formatBRL(p.recalculatedAmount)}{' '}
+                          <button
+                            type="button"
+                            onClick={() => refreshPayment(p)}
+                            disabled={isSaving}
+                            className="underline hover:text-amber-900 cursor-pointer disabled:opacity-50"
+                          >
+                            Atualizar valor
+                          </button>
                         </span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
-                      <IconButton label="Editar pagamento" onClick={() => setPaymentModal({ payment: p })}>
+                      <IconButton
+                        label="Editar pagamento"
+                        onClick={() => setPaymentModal({ payment: p })}
+                      >
                         <Pencil size={14} />
                       </IconButton>
                       <IconButton label="Excluir pagamento" danger onClick={() => deletePayment(p)}>
@@ -591,11 +709,11 @@ export const PayrollEmployeeDetail = ({
 
       {paymentModal && (
         <PaymentModal
+          employeeId={employeeId}
           employeeName={name}
           payment={paymentModal.payment}
-          defaultPeriodStart={from}
-          defaultPeriodEnd={to}
-          suggestedAmount={summary.outstanding > 0 ? summary.outstanding : b.netPayable}
+          defaultPeriodStart={suggested.from}
+          defaultPeriodEnd={suggested.to}
           isSaving={isSaving}
           onClose={() => setPaymentModal(null)}
           onSubmit={savePayment}
@@ -649,7 +767,9 @@ const AdjustmentList = ({
               {a.description ? ` · ${a.description}` : ''}
             </p>
           </div>
-          <span className={`font-semibold whitespace-nowrap ${a.addition ? 'text-emerald-600' : 'text-rose-600'}`}>
+          <span
+            className={`font-semibold whitespace-nowrap ${a.addition ? 'text-emerald-600' : 'text-rose-600'}`}
+          >
             {a.addition ? '+ ' : '− '}
             {formatBRL(a.amount)}
           </span>

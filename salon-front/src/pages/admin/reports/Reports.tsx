@@ -172,13 +172,21 @@ export const Reports = () => {
             baseStr,
             emp.doneAppointmentsCount.toString(),
             `R$ ${(emp.doneAppointmentsValue ?? 0).toFixed(2)}`,
-            `R$ ${(emp.calculatedPayout ?? 0).toFixed(2)}`,
+            `R$ ${(emp.estimatedPayment ?? 0).toFixed(2)}`,
+            [
+              ...(emp.paidRanges ?? []).map(
+                (r) => `${formatApiDate(r.start)} a ${formatApiDate(r.end)}: R$ ${(r.amount ?? 0).toFixed(2)}`
+              ),
+              ...(emp.unpaidRanges ?? []).map(
+                (r) => `Sem pagamento de ${formatApiDate(r.start)} a ${formatApiDate(r.end)}`
+              ),
+            ].join('\n'),
           ];
         });
 
         autoTable(doc, {
           startY: currentY,
-          head: [['Nome', 'Tipo', 'Base', 'Atendimentos', 'Valor Atendimentos', 'Custo no Período']],
+          head: [['Nome', 'Tipo', 'Base', 'Atend.', 'Valor Atendimentos', 'Pagamento Estimado', 'Período Pago']],
           body: employeeRows,
           theme: 'striped',
           headStyles: { fillColor: [59, 48, 54], textColor: [255, 255, 255], fontStyle: 'bold' },
@@ -423,10 +431,6 @@ export const Reports = () => {
                     <p className="text-xl font-extrabold text-indigo-600">
                       {formatBRL((financial?.totalSalaryPaid ?? 0) + (financial?.totalCommissionPaid ?? 0))}
                     </p>
-                    <p className="text-[11px] text-[#7a7074] mt-1">
-                      Comissões {formatBRL(financial?.totalCommissionPaid ?? 0)} · demais{' '}
-                      {formatBRL(financial?.totalSalaryPaid ?? 0)}
-                    </p>
                   </div>
                   <div className="bg-white rounded-2xl border border-[#eae1e1]/80 p-5 shadow-sm transition-all duration-300 relative overflow-hidden group">
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 to-orange-500" />
@@ -478,7 +482,10 @@ export const Reports = () => {
                               Valor Atendimentos
                             </th>
                             <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-right">
-                              Custo no período
+                              Pagamento estimado
+                            </th>
+                            <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider">
+                              Período pago
                             </th>
                           </tr>
                         </thead>
@@ -518,12 +525,26 @@ export const Reports = () => {
                                   {formatBRL(emp.doneAppointmentsValue ?? 0)}
                                 </td>
                                 <td className="px-6 py-4 text-sm font-bold text-[#be8a83] text-right">
-                                  {formatBRL(emp.calculatedPayout ?? 0)}
+                                  {formatBRL(emp.estimatedPayment ?? 0)}
                                   {isDaily && (
                                     <span className="block text-[10px] font-normal text-[#7a7074]">
                                       dias marcados na Folha de Pagamento
                                     </span>
                                   )}
+                                </td>
+                                <td className="px-6 py-4 text-xs whitespace-nowrap">
+                                  {(emp.paidRanges ?? []).map((r) => (
+                                    <span key={r.start} className="block font-semibold text-emerald-700">
+                                      {formatApiDate(r.start)} a {formatApiDate(r.end)} ·{' '}
+                                      {formatBRL(r.amount ?? 0)}
+                                    </span>
+                                  ))}
+                                  {(emp.unpaidRanges ?? []).map((r) => (
+                                    <span key={r.start} className="block text-rose-600">
+                                      Nenhuma quantia quitada de {formatApiDate(r.start)} a{' '}
+                                      {formatApiDate(r.end)}
+                                    </span>
+                                  ))}
                                 </td>
                               </tr>
                             );
