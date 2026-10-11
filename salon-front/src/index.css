@@ -56,8 +56,11 @@
       transform: translateY(16px);
       opacity: 0;
     }
+    /* "none" e não translateY(0): com fill-mode forwards o valor final fica aplicado pra
+       sempre, e qualquer transform (mesmo zero) faz o elemento virar referência do
+       position:fixed dos filhos — os modais da página saíam do centro da tela. */
     to {
-      transform: translateY(0);
+      transform: none;
       opacity: 1;
     }
   }

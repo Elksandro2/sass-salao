@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { CurrencyInput } from '../../../../components/CurrencyInput';
 import {
@@ -23,7 +24,10 @@ interface ShellProps {
   footer: ReactNode;
 }
 
-const ModalShell = ({ title, subtitle, onClose, children, footer }: ShellProps) => (
+// Renderizado direto no <body>: a página da folha tem animação de entrada (transform), e um
+// ancestral com transform faz o position:fixed se prender à página em vez da tela — o modal
+// aparecia fora do centro, exigindo scroll.
+const ModalShell = ({ title, subtitle, onClose, children, footer }: ShellProps) => createPortal(
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#261f23]/40 backdrop-blur-md">
     <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-[#eae1e1]/85 overflow-hidden animate-scale-up max-h-[85vh] flex flex-col">
       <div className="flex items-start justify-between px-6 py-4 border-b border-[#eae1e1] bg-[#fcf9f9]/50 shrink-0">
@@ -45,7 +49,8 @@ const ModalShell = ({ title, subtitle, onClose, children, footer }: ShellProps) 
         {footer}
       </div>
     </div>
-  </div>
+  </div>,
+  document.body
 );
 
 const CancelButton = ({ onClick }: { onClick: () => void }) => (
