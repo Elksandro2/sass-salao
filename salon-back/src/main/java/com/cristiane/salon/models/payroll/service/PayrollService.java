@@ -322,15 +322,10 @@ public class PayrollService {
         unmarkWorkDay(day.getEmployeeId(), day.getWorkDate());
     }
 
-    /** Valor do dia: o informado, ou a diária padrão. Diferente da padrão exige justificativa. */
+    /** Valor do dia: o informado, ou a diária padrão. Justificativa sempre opcional. */
     private void applyWorkDayValues(EmployeeWorkDay day, Employee employee, BigDecimal amount, String justification) {
-        BigDecimal defaultRate = employee.getRemunerationValue();
         BigDecimal value = amount != null ? amount : requireDefaultRate(employee);
         String reason = justification != null && !justification.isBlank() ? justification.trim() : null;
-        boolean differs = defaultRate == null || value.compareTo(defaultRate) != 0;
-        if (differs && reason == null) {
-            throw new BadRequestException("Informe a justificativa: o valor deste dia é diferente da diária padrão.");
-        }
         day.setAmount(value);
         day.setJustification(reason);
     }

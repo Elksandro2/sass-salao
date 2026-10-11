@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 interface ConfirmDialogProps {
   show: boolean;
@@ -37,7 +38,9 @@ export const ConfirmDialog = ({
     }
   };
 
-  return (
+  // Portal pro <body>: o modal não pode depender de onde é renderizado — um ancestral com
+  // transform/filter prende o position:fixed e o modal sai do centro da tela.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none">
       {/* Backdrop */}
       <div
@@ -86,6 +89,7 @@ export const ConfirmDialog = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

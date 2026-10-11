@@ -53,4 +53,16 @@ public class CashFlow {
      */
     @Column(name = "commission_amount", precision = 10, scale = 2)
     private BigDecimal commissionAmount;
+
+    /** % de comissão de produto vigente na venda (ver V87) — usado pra recalcular ao editar. */
+    @Column(name = "commission_percent", precision = 5, scale = 2)
+    private BigDecimal commissionPercent;
+
+    /** Comissão digitada à mão na edição da venda: editar de novo não recalcula por cima. */
+    @Column(name = "commission_manual", nullable = false)
+    private boolean commissionManual;
+
+    /** Itens da venda avulsa (vendas anteriores à V87 não têm — só o total). */
+    @OneToMany(mappedBy = "cashFlow", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<CashFlowItem> items = new java.util.ArrayList<>();
 }

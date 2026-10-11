@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, CalendarCheck, Pencil, Plus, Trash2, Wallet } from 'lucide-react';
 import { appointmentsApi, type AppointmentResponse } from '../../../appointments/services/appointments';
 import { AppointmentDetailModal } from '../../appointments/components/AppointmentDetailModal';
+import { cashFlowApi, type CashFlowRecord } from '../../cashflow/services/cashflow';
+import { SaleEditModal } from '../../cashflow/components/SaleEditModal';
 import {
   ADJUSTMENT_LABELS,
   PAYMENT_METHODS,
@@ -103,6 +105,8 @@ export const PayrollEmployeeDetail = ({
   const [appointmentTarget, setAppointmentTarget] = useState<AppointmentResponse | null>(null);
   const [appointmentChanged, setAppointmentChanged] = useState(false);
   const [openingAppointmentId, setOpeningAppointmentId] = useState<number | null>(null);
+  const [saleTarget, setSaleTarget] = useState<CashFlowRecord | null>(null);
+  const [openingSaleId, setOpeningSaleId] = useState<number | null>(null);
 
   const { error: showError, confirm } = useAlert();
 
@@ -290,6 +294,17 @@ export const PayrollEmployeeDetail = ({
     if (appointmentChanged) await afterChange();
   };
 
+  const openSale = async (cashFlowId: number) => {
+    setOpeningSaleId(cashFlowId);
+    try {
+      setSaleTarget(await cashFlowApi.findById(cashFlowId));
+    } catch (err) {
+      await showError(getApiErrorMessage(err, 'Erro ao abrir a venda'));
+    } finally {
+      setOpeningSaleId(null);
+    }
+  };
+
   const changedPayments = detail.payments.filter((p) => p.changedSincePayment);
 
   return (
@@ -468,15 +483,27 @@ export const PayrollEmployeeDetail = ({
                   <th className="px-3 py-2 font-semibold">Venda</th>
                   <th className="px-3 py-2 font-semibold text-right">Valor</th>
                   <th className="px-3 py-2 font-semibold text-right">Comissão</th>
+                  <th className="px-3 py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#eae1e1]/50">
                 {detail.productSales.map((s) => (
-                  <tr key={s.cashFlowId}>
+                  <tr
+                    key={s.cashFlowId}
+                    onClick={() => openSale(s.cashFlowId)}
+                    className="cursor-pointer hover:bg-[#fdf6f5] transition-colors"
+                    title="Abrir e editar a venda"
+                  >
                     <td className="px-3 py-2 text-[#7a7074] whitespace-nowrap">{formatShortDate(s.date)}</td>
                     <td className="px-3 py-2 text-[#3b3036]">{s.description}</td>
                     <td className="px-3 py-2 text-right text-[#3b3036]">{formatBRL(s.amount)}</td>
                     <td className="px-3 py-2 text-right font-semibold text-[#be8a83]">{formatBRL(s.commission)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#be8a83]">
+                        <Pencil size={12} />
+                        {openingSaleId === s.cashFlowId ? 'Abrindo...' : 'Abrir'}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -543,6 +570,15 @@ export const PayrollEmployeeDetail = ({
           </div>
         )}
       </Section>
+
+      <SaleEditModal
+        sale={saleTarget}
+        onClose={() => setSaleTarget(null)}
+        onSaved={async () => {
+          setSaleTarget(null);
+          await afterChange();
+        }}
+      />
 
       <AppointmentDetailModal
         appointment={appointmentTarget}

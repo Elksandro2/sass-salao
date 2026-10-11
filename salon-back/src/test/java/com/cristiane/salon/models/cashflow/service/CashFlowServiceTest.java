@@ -342,7 +342,7 @@ class CashFlowServiceTest {
         CashFlowItemRequest item1 = new CashFlowItemRequest(1L, 2, new BigDecimal("-5.00"));
         CashFlowRequest request = new CashFlowRequest(
                 "INCOME", BigDecimal.ZERO, "Venda de Produtos", salonClock.today(), null, List.of(item1), null);
-        when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
+        lenient().when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
 
         assertThatThrownBy(() -> cashFlowService.create(request))
                 .isInstanceOf(BadRequestException.class)
@@ -562,5 +562,79 @@ class CashFlowServiceTest {
 
         // Assert
         verify(cashFlowRepository).deleteById(10L);
+    }
+
+    // --- updateSale ------------------------------------------------------------------------------
+
+    private CashFlow existingSale() {
+        CashFlow sale = new CashFlow();
+        sale.setId(70L);
+        sale.setType(CashFlowType.INCOME);
+        sale.setAmount(new BigDecimal("100.00"));
+        sale.setDescription("Venda de Produtos: 2x Shampoo");
+        sale.setDate(salonClock.today());
+        sale.setCommissionPercent(new BigDecimal("10"));
+        return sale;
+    }
+
+    private com.cristiane.salon.models.employee.entity.Employee seller() {
+        User user = new User();
+        user.setName("Maria");
+        com.cristiane.salon.models.employee.entity.Employee emp = new com.cristiane.salon.models.employee.entity.Employee();
+        emp.setId(5L);
+        emp.setUser(user);
+        return emp;
+    }
+
+    @Test
+    void updateSale_replacesItems_recomputesTotalAndCommissionWithTheFrozenPercent() {
+        CashFlow sale = existingSale();
+        when(cashFlowRepository.findById(70L)).thenReturn(Optional.of(sale));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(activeProduct));
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(seller()));
+        when(cashFlowRepository.save(any(CashFlow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new com.cristiane.salon.models.cashflow.dto.SaleUpdateRequest(
+                salonClock.today().minusDays(2), 5L,
+                List.of(new com.cristiane.salon.models.cashflow.dto.SaleUpdateRequest.Item(1L, 3, new BigDecimal("40.00"))),
+                null, null, null);
+
+        CashFlowResponse response = cashFlowService.updateSale(70L, request);
+
+        assertThat(response.amount()).isEqualByComparingTo("120.00");
+        assertThat(response.commissionAmount()).isEqualByComparingTo("12.00"); // 10% congelado
+        assertThat(response.commissionManual()).isFalse();
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.date()).isEqualTo(salonClock.today().minusDays(2));
+        assertThat(response.description()).isEqualTo("Venda de Produtos: 3x Shampoo (a R$ 40.00 cada)");
+    }
+
+    @Test
+    void updateSale_manualCommissionWins_andRemovingSellerClearsCommission() {
+        CashFlow sale = existingSale();
+        when(cashFlowRepository.findById(70L)).thenReturn(Optional.of(sale));
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(seller()));
+        when(cashFlowRepository.save(any(CashFlow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var manual = cashFlowService.updateSale(70L, new com.cristiane.salon.models.cashflow.dto.SaleUpdateRequest(
+                salonClock.today(), 5L, null, new BigDecimal("100.00"), null, new BigDecimal("25.00")));
+        assertThat(manual.commissionAmount()).isEqualByComparingTo("25.00");
+        assertThat(manual.commissionManual()).isTrue();
+
+        var noSeller = cashFlowService.updateSale(70L, new com.cristiane.salon.models.cashflow.dto.SaleUpdateRequest(
+                salonClock.today(), null, null, new BigDecimal("100.00"), null, null));
+        assertThat(noSeller.employeeId()).isNull();
+        assertThat(noSeller.commissionAmount()).isNull();
+    }
+
+    @Test
+    void update_genericEditOfASale_isRejected_soTheSellerIsNotLostByAccident() {
+        CashFlow sale = existingSale();
+        sale.setEmployee(seller());
+        when(cashFlowRepository.findById(70L)).thenReturn(Optional.of(sale));
+
+        assertThatThrownBy(() -> cashFlowService.update(70L, new CashFlowRequest(
+                "INCOME", new BigDecimal("90"), "x", salonClock.today(), null, null, null)))
+                .isInstanceOf(com.cristiane.salon.exception.BusinessException.class);
     }
 }

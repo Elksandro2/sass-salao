@@ -8,7 +8,9 @@ import { ModalForm } from '../../../components/modal/ModalForm';
 import { ConfirmDialog } from '../../../components/modal/ConfirmDialog';
 import { PermissionGate } from '../../../components/permissions/PermissionGate';
 import { cashFlowApi } from './services/cashflow';
-import type { CashFlowData } from './services/cashflow';
+import type { CashFlowData, CashFlowRecord } from './services/cashflow';
+import { isProductSale } from './services/cashflow';
+import { SaleEditModal } from './components/SaleEditModal';
 import { cashFlowFormSchema } from './cashflow.schema';
 import type { CashFlowFormValues } from './cashflow.schema';
 import { productsApi } from '../products/services/products';
@@ -26,11 +28,13 @@ const inputCls = 'input-premium';
 const labelCls = 'label-premium';
 
 export const CashFlow = () => {
-  const [cashFlows, setCashFlows] = useState<CashFlowData[]>([]);
+  const [cashFlows, setCashFlows] = useState<CashFlowRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  /** Venda avulsa de produto aberta pra edição completa (itens, vendedora, comissão). */
+  const [saleTarget, setSaleTarget] = useState<CashFlowRecord | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<number | null>(null);
 
@@ -145,7 +149,7 @@ export const CashFlow = () => {
 
   /** Só entradas manuais (sem appointmentId) têm essa opção — a origem (venda de produto/
    * serviço, comissão etc.) não é reeditável aqui, só o essencial: tipo, valor, descrição e data. */
-  const handleOpenEditForm = (item: CashFlowData) => {
+  const handleOpenEditForm = (item: CashFlowRecord) => {
     setEditingId(item.id!);
     reset({ type: item.type, date: item.date, amount: String(item.amount), description: item.description });
     setSourceType('OTHER');
@@ -293,12 +297,12 @@ export const CashFlow = () => {
     {
       key: 'date',
       label: 'Data',
-      render: (item: CashFlowData) => formatApiDate(item.date),
+      render: (item: CashFlowRecord) => formatApiDate(item.date),
     },
     {
       key: 'description',
       label: 'Descrição',
-      render: (item: CashFlowData) => (
+      render: (item: CashFlowRecord) => (
         <div>
           <span>{item.description}</span>
           {item.employeeName && (
@@ -321,7 +325,7 @@ export const CashFlow = () => {
     {
       key: 'type',
       label: 'Tipo',
-      render: (item: CashFlowData) => (
+      render: (item: CashFlowRecord) => (
         <span
           className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
             item.type === 'INCOME'
@@ -336,7 +340,7 @@ export const CashFlow = () => {
     {
       key: 'amount',
       label: 'Valor',
-      render: (item: CashFlowData) => (
+      render: (item: CashFlowRecord) => (
         <span
           className={`font-semibold ${item.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}
         >
@@ -347,9 +351,19 @@ export const CashFlow = () => {
     {
       key: 'actions',
       label: 'Ações',
-      render: (item: CashFlowData) => (
+      render: (item: CashFlowRecord) => (
         <div className="flex gap-2">
-          {item.appointmentId == null ? (
+          {isProductSale(item) ? (
+            <PermissionGate method="PUT" endpoint={`/v1/cashflow/${item.id}/sale`}>
+              <button
+                onClick={() => setSaleTarget(item)}
+                className="p-2 text-indigo-600 hover:bg-indigo-50 border border-[#eae1e1] hover:border-indigo-200 rounded-xl transition-all cursor-pointer"
+                title="Editar venda"
+              >
+                <Pencil size={15} />
+              </button>
+            </PermissionGate>
+          ) : item.appointmentId == null ? (
             <PermissionGate method="PUT" endpoint={`/v1/cashflow/${item.id}`}>
               <button
                 onClick={() => handleOpenEditForm(item)}
@@ -386,6 +400,14 @@ export const CashFlow = () => {
 
   return (
     <>
+      <SaleEditModal
+        sale={saleTarget}
+        onClose={() => setSaleTarget(null)}
+        onSaved={() => {
+          setSaleTarget(null);
+          loadCashFlows();
+        }}
+      />
       <div className="space-y-6 animate-fade-in-up">
         <div className="flex justify-between items-center">
           <h2 className="font-heading text-2xl font-bold text-[#3b3036]">Fluxo de Caixa</h2>

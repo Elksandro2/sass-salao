@@ -24,12 +24,46 @@ export interface CashFlowData {
   commissionAmount?: number | null;
 }
 
+/** Item já registrado numa venda avulsa (resposta da API). */
+export interface CashFlowSaleItem {
+  /** null se o produto foi excluído de vez — o nome congelado continua valendo. */
+  productId: number | null;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+/** Lançamento como vem da API (listagem/consulta). */
+export interface CashFlowRecord extends Omit<CashFlowData, 'items'> {
+  /** Itens da venda avulsa — vazio em vendas antigas e em lançamentos que não são venda. */
+  items?: CashFlowSaleItem[];
+  /** % de comissão congelado na venda. */
+  commissionPercent?: number | null;
+  /** Comissão digitada à mão na edição da venda. */
+  commissionManual?: boolean;
+}
+
+export interface SaleUpdateInput {
+  date: string;
+  employeeId: number | null;
+  /** Vazio = venda antiga sem itens, editada pelo total (amount). */
+  items: { productId: number; quantity: number; unitPrice: number | null }[];
+  amount: number | null;
+  description: string | null;
+  /** null = calcula pelo % da venda. */
+  commissionAmount: number | null;
+}
+
+/** Venda avulsa de produto: tem itens registrados ou uma vendedora. */
+export const isProductSale = (record: CashFlowRecord) =>
+  record.appointmentId == null && ((record.items?.length ?? 0) > 0 || record.employeeId != null);
+
 export const cashFlowApi = {
   findByPeriod: async (from?: string, to?: string, page = 0, size = 20) => {
     const params: Record<string, string | number> = { page, size };
     if (from) params.from = from;
     if (to) params.to = to;
-    const { data } = await api.get<SpringPageResponse<CashFlowData>>('/cashflow', { params });
+    const { data } = await api.get<SpringPageResponse<CashFlowRecord>>('/cashflow', { params });
     return normalizePage(data);
   },
 
@@ -42,6 +76,17 @@ export const cashFlowApi = {
    * pelo próprio agendamento. */
   update: async (id: number, cashFlowData: CashFlowData) => {
     const { data } = await api.put<CashFlowData>(`/cashflow/${id}`, cashFlowData);
+    return data;
+  },
+
+  findById: async (id: number) => {
+    const { data } = await api.get<CashFlowRecord>(`/cashflow/${id}`);
+    return data;
+  },
+
+  /** Edita uma venda avulsa por completo (itens, vendedora, data, comissão). */
+  updateSale: async (id: number, input: SaleUpdateInput) => {
+    const { data } = await api.put<CashFlowRecord>(`/cashflow/${id}/sale`, input);
     return data;
   },
 

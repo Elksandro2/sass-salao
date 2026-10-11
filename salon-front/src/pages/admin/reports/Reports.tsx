@@ -8,7 +8,7 @@ import type {
 import { EmployeeFinancialHistorySection } from './EmployeeFinancialHistorySection';
 import { remunerationLabel, remunerationIsDaily } from '../../../utils/remuneration';
 import { cashFlowApi } from '../cashflow/services/cashflow';
-import type { CashFlowData } from '../cashflow/services/cashflow';
+import type { CashFlowRecord } from '../cashflow/services/cashflow';
 import {
   BarChart,
   Bar,
@@ -36,7 +36,7 @@ export const Reports = () => {
   const { user } = useAuth();
   const [financial, setFinancial] = useState<FinancialReportResponse | null>(null);
   const [appointments, setAppointments] = useState<AppointmentReportResponse | null>(null);
-  const [cashFlows, setCashFlows] = useState<CashFlowData[]>([]);
+  const [cashFlows, setCashFlows] = useState<CashFlowRecord[]>([]);
   const [servicePricing, setServicePricing] = useState<ServicePricingAnalysisResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);

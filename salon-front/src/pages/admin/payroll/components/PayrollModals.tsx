@@ -369,7 +369,6 @@ export const WorkDayModal = ({
     });
   }, [workDay, defaultRate, date]);
 
-  const differs = defaultRate == null || Number(values.amount) !== defaultRate;
 
   return (
     <ModalShell
@@ -414,7 +413,7 @@ export const WorkDayModal = ({
       </div>
       <div>
         <label htmlFor="wd-reason" className={labelCls}>
-          Justificativa {differs ? '(obrigatória — valor diferente do padrão)' : '(opcional)'}
+          Justificativa (opcional)
         </label>
         <textarea
           id="wd-reason"

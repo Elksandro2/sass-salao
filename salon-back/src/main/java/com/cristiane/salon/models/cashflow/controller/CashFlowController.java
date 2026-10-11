@@ -3,6 +3,7 @@ package com.cristiane.salon.models.cashflow.controller;
 import com.cristiane.salon.annotation.Auditable;
 import com.cristiane.salon.models.cashflow.dto.CashFlowRequest;
 import com.cristiane.salon.models.cashflow.dto.CashFlowResponse;
+import com.cristiane.salon.models.cashflow.dto.SaleUpdateRequest;
 import com.cristiane.salon.models.cashflow.service.CashFlowService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -51,6 +52,21 @@ public class CashFlowController {
     @Operation(summary = "Edita um registro manual do fluxo de caixa (Admin/Gerente) — só se não vier de um agendamento")
     public ResponseEntity<CashFlowResponse> update(@PathVariable Long id, @Valid @RequestBody CashFlowRequest request) {
         return ResponseEntity.ok(cashFlowService.update(id, request));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Operation(summary = "Busca um lançamento do fluxo de caixa (Admin/Gerente)")
+    public ResponseEntity<CashFlowResponse> findById(@PathVariable Long id) {
+        return ResponseEntity.ok(cashFlowService.findById(id));
+    }
+
+    @PutMapping("/{id}/sale")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Auditable(action = "PRODUCT_SALE_UPDATED", entityType = "CashFlow", captureArgs = true)
+    @Operation(summary = "Edita uma venda avulsa de produto: itens, vendedora, data e comissão (Admin/Gerente)")
+    public ResponseEntity<CashFlowResponse> updateSale(@PathVariable Long id, @Valid @RequestBody SaleUpdateRequest request) {
+        return ResponseEntity.ok(cashFlowService.updateSale(id, request));
     }
 
     @DeleteMapping("/{id}")

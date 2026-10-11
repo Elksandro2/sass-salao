@@ -12,6 +12,7 @@ import { getApiErrorMessage } from '../../../../utils/apiError';
 import { AppointmentProductsExpensesEditor } from './AppointmentProductsExpensesEditor';
 import { AppointmentServicesEditor } from './AppointmentServicesEditor';
 import { AppointmentProfitSection } from './AppointmentProfitSection';
+import { createPortal } from 'react-dom';
 
 const labelCls = 'label-premium';
 const inputCls = 'input-premium';
@@ -98,7 +99,9 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
     }
   };
 
-  return (
+  // Portal pro <body>: o modal não pode depender de onde é renderizado — um ancestral com
+  // transform/filter prende o position:fixed e o modal sai do centro da tela.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#261f23]/40 backdrop-blur-md">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-[#eae1e1]/85 overflow-hidden animate-scale-up max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#eae1e1] bg-[#fcf9f9]/50 shrink-0">
@@ -321,6 +324,7 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

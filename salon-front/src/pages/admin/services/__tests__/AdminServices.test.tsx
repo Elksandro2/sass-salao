@@ -242,9 +242,9 @@ describe('AdminServices Page', () => {
 
     it('submits the recipe with the chosen product, quantity and unit', async () => {
       vi.mocked(salonServicesApi.create).mockResolvedValue({} as never);
-      const { container } = await openFormAndAddRow();
+      await openFormAndAddRow();
 
-      const nameInput = container.querySelector('input[name="name"]') as HTMLInputElement;
+      const nameInput = document.body.querySelector('input[name="name"]') as HTMLInputElement;
       fireEvent.change(nameInput, { target: { value: 'Coloração' } });
 
       const productInput = screen.getByPlaceholderText('Buscar e selecionar o produto...');

@@ -188,15 +188,17 @@ class PayrollServiceTest {
     }
 
     @Test
-    void createWorkDay_withDifferentValue_requiresJustification() {
+    void createWorkDay_withDifferentValue_doesNotRequireJustification() {
         Employee emp = employee(RemunerationType.DIARISTA, "120.00");
         when(employeeRepository.findById(1L)).thenReturn(Optional.of(emp));
         when(workDayRepository.findByEmployeeIdAndWorkDate(1L, APR_1)).thenReturn(Optional.empty());
+        when(workDayRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThatThrownBy(() -> payrollService.createWorkDay(
-                new PayrollDtos.WorkDayRequest(1L, APR_1, new BigDecimal("60.00"), "  ")))
-                .isInstanceOf(BadRequestException.class);
-        verify(workDayRepository, never()).save(any());
+        var response = payrollService.createWorkDay(
+                new PayrollDtos.WorkDayRequest(1L, APR_1, new BigDecimal("60.00"), "  "));
+
+        assertThat(response.amount()).isEqualByComparingTo("60.00");
+        assertThat(response.justification()).isNull();
     }
 
     @Test
