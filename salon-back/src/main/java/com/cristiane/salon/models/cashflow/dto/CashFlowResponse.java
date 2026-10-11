@@ -25,6 +25,11 @@ public record CashFlowResponse(
     public record Item(Long productId, String productName, Integer quantity, BigDecimal unitPrice) {}
 
     public static CashFlowResponse fromEntity(CashFlow cashFlow) {
+        return fromEntity(cashFlow, null);
+    }
+
+    /** @param currentCommissionPercent % de comissão de produto vigente — pra venda sem % congelado */
+    public static CashFlowResponse fromEntity(CashFlow cashFlow, BigDecimal currentCommissionPercent) {
         return new CashFlowResponse(
                 cashFlow.getId(),
                 cashFlow.getType().name(),
@@ -34,7 +39,9 @@ public record CashFlowResponse(
                 cashFlow.getAppointment() != null ? cashFlow.getAppointment().getId() : null,
                 cashFlow.getEmployee() != null ? cashFlow.getEmployee().getId() : null,
                 cashFlow.getEmployee() != null ? cashFlow.getEmployee().getUser().getName() : null,
-                cashFlow.getCommissionAmount(),
+                currentCommissionPercent != null
+                        ? cashFlow.effectiveCommission(currentCommissionPercent)
+                        : cashFlow.getCommissionAmount(),
                 cashFlow.getCommissionPercent(),
                 cashFlow.isCommissionManual(),
                 cashFlow.getItems() == null ? List.of() : cashFlow.getItems().stream()

@@ -53,7 +53,7 @@ public class CashFlowService {
         if (to == null) to = salonClock.today().with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
 
         return cashFlowRepository.findByDateBetween(from, to).stream()
-                .map(CashFlowResponse::fromEntity)
+                .map(cf -> CashFlowResponse.fromEntity(cf, businessSettingsService.getProductCommissionPercent()))
                 .collect(Collectors.toList());
     }
 
@@ -63,7 +63,9 @@ public class CashFlowService {
         if (from == null) from = salonClock.today().withDayOfMonth(1);
         if (to == null) to = salonClock.today().with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
 
-        return cashFlowRepository.findByDateBetween(from, to, pageable).map(CashFlowResponse::fromEntity);
+        BigDecimal currentPct = businessSettingsService.getProductCommissionPercent();
+        return cashFlowRepository.findByDateBetween(from, to, pageable)
+                .map(cf -> CashFlowResponse.fromEntity(cf, currentPct));
     }
 
     @Transactional
@@ -184,7 +186,8 @@ public class CashFlowService {
     @Transactional(readOnly = true)
     public CashFlowResponse findById(Long id) {
         return CashFlowResponse.fromEntity(cashFlowRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Registro não encontrado")));
+                .orElseThrow(() -> new ResourceNotFoundException("Registro não encontrado")),
+                businessSettingsService.getProductCommissionPercent());
     }
 
     /**
@@ -219,7 +222,7 @@ public class CashFlowService {
             }
         }
         cashFlow.setDate(request.date());
-        if (cashFlow.getCommissionPercent() == null) {
+        if (cashFlow.getCommissionPercent() == null || cashFlow.getCommissionPercent().signum() <= 0) {
             // Venda anterior à V87: congela o % vigente agora pra ela.
             cashFlow.setCommissionPercent(businessSettingsService.getProductCommissionPercent());
         }
@@ -293,7 +296,7 @@ public class CashFlowService {
             return;
         }
         BigDecimal pct = cashFlow.getCommissionPercent();
-        cashFlow.setCommissionAmount(pct == null ? null
+        cashFlow.setCommissionAmount(pct == null || pct.signum() <= 0 ? null
                 : cashFlow.getAmount().multiply(pct).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP));
         cashFlow.setCommissionManual(false);
     }

@@ -585,6 +585,39 @@ class ReportServiceTest {
     }
 
     @Test
+    void computePayroll_saleMadeBeforeCommissionWasConfigured_usesTheCurrentPercent() {
+        Employee bob = employee(2L, "Bob", RemunerationType.DIARISTA, "100.00");
+        when(employeeRepository.findAll()).thenReturn(List.of(bob));
+        when(businessSettingsService.getProductCommissionPercent()).thenReturn(new BigDecimal("10"));
+        CashFlow sale = new CashFlow();
+        sale.setType(CashFlowType.INCOME);
+        sale.setAmount(new BigDecimal("80.00"));
+        sale.setEmployee(bob);
+        // sem % congelado e sem comissão gravada: a venda foi feita antes de configurar o %
+        when(cashFlowRepository.findSalesWithEmployeeBetween(any(), any())).thenReturn(List.of(sale));
+
+        assertEquals(0, new BigDecimal("8.00").compareTo(payrollOf(2L, monthStart(), monthEnd()).saleProductCommission()));
+    }
+
+    @Test
+    void computePayroll_appointmentFrozenAtZeroPercent_usesTheCurrentPercent() {
+        Employee ella = employee(7L, "Ella", RemunerationType.DIARISTA, "100.00");
+        when(employeeRepository.findAll()).thenReturn(List.of(ella));
+        when(businessSettingsService.getProductCommissionPercent()).thenReturn(new BigDecimal("10"));
+        SalonService svc = new SalonService();
+        svc.setPrice(new BigDecimal("50.00"));
+        Appointment apt = doneAptOn(ella, svc, now);
+        apt.setSnapshotProductCommissionPercent(BigDecimal.ZERO);
+        withProduct(apt, new BigDecimal("40.00"), 1);
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any())).thenReturn(List.of(apt));
+
+        // diarista ganha comissão de PRODUTO (não de serviço): 10% de 40
+        var breakdown = payrollOf(7L, monthStart(), monthEnd());
+        assertEquals(0, new BigDecimal("4.00").compareTo(breakdown.appointmentProductCommission()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(breakdown.serviceCommission()));
+    }
+
+    @Test
     void shouldHandleNullDateParamsAndDefaultCorrectly() {
         // Given
         when(cashFlowRepository.findByDateBetween(any(LocalDate.class), any(LocalDate.class)))

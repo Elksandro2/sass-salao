@@ -154,6 +154,12 @@ public class ReportService {
                 : computeServiceCommission(appointment.getEmployee(), appointment.getServices());
     }
 
+    /** Comissão da vendedora numa venda avulsa (Fluxo de Caixa). */
+    public BigDecimal saleCommissionOf(CashFlow sale) {
+        BigDecimal commission = sale.effectiveCommission(businessSettingsService.getProductCommissionPercent());
+        return commission != null ? commission : BigDecimal.ZERO;
+    }
+
     /** Comissão sobre produtos vendidos dentro deste atendimento. */
     public BigDecimal productCommissionOf(Appointment appointment) {
         return appointment.getOverrideProductCommission() != null
@@ -213,8 +219,11 @@ public class ReportService {
      * cai no % atual de {@link SalonBusinessSettingsService}.
      */
     private BigDecimal computeProductCommission(Appointment appointment) {
-        BigDecimal pct = appointment.getSnapshotProductCommissionPercent() != null
-                ? appointment.getSnapshotProductCommissionPercent()
+        // Sem % congelado (ou 0%, ex.: atendimento feito antes de configurar a comissão) usa o %
+        // atual — senão o produto vendido nunca entraria na folha da profissional.
+        BigDecimal snapshot = appointment.getSnapshotProductCommissionPercent();
+        BigDecimal pct = snapshot != null && snapshot.signum() > 0
+                ? snapshot
                 : businessSettingsService.getProductCommissionPercent();
         if (pct == null || pct.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
@@ -515,8 +524,9 @@ public class ReportService {
             appointmentProductCommission = appointmentProductCommission.add(productCommissionOf(appointment));
         }
 
+        BigDecimal currentPct = empSales.isEmpty() ? null : businessSettingsService.getProductCommissionPercent();
         BigDecimal saleProductCommission = empSales.stream()
-                .map(CashFlow::getCommissionAmount)
+                .map(c -> c.effectiveCommission(currentPct))
                 .filter(c -> c != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 

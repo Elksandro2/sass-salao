@@ -118,7 +118,7 @@ public class PayrollService {
 
         List<SaleLine> sales = data.productSales().stream()
                 .map(c -> new SaleLine(c.getId(), c.getDate(), c.getDescription(), c.getAmount(),
-                        c.getCommissionAmount() != null ? c.getCommissionAmount() : BigDecimal.ZERO))
+                        reportService.saleCommissionOf(c)))
                 .toList();
 
         BigDecimal defaultRate = employee.getRemunerationValue();

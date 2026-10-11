@@ -62,6 +62,25 @@ public class CashFlow {
     @Column(name = "commission_manual", nullable = false)
     private boolean commissionManual;
 
+    /**
+     * Comissão que a vendedora recebe por esta venda avulsa. Digitada à mão vence tudo; senão é
+     * o total × % congelado na venda. Venda feita quando a comissão ainda não estava configurada
+     * (sem %) usa o % atual do salão — não fica de fora da folha pra sempre.
+     */
+    public BigDecimal effectiveCommission(BigDecimal currentPercent) {
+        if (employee == null) return null;
+        if (commissionManual) return commissionAmount;
+        boolean percentFrozen = commissionPercent != null && commissionPercent.signum() > 0;
+        // Comissão já gravada (inclusive vendas antigas, que gravavam o valor mas não o %) vale.
+        // Só recalcula quando está vazia ou zerada por falta de % configurado na época.
+        if (commissionAmount != null && (commissionAmount.signum() > 0 || percentFrozen)) {
+            return commissionAmount;
+        }
+        BigDecimal pct = percentFrozen ? commissionPercent : currentPercent;
+        if (pct == null || pct.signum() <= 0 || amount == null) return null;
+        return amount.multiply(pct).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+    }
+
     /** Itens da venda avulsa (vendas anteriores à V87 não têm — só o total). */
     @OneToMany(mappedBy = "cashFlow", cascade = CascadeType.ALL, orphanRemoval = true)
     private java.util.List<CashFlowItem> items = new java.util.ArrayList<>();
