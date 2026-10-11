@@ -25,6 +25,15 @@ vi.mock('../services/payroll', async (importOriginal) => {
   };
 });
 
+vi.mock('../../../appointments/services/appointments', () => ({
+  appointmentsApi: { findById: vi.fn().mockResolvedValue({ id: 11, clientName: 'Cliente Teste' }) },
+}));
+// O modal real de agendamento já tem testes próprios; aqui só importa que a folha o abre.
+vi.mock('../../appointments/components/AppointmentDetailModal', () => ({
+  AppointmentDetailModal: ({ appointment }: { appointment: { id: number } | null }) =>
+    appointment ? <div>modal-agendamento-{appointment.id}</div> : null,
+}));
+
 // Objeto estável: as telas usam as funções do alerta como dependência de useCallback.
 const alertMock = { error: vi.fn(), success: vi.fn(), alert: vi.fn(), confirm: vi.fn() };
 vi.mock('../../../../hooks/useAlert', () => ({ useAlert: () => alertMock }));
@@ -192,6 +201,22 @@ describe('Payroll page', () => {
     });
 
     expect(payrollApi.unmarkWorkDay).toHaveBeenCalledWith(7, thirdDay);
+  });
+
+  it('opens the same appointment detail/edit modal when an appointment row is clicked', async () => {
+    await act(async () => {
+      customRender(<Payroll />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Ella'));
+    });
+    await waitFor(() => expect(screen.getByText('Cliente Teste')).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Cliente Teste'));
+    });
+
+    await waitFor(() => expect(screen.getByText('modal-agendamento-11')).toBeInTheDocument());
   });
 
   it('opens the payment modal prefilled with the outstanding value from "Marcar como pago"', async () => {

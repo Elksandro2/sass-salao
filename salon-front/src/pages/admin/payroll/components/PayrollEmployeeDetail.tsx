@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, CalendarCheck, Pencil, Plus, Trash2, Wallet } from 'lucide-react';
+import { appointmentsApi, type AppointmentResponse } from '../../../appointments/services/appointments';
+import { AppointmentDetailModal } from '../../appointments/components/AppointmentDetailModal';
 import {
   ADJUSTMENT_LABELS,
   PAYMENT_METHODS,
@@ -96,6 +98,11 @@ export const PayrollEmployeeDetail = ({
   const [paymentModal, setPaymentModal] = useState<{ payment: PayrollPayment | null } | null>(null);
   const [adjustmentModal, setAdjustmentModal] = useState<{ adjustment: PayrollAdjustment | null } | null>(null);
   const [workDayModal, setWorkDayModal] = useState<{ date: string; workDay: WorkDay | null } | null>(null);
+  // Mesmo modal de detalhes/edição da tela de Agendamentos. appointmentChanged: houve edição
+  // enquanto estava aberto — ao fechar, a folha recarrega (comissão, diária, valores mudam).
+  const [appointmentTarget, setAppointmentTarget] = useState<AppointmentResponse | null>(null);
+  const [appointmentChanged, setAppointmentChanged] = useState(false);
+  const [openingAppointmentId, setOpeningAppointmentId] = useState<number | null>(null);
 
   const { error: showError, confirm } = useAlert();
 
@@ -266,6 +273,23 @@ export const PayrollEmployeeDetail = ({
       { isDangerous: true, confirmText: 'Excluir' }
     );
 
+  const openAppointment = async (appointmentId: number) => {
+    setOpeningAppointmentId(appointmentId);
+    try {
+      setAppointmentChanged(false);
+      setAppointmentTarget(await appointmentsApi.findById(appointmentId));
+    } catch (err) {
+      await showError(getApiErrorMessage(err, 'Erro ao abrir o agendamento'));
+    } finally {
+      setOpeningAppointmentId(null);
+    }
+  };
+
+  const closeAppointment = async () => {
+    setAppointmentTarget(null);
+    if (appointmentChanged) await afterChange();
+  };
+
   const changedPayments = detail.payments.filter((p) => p.changedSincePayment);
 
   return (
@@ -397,11 +421,17 @@ export const PayrollEmployeeDetail = ({
                   <th className="px-3 py-2 font-semibold text-right">Serviços</th>
                   <th className="px-3 py-2 font-semibold text-right">Produtos</th>
                   <th className="px-3 py-2 font-semibold text-right">Comissão</th>
+                  <th className="px-3 py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#eae1e1]/50">
                 {detail.appointments.map((a) => (
-                  <tr key={a.appointmentId}>
+                  <tr
+                    key={a.appointmentId}
+                    onClick={() => openAppointment(a.appointmentId)}
+                    className="cursor-pointer hover:bg-[#fdf6f5] transition-colors"
+                    title="Abrir e editar o agendamento"
+                  >
                     <td className="px-3 py-2 text-[#7a7074] whitespace-nowrap">{formatShortDate(a.date)}</td>
                     <td className="px-3 py-2 text-[#3b3036]">{a.clientName ?? '—'}</td>
                     <td className="px-3 py-2 text-[#7a7074]">{a.serviceNames}</td>
@@ -412,6 +442,12 @@ export const PayrollEmployeeDetail = ({
                       {a.commissionManual && (
                         <span className="block text-[10px] font-normal text-amber-600">valor manual</span>
                       )}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#be8a83]">
+                        <Pencil size={12} />
+                        {openingAppointmentId === a.appointmentId ? 'Abrindo...' : 'Abrir'}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -507,6 +543,15 @@ export const PayrollEmployeeDetail = ({
           </div>
         )}
       </Section>
+
+      <AppointmentDetailModal
+        appointment={appointmentTarget}
+        onClose={closeAppointment}
+        onNotesSaved={(updated) => {
+          setAppointmentTarget(updated);
+          setAppointmentChanged(true);
+        }}
+      />
 
       {paymentModal && (
         <PaymentModal

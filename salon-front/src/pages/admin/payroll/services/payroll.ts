@@ -17,8 +17,8 @@ export const ADJUSTMENT_LABELS: Record<PayrollAdjustmentType, string> = {
   FERIAS: 'Férias',
   HORA_EXTRA: 'Hora extra',
   OUTRO_ACRESCIMO: 'Outro acréscimo',
-  VALE: 'Vale / adiantamento',
-  DESCONTO: 'Desconto',
+  VALE: 'Vale / adiantamento (já pago antes)',
+  DESCONTO: 'Desconto (ela deixa de receber)',
 };
 
 export const ADJUSTMENT_HINTS: Record<PayrollAdjustmentType, string> = {
@@ -27,8 +27,13 @@ export const ADJUSTMENT_HINTS: Record<PayrollAdjustmentType, string> = {
   FERIAS: 'Soma no valor a pagar.',
   HORA_EXTRA: 'Soma no valor a pagar.',
   OUTRO_ACRESCIMO: 'Soma no valor a pagar.',
-  VALE: 'Dinheiro já entregue antes: abate do que falta pagar, mas continua sendo custo do salão.',
-  DESCONTO: 'Abate do valor a pagar e do custo do salão (ex.: falta, dano).',
+  VALE:
+    'Dinheiro que ela JÁ recebeu antes do dia do pagamento (ex.: pediu R$ 200 adiantado no dia 10). '
+    + 'Sai do valor a pagar pra ela não receber duas vezes. O custo da folha não muda: o salão gastou '
+    + 'esse dinheiro do mesmo jeito, só que antes.',
+  DESCONTO:
+    'Valor que ela deixa de receber de fato (ex.: falta não justificada, produto quebrado). Diminui o '
+    + 'valor a pagar e também o custo da folha, porque esse dinheiro nunca sai do salão.',
 };
 
 export const PAYMENT_METHODS: Record<string, string> = {
