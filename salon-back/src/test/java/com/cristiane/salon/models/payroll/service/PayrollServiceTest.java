@@ -342,4 +342,30 @@ class PayrollServiceTest {
         assertThat(preview.breakdown()).isNotNull();
         assertThat(preview.breakdown().fixedSalary()).isEqualByComparingTo("1000.00");
     }
+
+    @Test
+    void createPayment_rejectsNegativeValue_insteadOfFailingInTheDatabase() {
+        Employee emp = employee(RemunerationType.COMISSIONADO, null);
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(emp));
+        when(paymentRepository.findByEmployeeIdOrderByPeriodStartAsc(1L)).thenReturn(List.of());
+        when(reportService.computeEmployeePayroll(emp, APR_1, APR_30)).thenReturn(
+                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("-50.00")));
+
+        assertThatThrownBy(() -> payrollService.createPayment(
+                new PayrollDtos.PaymentRequest(1L, APR_1, APR_30, APR_30, null, null)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("negativo");
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    void previewPayment_flagsNegativeValueAsAProblem() {
+        Employee emp = employee(RemunerationType.COMISSIONADO, null);
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(emp));
+        when(paymentRepository.findByEmployeeIdOrderByPeriodStartAsc(1L)).thenReturn(List.of());
+        when(reportService.computeEmployeePayroll(emp, APR_1, APR_30)).thenReturn(
+                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("-50.00")));
+
+        assertThat(payrollService.previewPayment(1L, APR_1, APR_30, null).conflict()).contains("negativo");
+    }
 }

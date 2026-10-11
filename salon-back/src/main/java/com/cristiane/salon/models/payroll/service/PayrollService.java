@@ -430,6 +430,9 @@ public class PayrollService {
             return new PaymentPreview(BigDecimal.ZERO, conflict, null);
         }
         var breakdown = reportService.computeEmployeePayroll(employee, start, end).breakdown();
+        if (conflict == null && breakdown.netPayable().signum() < 0) {
+            conflict = negativeMessage(breakdown.netPayable());
+        }
         return new PaymentPreview(breakdown.netPayable(), conflict, BreakdownResponse.of(breakdown));
     }
 
@@ -507,12 +510,22 @@ public class PayrollService {
         BigDecimal calculated = reportService
                 .computeEmployeePayroll(employee, request.periodStart(), request.periodEnd())
                 .breakdown().netPayable();
+        // Descontos maiores que o que ela tem a receber deixam o período negativo — não existe
+        // "pagamento negativo" (o banco também recusa); melhor explicar do que estourar erro 500.
+        if (calculated.signum() < 0) {
+            throw new BadRequestException(negativeMessage(calculated));
+        }
         payment.setCalculatedAmount(calculated);
         payment.setAmountPaid(calculated);
         payment.setPaidAt(request.paidAt());
         payment.setPaymentMethod(request.paymentMethod() != null && !request.paymentMethod().isBlank()
                 ? request.paymentMethod().trim().toUpperCase() : null);
         payment.setNotes(request.notes() != null && !request.notes().isBlank() ? request.notes().trim() : null);
+    }
+
+    private static String negativeMessage(BigDecimal value) {
+        return "O valor do período ficou negativo (" + value.toPlainString().replace('.', ',')
+                + "): os descontos passam do que ela tem a receber. Ajuste os descontos antes de marcar como pago.";
     }
 
     private static PaymentResponse toResponse(PayrollPayment p, BigDecimal recalculated, String employeeName) {
