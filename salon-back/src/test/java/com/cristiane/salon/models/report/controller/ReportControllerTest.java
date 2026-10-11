@@ -4,9 +4,9 @@ import com.cristiane.salon.controllers.BaseControllerTest;
 
 import com.cristiane.salon.models.report.controller.ReportController;
 import com.cristiane.salon.models.report.dto.AppointmentFinancialResponse;
+import com.cristiane.salon.models.report.dto.AppointmentProfitResponse;
 import com.cristiane.salon.models.report.dto.AppointmentReportResponse;
 import com.cristiane.salon.models.report.dto.FinancialReportResponse;
-import com.cristiane.salon.models.report.dto.PayrollReportResponse;
 import com.cristiane.salon.models.report.service.ReportService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,15 +17,16 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,19 +49,6 @@ class ReportControllerTest extends BaseControllerTest {
         when(reportService.generateFinancialReport(any(), any())).thenReturn(response);
 
         mvc.perform(get("/v1/reports/financial?from=2026-05-01&to=2026-05-16")
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.period").value("Period"));
-    }
-
-    @Test
-    @WithMockUser(roles = { "ADMIN" })
-    void getPayrollReportReturns200() throws Exception {
-        PayrollReportResponse response = new PayrollReportResponse(List.of(), "Period", null, null);
-        when(reportService.generatePayrollReport(any(LocalDate.class), any(LocalDate.class)))
-                .thenReturn(response);
-
-        mvc.perform(get("/v1/reports/payroll?from=2026-05-01&to=2026-05-16")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.period").value("Period"));
@@ -96,28 +84,29 @@ class ReportControllerTest extends BaseControllerTest {
 
     @Test
     @WithMockUser(roles = { "ADMIN" })
-    void saveWorkedDaysReturns204AndDelegates() throws Exception {
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                .put("/v1/reports/payroll/worked-days")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"employeeId\":7,\"periodStart\":\"2026-05-01\",\"periodEnd\":\"2026-05-31\",\"daysWorked\":22}"))
-                .andExpect(status().isNoContent());
+    void updateAppointmentProfitReturns200AndDelegates() throws Exception {
+        AppointmentProfitResponse response = AppointmentProfitResponse.of(
+                9L, new BigDecimal("200.00"), BigDecimal.ZERO, null, BigDecimal.ZERO, null,
+                new BigDecimal("20.00"), new BigDecimal("50.00"), BigDecimal.ZERO, null, "combinado");
+        when(reportService.updateAppointmentProfitOverride(eq(9L), any())).thenReturn(response);
 
-        verify(reportService).saveWorkedDaysOverride(eq(7L),
-                eq(LocalDate.parse("2026-05-01")), eq(LocalDate.parse("2026-05-31")), eq(22));
+        mvc.perform(put("/v1/reports/appointments/9/profit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"serviceCommissionCost\":50.00,\"note\":\"combinado\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.serviceCommissionCost").value(50.00))
+                .andExpect(jsonPath("$.serviceCommissionCostManual").value(true));
+
+        verify(reportService).updateAppointmentProfitOverride(eq(9L),
+                argThat(r -> r.serviceCommissionCost().compareTo(new BigDecimal("50")) == 0 && r.serviceRecipeCost() == null));
     }
 
     @Test
     @WithMockUser(roles = { "ADMIN" })
-    void clearWorkedDaysReturns204AndDelegates() throws Exception {
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                .delete("/v1/reports/payroll/worked-days")
-                .param("employeeId", "7")
-                .param("periodStart", "2026-05-01")
-                .param("periodEnd", "2026-05-31"))
-                .andExpect(status().isNoContent());
-
-        verify(reportService).clearWorkedDaysOverride(eq(7L),
-                eq(LocalDate.parse("2026-05-01")), eq(LocalDate.parse("2026-05-31")));
+    void updateAppointmentProfitRejectsNegativeValues() throws Exception {
+        mvc.perform(put("/v1/reports/appointments/9/profit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"serviceCommissionCost\":-1}"))
+                .andExpect(status().isBadRequest());
     }
 }

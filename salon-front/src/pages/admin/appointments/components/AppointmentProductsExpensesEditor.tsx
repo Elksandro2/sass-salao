@@ -52,13 +52,6 @@ export const AppointmentProductsExpensesEditor = ({
   const [isSavingExpenses, setIsSavingExpenses] = useState(false);
   const { error: showError, success: showSuccess } = useAlert();
 
-  // Trava só quando o PAGAMENTO já aconteceu (PAID ou MANUAL) — não pelo status do
-  // agendamento em si. Um atendimento concluído mas ainda não pago continua editável
-  // (ex.: cliente comprou mais um produto na saída, antes de fechar a conta).
-  const readOnly =
-    appointment.status === 'CANCELLED' ||
-    appointment.paymentStatus === 'PAID' ||
-    appointment.paymentStatus === 'MANUAL';
 
   useEffect(() => {
     productsApi
@@ -180,7 +173,7 @@ export const AppointmentProductsExpensesEditor = ({
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className={labelCls}>Produtos vendidos</span>
-            {isEditing && !readOnly && (
+            {isEditing && (
               <button
                 type="button"
                 onClick={addProductRow}
@@ -191,11 +184,11 @@ export const AppointmentProductsExpensesEditor = ({
             )}
           </div>
 
-          {(!isEditing || readOnly) && productRows.length === 0 && (
+          {!isEditing && productRows.length === 0 && (
             <p className="text-xs text-gray-400">Nenhum produto vendido neste atendimento.</p>
           )}
 
-          {(!isEditing || readOnly) ? (
+          {!isEditing ? (
             <ul className="text-sm text-[#3b3036] space-y-1">
               {(appointment.products ?? []).map((p) => (
                 <li key={p.productId} className="flex justify-between">
@@ -303,7 +296,7 @@ export const AppointmentProductsExpensesEditor = ({
         <div className="border-t border-[#eae1e1] pt-4">
           <div className="flex items-center justify-between mb-2">
             <span className={labelCls}>Despesas do atendimento</span>
-            {isEditing && !readOnly && (
+            {isEditing && (
               <button
                 type="button"
                 onClick={addExpenseRow}
@@ -314,7 +307,7 @@ export const AppointmentProductsExpensesEditor = ({
             )}
           </div>
 
-          {(!isEditing || readOnly) ? (
+          {!isEditing ? (
             <>
               {expenseRows.length === 0 && (
                 <p className="text-xs text-gray-400">Nenhuma despesa lançada neste atendimento.</p>

@@ -49,7 +49,7 @@ public class CashFlowService {
     public List<CashFlowResponse> findByPeriod(LocalDate from, LocalDate to) {
         DateRangeValidator.validate(from, to);
         if (from == null) from = salonClock.today().withDayOfMonth(1);
-        if (to == null) to = salonClock.today().plusDays(30);
+        if (to == null) to = salonClock.today().with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
 
         return cashFlowRepository.findByDateBetween(from, to).stream()
                 .map(CashFlowResponse::fromEntity)
@@ -60,7 +60,7 @@ public class CashFlowService {
     public Page<CashFlowResponse> findByPeriod(LocalDate from, LocalDate to, Pageable pageable) {
         DateRangeValidator.validate(from, to);
         if (from == null) from = salonClock.today().withDayOfMonth(1);
-        if (to == null) to = salonClock.today().plusDays(30);
+        if (to == null) to = salonClock.today().with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
 
         return cashFlowRepository.findByDateBetween(from, to, pageable).map(CashFlowResponse::fromEntity);
     }
@@ -89,6 +89,11 @@ public class CashFlowService {
                     throw new BadRequestException("O preço customizado não pode ser negativo");
                 }
 
+                if (item.customPrice() == null && product.getPrice() == null) {
+                    throw new BadRequestException("O produto '" + product.getName()
+                            + "' não tem preço de venda cadastrado — informe o preço desta venda.");
+                }
+
                 // Preço especial pra essa venda (ex.: cliente fiel, negociação) sobrescreve o do
                 // catálogo — só nesta venda, o cadastro do produto não muda.
                 BigDecimal unitPrice = item.customPrice() != null ? item.customPrice() : product.getPrice();
@@ -96,7 +101,7 @@ public class CashFlowService {
                 totalAmount = totalAmount.add(itemTotal);
 
                 boolean isCustomPrice = item.customPrice() != null
-                        && item.customPrice().compareTo(product.getPrice()) != 0;
+                        && (product.getPrice() == null || item.customPrice().compareTo(product.getPrice()) != 0);
                 itemDescriptions.add(item.quantity() + "x " + product.getName()
                         + (isCustomPrice ? " (a R$ " + unitPrice.setScale(2, java.math.RoundingMode.HALF_UP) + " cada)" : ""));
             }

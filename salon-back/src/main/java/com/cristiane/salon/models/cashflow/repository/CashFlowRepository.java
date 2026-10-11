@@ -30,6 +30,11 @@ public interface CashFlowRepository extends JpaRepository<CashFlow, Long> {
     // full table scan a cada confirmação de pagamento.
     boolean existsByAppointmentId(Long appointmentId);
 
+    // Vendas avulsas de produto com vendedora identificada no período — a comissão congelada
+    // em commissionAmount entra na folha dela (ver ReportService.computePayroll).
+    @Query("SELECT c FROM CashFlow c WHERE c.employee IS NOT NULL AND c.date >= :startDate AND c.date <= :endDate ORDER BY c.date ASC")
+    List<CashFlow> findSalesWithEmployeeBetween(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
     // Usado pra manter o valor lançado no Caixa em dia quando produtos/serviços/despesas de um
     // agendamento já faturado (mas ainda não pago) são editados — ver assertNotBilled.
     Optional<CashFlow> findByAppointmentId(Long appointmentId);

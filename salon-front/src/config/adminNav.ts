@@ -14,6 +14,7 @@ import {
   Store,
   StickyNote,
   CircleUser,
+  Wallet,
 } from 'lucide-react';
 
 export interface AdminNavItem {
@@ -30,6 +31,7 @@ export interface AdminNavItem {
  */
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { to: '/admin/reports', label: 'Relatórios', icon: FileBarChart, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
+  { to: '/admin/payroll', label: 'Folha de Pagamento', icon: Wallet, allowedRoles: ['ADMIN'] },
   { to: '/admin/clients', label: 'Clientes', icon: Users, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
   { to: '/admin/team', label: 'Equipe', icon: UserCog, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },
   { to: '/admin/services', label: 'Serviços', icon: Scissors, allowedRoles: ['ADMIN', 'GERENTE_DE_ATENDIMENTO'] },

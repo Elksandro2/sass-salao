@@ -15,6 +15,7 @@ import type { ProductFormValues } from './product.schema';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import { useAlert } from '../../../hooks/useAlert';
 import { PRODUCT_UNITS } from '../../../utils/productUnit';
+import { ProductCommissionCard } from './components/ProductCommissionCard';
 
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
@@ -251,6 +252,8 @@ export const Products = ({ mode }: ProductsProps) => {
           </button>
         </PermissionGate>
       </div>
+
+      {isSaleMode && <ProductCommissionCard />}
 
       <DataTable
         columns={columns}

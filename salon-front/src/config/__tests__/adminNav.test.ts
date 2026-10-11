@@ -22,12 +22,13 @@ describe('adminNav', () => {
     expect(getVisibleAdminNavItems('ADMIN')).toHaveLength(ADMIN_NAV_ITEMS.length);
   });
 
-  it('GERENTE_DE_ATENDIMENTO sees everything except Produtos and Perfil do Salão', () => {
+  it('GERENTE_DE_ATENDIMENTO sees everything except Produtos, Perfil do Salão and Folha de Pagamento', () => {
     const visible = getVisibleAdminNavItems('GERENTE_DE_ATENDIMENTO');
     expect(visible.map((i) => i.to)).not.toContain('/admin/products');
     expect(visible.map((i) => i.to)).not.toContain('/admin/products/uso');
     expect(visible.map((i) => i.to)).not.toContain('/admin/salon-profile');
-    expect(visible).toHaveLength(ADMIN_NAV_ITEMS.length - 3);
+    expect(visible.map((i) => i.to)).not.toContain('/admin/payroll');
+    expect(visible).toHaveLength(ADMIN_NAV_ITEMS.length - 4);
   });
 
   it('returns no items for a role without admin access', () => {

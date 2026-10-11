@@ -14,6 +14,13 @@ vi.mock('../services/products', () => ({
   },
 }));
 
+vi.mock('../../../../services/businessSettings', () => ({
+  businessSettingsService: {
+    get: vi.fn().mockResolvedValue({ productCommissionPercent: 10, updatedAt: null }),
+    update: vi.fn(),
+  },
+}));
+
 vi.mock('../../../../hooks/usePermission', () => ({
   usePermission: () => true,
 }));

@@ -37,7 +37,7 @@ public class FixedExpenseService {
     private LocalDate[] resolvePeriod(LocalDate from, LocalDate to) {
         DateRangeValidator.validate(from, to);
         LocalDate resolvedFrom = from != null ? from : salonClock.today().withDayOfMonth(1);
-        LocalDate resolvedTo = to != null ? to : salonClock.today().plusDays(30);
+        LocalDate resolvedTo = to != null ? to : salonClock.today().with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
         return new LocalDate[]{resolvedFrom, resolvedTo};
     }
 

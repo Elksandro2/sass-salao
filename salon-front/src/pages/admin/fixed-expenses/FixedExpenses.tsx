@@ -162,8 +162,12 @@ export const FixedExpenses = () => {
       <div>
         <h2 className="font-heading text-2xl font-bold text-[#3b3036]">Gastos Fixos</h2>
         <p className="text-xs text-[#3b3036]/60 mt-1">
-          Aluguel, água, luz, salários e qualquer outro custo fixo do salão — separado das vendas
+          Aluguel, água, luz, internet e qualquer outro custo fixo do salão — separado das vendas
           e recebimentos do Fluxo de Caixa. Vira base dos relatórios de saúde financeira.
+        </p>
+        <p className="text-xs text-amber-700 mt-1">
+          Salário, diária e comissão das colaboradoras não entram aqui: eles já são calculados na
+          Folha de Pagamento e descontados do lucro — lançar aqui também contaria duas vezes.
         </p>
       </div>
 

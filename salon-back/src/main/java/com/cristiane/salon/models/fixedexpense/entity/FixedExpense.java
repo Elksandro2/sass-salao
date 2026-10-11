@@ -12,8 +12,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 /**
- * Um gasto fixo/operacional do salão (aluguel, água, luz, salário de funcionária, etc.),
- * lançado livremente pela administração — não vinculado a nenhum atendimento específico.
+ * Um gasto fixo/operacional do salão (aluguel, água, luz, etc.), lançado livremente pela
+ * administração — não vinculado a nenhum atendimento específico. Salário de colaboradora NÃO
+ * entra aqui: a folha já é calculada e descontada do lucro (ver ReportService.computePayroll).
  *
  * <p>Separado do lançamento livre do Fluxo de Caixa (tb_cashflow) porque a Cristiane pediu uma
  * tela dedicada só pra isso: é a base usada pelo relatório de saúde financeira e pela análise

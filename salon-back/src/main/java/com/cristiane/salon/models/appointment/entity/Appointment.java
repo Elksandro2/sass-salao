@@ -140,6 +140,24 @@ public class Appointment {
     @Column(name = "snapshot_product_commission_percent", precision = 5, scale = 2)
     private BigDecimal snapshotProductCommissionPercent;
 
+    // --- Valores manuais do "lucro deste atendimento" (ver V86). Null = usa o cálculo
+    // automático. As comissões manuais também são o que entra na folha da profissional. ---
+
+    @Column(name = "override_recipe_cost", precision = 10, scale = 2)
+    private BigDecimal overrideRecipeCost;
+
+    @Column(name = "override_products_cost", precision = 10, scale = 2)
+    private BigDecimal overrideProductsCost;
+
+    @Column(name = "override_service_commission", precision = 10, scale = 2)
+    private BigDecimal overrideServiceCommission;
+
+    @Column(name = "override_product_commission", precision = 10, scale = 2)
+    private BigDecimal overrideProductCommission;
+
+    @Column(name = "profit_override_note", length = 500)
+    private String profitOverrideNote;
+
     /** Tem uma data (e, se for por bloco, um período) definidos — hora exata (legado) ou
      * manhã/tarde (atual) — que autoriza confirmar/concluir o agendamento. */
     public boolean isScheduled() {

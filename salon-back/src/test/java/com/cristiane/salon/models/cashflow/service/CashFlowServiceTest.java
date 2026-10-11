@@ -135,10 +135,10 @@ class CashFlowServiceTest {
     }
 
     @Test
-    void findByPeriod_whenToIsNull_shouldDefaultTo30DaysFuture() {
+    void findByPeriod_whenToIsNull_shouldDefaultToLastDayOfMonth() {
         // Arrange
         LocalDate from = salonClock.today().minusDays(5);
-        LocalDate expectedTo = salonClock.today().plusDays(30);
+        LocalDate expectedTo = salonClock.today().with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
         when(cashFlowRepository.findByDateBetween(eq(from), eq(expectedTo))).thenReturn(List.of());
 
         // Act
@@ -178,7 +178,7 @@ class CashFlowServiceTest {
         // Arrange
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 20);
         LocalDate expectedFrom = salonClock.today().withDayOfMonth(1);
-        LocalDate expectedTo = salonClock.today().plusDays(30);
+        LocalDate expectedTo = salonClock.today().with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
         when(cashFlowRepository.findByDateBetween(eq(expectedFrom), eq(expectedTo), eq(pageable)))
                 .thenReturn(org.springframework.data.domain.Page.empty());
 

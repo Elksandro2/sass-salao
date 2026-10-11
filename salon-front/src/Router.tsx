@@ -28,6 +28,7 @@ import { Recommendations } from './pages/admin/recommendations/Recommendations';
 import { EmailOutbox } from './pages/admin/email-outbox/EmailOutbox';
 import { SalonProfile } from './pages/admin/salon-profile/SalonProfile';
 import { Reports } from './pages/admin/reports/Reports';
+import { Payroll } from './pages/admin/payroll/Payroll';
 import { AuditLog } from './pages/admin/audit/AuditLog';
 import { NotFound } from './pages/error/NotFound';
 import { Profile } from './pages/profile/Profile';
@@ -214,6 +215,14 @@ export const Router = () => {
           element={
             <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE_DE_ATENDIMENTO']}>
               <Reports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/payroll"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <Payroll />
             </ProtectedRoute>
           }
         />

@@ -3,7 +3,6 @@ import { reportsApi } from './services/reports';
 import type {
   FinancialReportResponse,
   AppointmentReportResponse,
-  PayrollReportResponse,
   ServicePricingAnalysisResponse,
 } from './services/reports';
 import { EmployeeFinancialHistorySection } from './EmployeeFinancialHistorySection';
@@ -28,6 +27,7 @@ import { Download, Loader2, TrendingUp, TrendingDown, AlertTriangle } from 'luci
 import { useAlert } from '../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import { useAuth } from '../../../hooks/useAuth';
+import { formatApiDate } from '../../../utils/datetime';
 
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
@@ -37,40 +37,28 @@ export const Reports = () => {
   const [financial, setFinancial] = useState<FinancialReportResponse | null>(null);
   const [appointments, setAppointments] = useState<AppointmentReportResponse | null>(null);
   const [cashFlows, setCashFlows] = useState<CashFlowData[]>([]);
-  const [payroll, setPayroll] = useState<PayrollReportResponse | null>(null);
   const [servicePricing, setServicePricing] = useState<ServicePricingAnalysisResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  const [activeTab, setActiveTab] = useState<'financial' | 'payroll' | 'appointments' | 'pricing'>(
-    'financial'
-  );
+  const [activeTab, setActiveTab] = useState<'financial' | 'appointments' | 'pricing'>('financial');
 
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  // Edições em andamento do campo "dias trabalhados" da diarista (chave = employeeId).
-  // O valor efetivo/salvo vem do backend (payroll.items[].daysWorked); isto é só o rascunho
-  // do <input> até a pessoa clicar em Salvar.
-  const [dayEdits, setDayEdits] = useState<Record<number, string>>({});
-  const [savingDaysFor, setSavingDaysFor] = useState<number | null>(null);
-
-  const { error: showError, success: showSuccess } = useAlert();
+  const { error: showError } = useAlert();
 
   const loadReports = async () => {
     setIsLoading(true);
     try {
-      const [finData, aptData, cfData, payData, pricingData] = await Promise.all([
+      const [finData, aptData, cfData, pricingData] = await Promise.all([
         reportsApi.getFinancialReport(dateFrom || undefined, dateTo || undefined),
         reportsApi.getAppointmentReport(dateFrom || undefined, dateTo || undefined),
         cashFlowApi.findByPeriod(dateFrom || undefined, dateTo || undefined, 0, 1000),
-        reportsApi.getPayrollReport(dateFrom || undefined, dateTo || undefined),
         reportsApi.getServicePricingAnalysis(dateFrom || undefined, dateTo || undefined),
       ]);
       setFinancial(finData);
       setAppointments(aptData);
       setCashFlows(cfData.content);
-      setPayroll(payData);
-      setDayEdits({}); // rascunhos são descartados quando os dados recarregam
       setServicePricing(pricingData);
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Erro ao carregar relatórios');
@@ -84,60 +72,11 @@ export const Reports = () => {
     loadReports();
   }, [dateFrom, dateTo]);
 
-  // Datas concretas do período da folha (o backend resolve os defaults e devolve em periodStart/End).
-  const payrollPeriod = (): { periodStart: string; periodEnd: string } | null => {
-    const start = payroll?.periodStart ?? (dateFrom || null);
-    const end = payroll?.periodEnd ?? (dateTo || null);
-    return start && end ? { periodStart: start, periodEnd: end } : null;
-  };
-
-  const saveDaysWorked = async (employeeId: number) => {
-    const period = payrollPeriod();
-    if (!period) {
-      await showError('Escolha um período (data inicial e final) para ajustar os dias.');
-      return;
-    }
-    const raw = dayEdits[employeeId];
-    const days = Number(raw);
-    if (raw === undefined || raw === '' || !Number.isFinite(days) || days < 0) {
-      await showError('Informe um número de dias válido (0 ou mais).');
-      return;
-    }
-    setSavingDaysFor(employeeId);
-    try {
-      await reportsApi.saveWorkedDays({ employeeId, ...period, daysWorked: Math.floor(days) });
-      await showSuccess('Dias trabalhados ajustados.');
-      await loadReports();
-    } catch (err) {
-      await showError(getApiErrorMessage(err, 'Erro ao salvar os dias trabalhados.'));
-    } finally {
-      setSavingDaysFor(null);
-    }
-  };
-
-  const resetDaysWorked = async (employeeId: number) => {
-    const period = payrollPeriod();
-    if (!period) return;
-    setSavingDaysFor(employeeId);
-    try {
-      await reportsApi.resetWorkedDays({ employeeId, ...period });
-      await showSuccess('Voltou a contar os dias automaticamente.');
-      await loadReports();
-    } catch (err) {
-      await showError(getApiErrorMessage(err, 'Erro ao voltar para a contagem automática.'));
-    } finally {
-      setSavingDaysFor(null);
-    }
-  };
-
   const generatePDF = async () => {
     setIsGeneratingPDF(true);
     try {
-      // Fetch fresh cash flow and payroll data before drawing the PDF (user requirement)
-      const [cfPage, payData] = await Promise.all([
-        cashFlowApi.findByPeriod(dateFrom || undefined, dateTo || undefined, 0, 1000),
-        reportsApi.getPayrollReport(dateFrom || undefined, dateTo || undefined),
-      ]);
+      // Busca o fluxo de caixa de novo antes de desenhar o PDF (dado sempre fresco no documento)
+      const cfPage = await cashFlowApi.findByPeriod(dateFrom || undefined, dateTo || undefined, 0, 1000);
       const cfData = cfPage.content;
 
       const doc = new jsPDF();
@@ -181,7 +120,7 @@ export const Reports = () => {
       autoTable(doc, {
         startY: currentY,
         head: [
-          ['Receitas', 'Despesas Gerais', 'Gastos Salários', 'Gastos Comissões', 'Gastos Fixos', 'Lucro Líquido'],
+          ['Receitas', 'Despesas Gerais', 'Salários e Extras', 'Comissões', 'Gastos Fixos', 'Lucro Líquido'],
         ],
         body: [
           [
@@ -240,7 +179,7 @@ export const Reports = () => {
 
         autoTable(doc, {
           startY: currentY,
-          head: [['Nome', 'Tipo', 'Base', 'Atendimentos', 'Valor Atendimentos', 'Valor A Pagar']],
+          head: [['Nome', 'Tipo', 'Base', 'Atendimentos', 'Valor Atendimentos', 'Custo no Período']],
           body: employeeRows,
           theme: 'striped',
           headStyles: { fillColor: [59, 48, 54], textColor: [255, 255, 255], fontStyle: 'bold' },
@@ -278,53 +217,18 @@ export const Reports = () => {
 
       currentY = (doc as any).lastAutoTable.finalY + 12;
 
-      // 5. Payroll Table inside PDF (aligned to scope requirements)
-      if (payData && payData.items && payData.items.length > 0) {
-        if (currentY > 200) {
-          doc.addPage();
-          currentY = 20;
-        }
-        currentY = drawSectionHeader('4. Folha de Pagamento', currentY);
-
-        const payrollRows = payData.items.map((item) => {
-          const daysStr =
-            item.daysWorked != null && item.dailyRate != null
-              ? `${item.daysWorked} × R$ ${item.dailyRate.toFixed(2)}`
-              : '-';
-          return [
-            item.employeeName,
-            remunerationLabel(item.remunerationType),
-            daysStr,
-            `R$ ${item.baseAmount.toFixed(2)}`,
-            `R$ ${item.calculatedPay.toFixed(2)}`,
-          ];
-        });
-
-        autoTable(doc, {
-          startY: currentY,
-          head: [['Nome', 'Tipo de Remuneração', 'Dias (diarista)', 'Base de Cálculo', 'Total a Pagar']],
-          body: payrollRows,
-          theme: 'striped',
-          headStyles: { fillColor: [59, 48, 54], textColor: [255, 255, 255], fontStyle: 'bold' },
-          bodyStyles: { textColor: [59, 48, 54] },
-          alternateRowStyles: { fillColor: [252, 249, 249] },
-          margin: { left: margin, right: margin },
-        });
-
-        currentY = (doc as any).lastAutoTable.finalY + 12;
-      }
-
       // 6. Cash Flow Transactions Detail
       if (cfData && cfData.length > 0) {
         if (currentY > 200) {
           doc.addPage();
           currentY = 20;
         }
-        currentY = drawSectionHeader('5. Detalhamento de Transações (Fluxo de Caixa)', currentY);
+        currentY = drawSectionHeader('4. Detalhamento de Transações (Fluxo de Caixa)', currentY);
 
         const cfRows = cfData.map((cf) => {
           const typeStr = cf.type === 'INCOME' ? 'Entrada' : 'Saída';
-          const formattedDate = new Date(cf.date).toLocaleDateString('pt-BR');
+          // formatApiDate evita o "um dia a menos": new Date('AAAA-MM-DD') é lido como UTC.
+          const formattedDate = formatApiDate(cf.date.substring(0, 10));
           return [
             formattedDate,
             cf.description || 'Sem descrição',
@@ -392,7 +296,7 @@ export const Reports = () => {
   const chartDataRevenue = Object.entries(revenueByDate)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, amount]) => ({
-      Data: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+      Data: new Date(`${date}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
       Receita: amount,
     }));
 
@@ -460,7 +364,6 @@ export const Reports = () => {
       <div className="flex border-b border-[#eae1e1] gap-8">
         {[
           { id: 'financial', label: 'Finanças & Receitas' },
-          { id: 'payroll', label: 'Folha de Pagamento' },
           { id: 'appointments', label: 'Agendamentos' },
           { id: 'pricing', label: 'Preço por Serviço' },
         ].map((tab) => (
@@ -516,7 +419,7 @@ export const Reports = () => {
                   <div className="bg-white rounded-2xl border border-[#eae1e1]/80 p-5 shadow-sm transition-all duration-300 relative overflow-hidden group">
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-400 to-indigo-500" />
                     <p className="text-[10px] font-bold text-[#7a7074] uppercase tracking-wider mb-1">
-                      Salários Fixos
+                      Salários, diárias e extras
                     </p>
                     <p className="text-xl font-extrabold text-indigo-600">
                       {formatBRL(financial?.totalSalaryPaid ?? 0)}
@@ -581,7 +484,7 @@ export const Reports = () => {
                               Valor Atendimentos
                             </th>
                             <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-right">
-                              Valor A Pagar
+                              Custo no período
                             </th>
                           </tr>
                         </thead>
@@ -624,7 +527,7 @@ export const Reports = () => {
                                   {formatBRL(emp.calculatedPayout ?? 0)}
                                   {isDaily && (
                                     <span className="block text-[10px] font-normal text-[#7a7074]">
-                                      dias ajustáveis na aba Folha
+                                      dias marcados na Folha de Pagamento
                                     </span>
                                   )}
                                 </td>
@@ -675,156 +578,6 @@ export const Reports = () => {
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: Payroll & Commissions */}
-          {activeTab === 'payroll' && (
-            <div className="space-y-6 animate-fade-in-up">
-              <div className="flex flex-col gap-2">
-                <h4 className="font-heading font-bold text-lg text-[#3b3036]">
-                  Demonstrativo de Folha de Pagamento
-                </h4>
-                <p className="text-xs text-[#7a7074]">
-                  Cálculo dos valores finais a pagar baseados no regime de contratação e faturamento
-                  por profissional. Para diaristas, informe os dias trabalhados no período e clique
-                  em Recalcular.
-                </p>
-              </div>
-
-              {payroll?.items?.some((i) => remunerationIsDaily(i.remunerationType)) && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-                  Os dias trabalhados de diaristas são contados automaticamente pelos dias com
-                  atendimento concluído no período. <strong>Confira</strong> e ajuste se ela trabalhou
-                  algum dia sem cliente (preparação, faxina) ou faltou — o valor ajustado fica salvo
-                  para este período e entra também no lucro do relatório Financeiro.
-                </div>
-              )}
-
-              <div className="bg-white rounded-2xl border border-[#eae1e1]/80 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[760px]">
-                    <thead>
-                      <tr className="bg-[#fcf9f9]/50 border-b border-[#eae1e1]">
-                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider">
-                          Profissional
-                        </th>
-                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider">
-                          Regime Contratual
-                        </th>
-                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-center">
-                          Dias trabalhados
-                        </th>
-                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-right">
-                          Base de Cálculo
-                        </th>
-                        <th className="px-6 py-4 text-xs font-semibold text-[#3b3036] font-heading uppercase tracking-wider text-right">
-                          Total a Pagar
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#eae1e1]/40">
-                      {payroll && payroll.items && payroll.items.length > 0 ? (
-                        payroll.items.map((item) => {
-                          const daily = remunerationIsDaily(item.remunerationType);
-                          return (
-                            <tr
-                              key={item.employeeId}
-                              className="hover:bg-[#fcf9f9]/20 transition-colors"
-                            >
-                              <td className="px-6 py-4 text-sm font-semibold text-[#3b3036]">
-                                {item.employeeName}
-                              </td>
-
-                              <td className="px-6 py-4 text-sm">
-                                {item.remunerationType ? (
-                                  <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-[#f3e9e7] text-[#8b6d68] border border-[#e6d5d1]">
-                                    {remunerationLabel(item.remunerationType)}
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-400">-</span>
-                                )}
-                              </td>
-
-                              {/* Dias trabalhados — editável só para diaristas */}
-                              <td className="px-6 py-4 text-sm text-center">
-                                {daily ? (
-                                  (() => {
-                                    const draft = dayEdits[item.employeeId];
-                                    const current = String(item.daysWorked ?? 0);
-                                    const value = draft ?? current;
-                                    const dirty = draft !== undefined && draft !== current;
-                                    const busy = savingDaysFor === item.employeeId;
-                                    return (
-                                      <div className="flex flex-col items-center gap-1.5">
-                                        <div className="flex items-center gap-2">
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            step="1"
-                                            value={value}
-                                            disabled={busy}
-                                            onChange={(e) =>
-                                              setDayEdits((prev) => ({
-                                                ...prev,
-                                                [item.employeeId]: e.target.value,
-                                              }))
-                                            }
-                                            className="w-16 px-2 py-1 text-sm text-center border border-[#eae1e1] rounded-lg focus:outline-none focus:border-[#be8a83]"
-                                          />
-                                          <button
-                                            type="button"
-                                            onClick={() => saveDaysWorked(item.employeeId)}
-                                            disabled={!dirty || busy}
-                                            className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-[#be8a83]/40 text-[#be8a83] hover:bg-[#be8a83]/5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                                          >
-                                            {busy ? '...' : 'Salvar'}
-                                          </button>
-                                        </div>
-                                        {item.daysWorkedIsOverride ? (
-                                          <button
-                                            type="button"
-                                            onClick={() => resetDaysWorked(item.employeeId)}
-                                            disabled={busy}
-                                            className="text-[10px] text-[#7a7074] underline hover:text-[#3b3036] cursor-pointer"
-                                          >
-                                            ajustado — voltar ao automático ({item.daysWorkedAuto ?? 0})
-                                          </button>
-                                        ) : (
-                                          <span className="text-[10px] text-emerald-600">automático</span>
-                                        )}
-                                      </div>
-                                    );
-                                  })()
-                                ) : (
-                                  <span className="text-gray-400">—</span>
-                                )}
-                              </td>
-
-                              {/* Base de cálculo */}
-                              <td className="px-6 py-4 text-sm text-[#7a7074] text-right">
-                                {daily && item.dailyRate != null
-                                  ? `${formatBRL(item.dailyRate)} / dia`
-                                  : formatBRL(item.baseAmount)}
-                              </td>
-
-                              <td className="px-6 py-4 text-sm font-extrabold text-[#be8a83] text-right">
-                                {formatBRL(item.calculatedPay)}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="px-6 py-10 text-center text-sm text-[#7a7074]">
-                            Nenhum registro de pagamento encontrado para o período selecionado.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             </div>

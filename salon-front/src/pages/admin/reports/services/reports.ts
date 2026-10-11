@@ -41,30 +41,6 @@ export interface AppointmentReportResponse {
   period: string;
 }
 
-export interface PayrollItem {
-  employeeId: number;
-  employeeName: string;
-  remunerationType?: RemunerationType;
-  baseAmount: number;
-  calculatedPay: number;
-  /** Valor da diária — só para Diarista/Diária+Comissão, senão null. */
-  dailyRate?: number | null;
-  /** Dias trabalhados usados no cálculo — só para Diarista/Diária+Comissão, senão null. */
-  daysWorked?: number | null;
-  /** Contagem automática (dias com atendimento concluído) — referência. */
-  daysWorkedAuto?: number | null;
-  /** true = o número veio de um ajuste manual salvo; false = veio do automático. */
-  daysWorkedIsOverride?: boolean | null;
-}
-
-export interface PayrollReportResponse {
-  items: PayrollItem[];
-  period: string;
-  /** Período já resolvido (defaults aplicados) — usar ao salvar ajuste de dias da diarista. */
-  periodStart?: string | null;
-  periodEnd?: string | null;
-}
-
 export interface AppointmentProfitResponse {
   appointmentId: number;
   grossRevenue: number;
@@ -74,6 +50,25 @@ export interface AppointmentProfitResponse {
   productCommissionCost: number;
   netProfit: number;
   positive: boolean;
+  /** Valores que o sistema calcularia — referência quando algum custo foi digitado à mão. */
+  autoServiceRecipeCost: number;
+  autoProductsSoldCost: number;
+  autoServiceCommissionCost: number;
+  autoProductCommissionCost: number;
+  serviceRecipeCostManual: boolean;
+  productsSoldCostManual: boolean;
+  serviceCommissionCostManual: boolean;
+  productCommissionCostManual: boolean;
+  overrideNote: string | null;
+}
+
+/** Cada campo null = volta ao cálculo automático. */
+export interface AppointmentProfitOverrideInput {
+  serviceRecipeCost: number | null;
+  productsSoldCost: number | null;
+  serviceCommissionCost: number | null;
+  productCommissionCost: number | null;
+  note: string | null;
 }
 
 export interface ServicePricingItemResponse {
@@ -125,29 +120,6 @@ export const reportsApi = {
     return data;
   },
 
-  getPayrollReport: async (from?: string, to?: string) => {
-    const params: Record<string, string> = {};
-    if (from) params.from = from;
-    if (to) params.to = to;
-    const { data } = await api.get<PayrollReportResponse>('/reports/payroll', { params });
-    return data;
-  },
-
-  /** Ajuste manual dos dias trabalhados de uma diarista para exatamente [periodStart, periodEnd]. */
-  saveWorkedDays: async (input: {
-    employeeId: number;
-    periodStart: string;
-    periodEnd: string;
-    daysWorked: number;
-  }) => {
-    await api.put('/reports/payroll/worked-days', input);
-  },
-
-  /** Remove o ajuste manual — o período volta a contar os dias automaticamente. */
-  resetWorkedDays: async (input: { employeeId: number; periodStart: string; periodEnd: string }) => {
-    await api.delete('/reports/payroll/worked-days', { params: input });
-  },
-
   getServicePricingAnalysis: async (from?: string, to?: string) => {
     const params: Record<string, string> = {};
     if (from) params.from = from;
@@ -159,6 +131,14 @@ export const reportsApi = {
   getAppointmentProfit: async (appointmentId: number) => {
     const { data } = await api.get<AppointmentProfitResponse>(
       `/reports/appointments/${appointmentId}/profit`
+    );
+    return data;
+  },
+
+  updateAppointmentProfit: async (appointmentId: number, input: AppointmentProfitOverrideInput) => {
+    const { data } = await api.put<AppointmentProfitResponse>(
+      `/reports/appointments/${appointmentId}/profit`,
+      input
     );
     return data;
   },

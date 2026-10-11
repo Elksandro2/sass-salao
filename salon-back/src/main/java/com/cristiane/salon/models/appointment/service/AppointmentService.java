@@ -351,6 +351,10 @@ public class AppointmentService {
             if (!product.getActive()) {
                 throw new BadRequestException("Este produto não está disponível: " + product.getName());
             }
+            if (pr.customPrice() == null && product.getPrice() == null) {
+                throw new BadRequestException("O produto '" + product.getName()
+                        + "' não tem preço de venda cadastrado — informe o preço cobrado.");
+            }
             AppointmentProductItem item = new AppointmentProductItem();
             item.setAppointment(appointment);
             item.setProduct(product);
@@ -388,45 +392,55 @@ public class AppointmentService {
     }
 
     /**
-     * O que trava a edição é o PAGAMENTO já ter acontecido (PAID, via plataforma, ou MANUAL,
-     * confirmado pela equipe fora da plataforma) — não o status do agendamento em si. Um
-     * atendimento marcado DONE mas ainda não pago continua editável (ex.: cliente comprou mais
-     * um produto na saída, antes de fechar a conta); se ele já tiver sido faturado no Caixa
-     * nesse meio tempo (todo DONE fatura, ver billAppointmentOnce), o valor lançado é
-     * resincronizado com o novo total logo após a edição — ver syncCashFlowAmountIfAlreadyBilled.
+     * Mantém o lançamento do agendamento no Caixa coerente com o estado atual dele. Agendamento
+     * pode ser editado a qualquer momento — inclusive já concluído e pago (correção de engano é
+     * rotina) —, então toda edição/mudança de status passa por aqui:
+     * <ul>
+     *   <li>deveria estar faturado (concluído, ou pago via PIX) e já está: atualiza valor e data;</li>
+     *   <li>deveria e ainda não está (ex.: concluído com valor zero, depois ganhou serviço): fatura;</li>
+     *   <li>não deveria mais (saiu de Concluído sem ter sido pago pela plataforma): remove,
+     *   senão o relatório contaria uma receita que não aconteceu.</li>
+     * </ul>
      */
-    private void assertNotBilled(Appointment appointment, String acao) {
-        if (appointment.getStatus() == AppointmentStatus.CANCELLED) {
-            throw new BusinessException("Não é possível " + acao + " um agendamento cancelado.");
+    private void resyncBilling(Appointment appointment) {
+        boolean shouldBeBilled = appointment.getStatus() == AppointmentStatus.DONE
+                || appointment.getPaymentStatus() == PaymentStatus.PAID;
+        var existing = cashFlowRepository.findByAppointmentId(appointment.getId());
+        if (existing.isEmpty()) {
+            if (shouldBeBilled) {
+                billAppointmentOnce(appointment, appointment.getGrandTotal(),
+                        "Pagamento do agendamento #" + appointment.getId() + " - " + appointment.getServiceNames());
+            }
+            return;
         }
-        if (appointment.getPaymentStatus() == PaymentStatus.PAID || appointment.getPaymentStatus() == PaymentStatus.MANUAL) {
-            throw new BusinessException("Não é possível " + acao + " depois que o atendimento foi pago.");
+        CashFlow cashFlow = existing.get();
+        BigDecimal total = appointment.getGrandTotal();
+        if (!shouldBeBilled || total == null || total.signum() <= 0) {
+            cashFlowRepository.delete(cashFlow);
+            return;
         }
+        cashFlow.setAmount(total);
+        cashFlow.setDate(billingDate(appointment));
+        cashFlowRepository.save(cashFlow);
     }
 
-    /**
-     * Se este agendamento já tinha sido faturado no Caixa (por ter passado por DONE antes desta
-     * edição), mantém o valor lançado em dia com o novo total — sem isso, editar produtos/
-     * despesas depois do DONE reintroduziria a divergência que assertNotBilled existe pra evitar.
-     */
-    private void syncCashFlowAmountIfAlreadyBilled(Appointment appointment) {
-        cashFlowRepository.findByAppointmentId(appointment.getId()).ifPresent(cashFlow -> {
-            cashFlow.setAmount(appointment.getGrandTotal());
-            cashFlowRepository.save(cashFlow);
-        });
+    private LocalDate billingDate(Appointment appointment) {
+        return appointment.getEffectiveScheduledDate() != null
+                ? appointment.getEffectiveScheduledDate()
+                : salonClock.today();
     }
 
     /**
      * Edita os dados básicos de um agendamento já criado (profissional, dia/período) — corrige
-     * engano de cadastro ou reagenda sem precisar cancelar e criar outro. Mesma trava financeira
-     * de {@link #updateServices}: não dá pra editar depois de cancelado ou já pago.
+     * engano de cadastro ou reagenda sem precisar cancelar e criar outro. Vale em qualquer
+     * situação (concluído, pago, data passada) — se o agendamento já estava faturado, o
+     * lançamento do Caixa acompanha a nova data (ver resyncBilling).
      */
     @Transactional
     public AppointmentResponse updateDetails(Long id, UpdateAppointmentDetailsRequest request) {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
         assertCanManage(appointment, "editar os dados de");
-        assertNotBilled(appointment, "editar os dados de");
 
         if (request.employeeId() != null
                 && !request.employeeId().equals(appointment.getEmployee().getId())) {
@@ -447,9 +461,6 @@ public class AppointmentService {
             throw new BadRequestException("Informe a data e o período juntos, ou nenhum dos dois");
         }
         if (hasDate) {
-            if (request.scheduledDate().isBefore(salonClock.today())) {
-                throw new BadRequestException("Não é possível definir uma data no passado");
-            }
             // Converte pro modelo de bloco (manhã/tarde) mesmo se o agendamento era antigo, com
             // hora exata — a equipe não cria nem edita mais com hora exata a partir daqui.
             appointment.setScheduledAt(null);
@@ -458,6 +469,7 @@ public class AppointmentService {
         }
 
         Appointment saved = appointmentRepository.save(appointment);
+        resyncBilling(saved);
         return AppointmentResponse.fromEntity(saved);
     }
 
@@ -471,7 +483,6 @@ public class AppointmentService {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
         assertCanManage(appointment, "editar os serviços de");
-        assertNotBilled(appointment, "editar os serviços de");
 
         if (serviceRequests == null || serviceRequests.isEmpty()) {
             throw new BadRequestException("Ao menos um serviço é obrigatório");
@@ -498,7 +509,7 @@ public class AppointmentService {
         appointment.getServices().addAll(buildServiceItems(appointment, serviceRequests, resolvedServices, true));
 
         Appointment saved = appointmentRepository.save(appointment);
-        syncCashFlowAmountIfAlreadyBilled(saved);
+        resyncBilling(saved);
         return AppointmentResponse.fromEntity(saved);
     }
 
@@ -507,7 +518,6 @@ public class AppointmentService {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
         assertCanManage(appointment, "editar os produtos de");
-        assertNotBilled(appointment, "editar os produtos de");
 
         // Reeditar os produtos re-congela também o % de comissão de produto do salão vigente agora.
         appointment.setSnapshotProductCommissionPercent(businessSettingsService.getProductCommissionPercent());
@@ -515,7 +525,7 @@ public class AppointmentService {
         appointment.getProducts().addAll(buildProductItems(appointment, productRequests));
 
         Appointment saved = appointmentRepository.save(appointment);
-        syncCashFlowAmountIfAlreadyBilled(saved);
+        resyncBilling(saved);
         return AppointmentResponse.fromEntity(saved);
     }
 
@@ -524,13 +534,12 @@ public class AppointmentService {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Agendamento não encontrado"));
         assertCanManage(appointment, "editar as despesas de");
-        assertNotBilled(appointment, "editar as despesas de");
 
         appointment.getExpenses().clear();
         appointment.getExpenses().addAll(buildExpenseItems(appointment, expenseRequests));
 
         Appointment saved = appointmentRepository.save(appointment);
-        syncCashFlowAmountIfAlreadyBilled(saved);
+        resyncBilling(saved);
         return AppointmentResponse.fromEntity(saved);
     }
 
@@ -909,12 +918,9 @@ public class AppointmentService {
 
             appointment.setStatus(status);
 
-            if (status == AppointmentStatus.DONE) {
-                billAppointmentOnce(appointment, appointment.getGrandTotal(),
-                        "Pagamento do agendamento #" + appointment.getId() + " - " + appointment.getServiceNames());
-            }
-
             Appointment saved = appointmentRepository.save(appointment);
+            // Concluir fatura; sair de Concluído (ex.: marcado por engano) desfaz o faturamento.
+            resyncBilling(saved);
 
             // Trigger email/push notifications based on resulting status
             if (status == AppointmentStatus.CONFIRMED) {
@@ -1011,9 +1017,7 @@ public class AppointmentService {
             // Data do próprio atendimento, não "hoje" — essencial pro cadastro de agendamento
             // histórico (data passada) cair no período certo do relatório financeiro, em vez de
             // aparecer no relatório de hoje só porque foi quando alguém deu baixa no sistema.
-            cashFlow.setDate(appointment.getEffectiveScheduledDate() != null
-                    ? appointment.getEffectiveScheduledDate()
-                    : salonClock.today());
+            cashFlow.setDate(billingDate(appointment));
             cashFlow.setAppointment(appointment);
             cashFlowRepository.save(cashFlow);
         } catch (DataIntegrityViolationException e) {

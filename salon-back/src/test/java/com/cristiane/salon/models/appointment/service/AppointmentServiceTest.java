@@ -2427,18 +2427,6 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void updateServices_whenAppointmentPaid_shouldThrowBusinessException() {
-        Appointment apt = appointmentWithStatus(AppointmentStatus.DONE);
-        apt.setPaymentStatus(com.cristiane.salon.models.appointment.enums.PaymentStatus.PAID);
-        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
-
-        var request = new AppointmentServiceRequest(8L, null, null);
-
-        assertThatThrownBy(() -> appointmentService.updateServices(1L, List.of(request)))
-                .isInstanceOf(BusinessException.class);
-    }
-
-    @Test
     void updateServices_whenDoneButNotPaid_shouldAllowEditingAndSyncCashFlowAmount() {
         // Atendimento concluído mas ainda não pago já foi faturado no Caixa (todo DONE fatura) —
         // editar os serviços agora precisa manter esse lançamento em dia com o novo total.
@@ -2458,6 +2446,63 @@ class AppointmentServiceTest {
 
         assertThat(result.totalPrice()).isEqualByComparingTo("150.00");
         verify(cashFlowRepository).save(argThat(cf -> cf.getAmount().compareTo(new BigDecimal("150.00")) == 0));
+    }
+
+    @Test
+    void updateServices_whenAppointmentAlreadyPaid_shouldStillAllowEditingAndResyncCashFlow() {
+        // Edição liberada em qualquer situação — corrigir engano depois de pago é rotina.
+        Appointment apt = appointmentWithStatus(AppointmentStatus.DONE);
+        apt.setPaymentStatus(com.cristiane.salon.models.appointment.enums.PaymentStatus.MANUAL);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(salonServiceRepository.findById(8L)).thenReturn(Optional.of(salonService));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        com.cristiane.salon.models.cashflow.entity.CashFlow existingEntry =
+                new com.cristiane.salon.models.cashflow.entity.CashFlow();
+        existingEntry.setAmount(new BigDecimal("100.00"));
+        when(cashFlowRepository.findByAppointmentId(1L)).thenReturn(Optional.of(existingEntry));
+
+        AppointmentResponse result = appointmentService.updateServices(1L,
+                List.of(new AppointmentServiceRequest(8L, new BigDecimal("180.00"), null)));
+
+        assertThat(result.totalPrice()).isEqualByComparingTo("180.00");
+        verify(cashFlowRepository).save(argThat(cf -> cf.getAmount().compareTo(new BigDecimal("180.00")) == 0));
+    }
+
+    @Test
+    void updateDetails_whenDateInPast_shouldAcceptAndMoveBilledCashFlowToTheNewDate() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.DONE);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        com.cristiane.salon.models.cashflow.entity.CashFlow existingEntry =
+                new com.cristiane.salon.models.cashflow.entity.CashFlow();
+        existingEntry.setAmount(new BigDecimal("100.00"));
+        existingEntry.setDate(salonClock.today());
+        when(cashFlowRepository.findByAppointmentId(1L)).thenReturn(Optional.of(existingEntry));
+        LocalDate past = salonClock.today().minusDays(10);
+
+        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(
+                null, past, AppointmentPeriod.MORNING);
+        appointmentService.updateDetails(1L, request);
+
+        assertThat(apt.getScheduledDate()).isEqualTo(past);
+        verify(cashFlowRepository).save(argThat(cf -> past.equals(cf.getDate())));
+    }
+
+    @Test
+    void updateStatus_whenLeavingDoneWithoutPlatformPayment_shouldRemoveCashFlowEntry() {
+        Appointment apt = appointmentWithStatus(AppointmentStatus.DONE);
+        apt.setScheduledDate(salonClock.today());
+        apt.setScheduledPeriod(AppointmentPeriod.MORNING);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        com.cristiane.salon.models.cashflow.entity.CashFlow existingEntry =
+                new com.cristiane.salon.models.cashflow.entity.CashFlow();
+        existingEntry.setAmount(new BigDecimal("100.00"));
+        when(cashFlowRepository.findByAppointmentId(1L)).thenReturn(Optional.of(existingEntry));
+
+        appointmentService.updateStatus(1L, "CONFIRMED");
+
+        verify(cashFlowRepository).delete(existingEntry);
     }
 
     // --- updateDetails tests ---
@@ -2536,41 +2581,6 @@ class AppointmentServiceTest {
 
         assertThatThrownBy(() -> appointmentService.updateDetails(1L, request))
                 .isInstanceOf(BadRequestException.class);
-    }
-
-    @Test
-    void updateDetails_whenDateInPast_shouldThrowBadRequestException() {
-        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
-        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
-
-        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(
-                5L, salonClock.today().minusDays(1), AppointmentPeriod.MORNING);
-
-        assertThatThrownBy(() -> appointmentService.updateDetails(1L, request))
-                .isInstanceOf(BadRequestException.class);
-    }
-
-    @Test
-    void updateDetails_whenAppointmentCancelled_shouldThrowBusinessException() {
-        Appointment apt = appointmentWithStatus(AppointmentStatus.CANCELLED);
-        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
-
-        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(5L, null, null);
-
-        assertThatThrownBy(() -> appointmentService.updateDetails(1L, request))
-                .isInstanceOf(BusinessException.class);
-    }
-
-    @Test
-    void updateDetails_whenAlreadyPaid_shouldThrowBusinessException() {
-        Appointment apt = appointmentWithStatus(AppointmentStatus.DONE);
-        apt.setPaymentStatus(com.cristiane.salon.models.appointment.enums.PaymentStatus.PAID);
-        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
-
-        var request = new com.cristiane.salon.models.appointment.dto.UpdateAppointmentDetailsRequest(5L, null, null);
-
-        assertThatThrownBy(() -> appointmentService.updateDetails(1L, request))
-                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -2672,29 +2682,6 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void updateProducts_whenAppointmentCancelled_shouldThrowBusinessException() {
-        Appointment apt = appointmentWithStatus(AppointmentStatus.CANCELLED);
-        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
-
-        var request = new com.cristiane.salon.models.appointment.dto.AppointmentProductRequest(30L, 1, null);
-
-        assertThatThrownBy(() -> appointmentService.updateProducts(1L, List.of(request)))
-                .isInstanceOf(BusinessException.class);
-    }
-
-    @Test
-    void updateProducts_whenAppointmentManuallyPaid_shouldThrowBusinessException() {
-        Appointment apt = appointmentWithStatus(AppointmentStatus.DONE);
-        apt.setPaymentStatus(com.cristiane.salon.models.appointment.enums.PaymentStatus.MANUAL);
-        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
-
-        var request = new com.cristiane.salon.models.appointment.dto.AppointmentProductRequest(30L, 1, null);
-
-        assertThatThrownBy(() -> appointmentService.updateProducts(1L, List.of(request)))
-                .isInstanceOf(BusinessException.class);
-    }
-
-    @Test
     void updateProducts_whenDoneButNotPaid_shouldAllowAddingProductAfterConclusion() {
         // Cenário real: cliente compra um produto na saída, depois que o atendimento já foi
         // marcado como concluído mas antes de fechar o pagamento.
@@ -2753,17 +2740,5 @@ class AppointmentServiceTest {
                 .hasMessage("A porcentagem da despesa não pode ser maior que 100");
     }
 
-    @Test
-    void updateExpenses_whenAppointmentPaid_shouldThrowBusinessException() {
-        Appointment apt = appointmentWithStatus(AppointmentStatus.CONFIRMED);
-        apt.setPaymentStatus(com.cristiane.salon.models.appointment.enums.PaymentStatus.PAID);
-        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(apt));
-
-        var request = new com.cristiane.salon.models.appointment.dto.AppointmentExpenseRequest(
-                "Taxa", "FIXED", new BigDecimal("10"));
-
-        assertThatThrownBy(() -> appointmentService.updateExpenses(1L, List.of(request)))
-                .isInstanceOf(BusinessException.class);
-    }
 }
 

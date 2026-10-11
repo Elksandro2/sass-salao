@@ -48,13 +48,6 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
 
   if (!appointment) return null;
 
-  // Mesma trava financeira usada nos editores de serviços/produtos/despesas: só bloqueia quando
-  // o pagamento já aconteceu de verdade (PAID/MANUAL) ou o agendamento foi cancelado.
-  const detailsReadOnly =
-    appointment.status === 'CANCELLED' ||
-    appointment.paymentStatus === 'PAID' ||
-    appointment.paymentStatus === 'MANUAL';
-
   const handleToggleEdit = () => {
     if (!isEditing) {
       setEditEmployeeId(String(appointment.employeeId));
@@ -112,20 +105,18 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
           <h3 className="font-heading text-lg font-bold text-[#3b3036]">Detalhes do agendamento</h3>
           <div className="flex items-center gap-1">
             <PermissionGate method="PATCH" endpoint={`/v1/appointments/${appointment.id}/details`}>
-              {!detailsReadOnly && (
-                <button
-                  onClick={handleToggleEdit}
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold ${
-                    isEditing
-                      ? 'text-[#a6726b] bg-[#be8a83]/10 hover:bg-[#be8a83]/20'
-                      : 'text-gray-500 hover:text-[#be8a83] hover:bg-[#fdf6f5]'
-                  }`}
-                  title={isEditing ? 'Cancelar edição' : 'Editar agendamento'}
-                >
-                  <Pencil size={15} />
-                  <span>{isEditing ? 'Cancelar edição' : 'Editar'}</span>
-                </button>
-              )}
+              <button
+                onClick={handleToggleEdit}
+                className={`p-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold ${
+                  isEditing
+                    ? 'text-[#a6726b] bg-[#be8a83]/10 hover:bg-[#be8a83]/20'
+                    : 'text-gray-500 hover:text-[#be8a83] hover:bg-[#fdf6f5]'
+                }`}
+                title={isEditing ? 'Cancelar edição' : 'Editar agendamento'}
+              >
+                <Pencil size={15} />
+                <span>{isEditing ? 'Cancelar edição' : 'Editar'}</span>
+              </button>
             </PermissionGate>
             <button
               onClick={onClose}
@@ -264,7 +255,7 @@ export const AppointmentDetailModal = ({ appointment, onClose, onNotesSaved }: A
           {/* Cancelado/recusado nunca vai gerar receita de verdade — mostrar "lucro" aqui
               induziria a dona a contar como real um valor que nunca vai entrar. */}
           {appointment.status !== 'CANCELLED' && appointment.status !== 'DECLINED' && (
-            <AppointmentProfitSection appointmentId={appointment.id} />
+            <AppointmentProfitSection appointmentId={appointment.id} refreshToken={appointment} />
           )}
 
           {appointment.clientNotes && (
