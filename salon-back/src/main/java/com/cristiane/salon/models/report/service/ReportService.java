@@ -17,6 +17,7 @@ import com.cristiane.salon.models.employee.repository.EmployeeRepository;
 import com.cristiane.salon.models.fixedexpense.repository.FixedExpenseRepository;
 import com.cristiane.salon.models.payroll.dto.EmployeePayrollData;
 import com.cristiane.salon.models.payroll.dto.PayrollBreakdown;
+import com.cristiane.salon.models.payroll.dto.WorkDayEntry;
 import com.cristiane.salon.models.payroll.entity.EmployeeWorkDay;
 import com.cristiane.salon.models.payroll.entity.PayrollAdjustment;
 import com.cristiane.salon.models.payroll.entity.PayrollAdjustmentType;
@@ -475,7 +476,7 @@ public class ReportService {
 
     /**
      * Calcula o pagamento de uma colaboradora no período: salário fixo proporcional
-     * (Salário Fixo/Fixo+Comissionado) + diárias marcadas + comissão de serviço + comissão de
+     * (Salário Fixo/Fixo+Comissionado) + diárias (ver {@link #resolveWorkDays}) + comissão de serviço + comissão de
      * produto (em atendimento e em venda avulsa) + acréscimos − descontos. Span manual: fica
      * aninhado dentro do span de quem chamou, um por funcionária.
      */
@@ -500,8 +501,11 @@ public class ReportService {
             fixedSalary = proratedMonthlySalary(employee.getRemunerationValue(), start, to);
         }
 
-        BigDecimal dailyTotal = empDays.stream()
-                .map(EmployeeWorkDay::getAmount)
+        List<WorkDayEntry> workDays = new ArrayList<>();
+        List<LocalDate> unmarkedAppointmentDates = new ArrayList<>();
+        resolveWorkDays(employee, from, to, empDone, empDays, workDays, unmarkedAppointmentDates);
+        BigDecimal dailyTotal = workDays.stream()
+                .map(WorkDayEntry::amount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal serviceCommission = BigDecimal.ZERO;
@@ -529,11 +533,52 @@ public class ReportService {
             }
         }
 
-        PayrollBreakdown breakdown = new PayrollBreakdown(fixedSalary, empDays.size(), dailyTotal,
+        PayrollBreakdown breakdown = new PayrollBreakdown(fixedSalary, workDays.size(), dailyTotal,
                 serviceCommission, appointmentProductCommission, saleProductCommission,
                 additions, discounts, advances);
         span.setAttribute("funcionaria.pagamento_calculado", breakdown.netPayable().doubleValue());
-        return new EmployeePayrollData(employee, active, empDone, empSales, empDays, empAdjustments, breakdown);
+        return new EmployeePayrollData(employee, active, empDone, empSales, workDays,
+                unmarkedAppointmentDates, empAdjustments, breakdown);
+    }
+
+    /**
+     * Diárias que contam no período. Pra diarista, todo dia com atendimento concluído já conta
+     * sozinho com a diária padrão — ninguém precisa lembrar de marcar. Os registros salvos são as
+     * exceções: dia trabalhado sem atendimento, dia com valor próprio (e justificativa), ou dia
+     * com atendimento desmarcado de propósito ({@code removed}), que então não conta.
+     *
+     * @param workDays                 saída: diárias que contam, ordenadas por data
+     * @param unmarkedAppointmentDates saída: dias com atendimento que foram desmarcados
+     */
+    private void resolveWorkDays(Employee employee, LocalDate from, LocalDate to, List<Appointment> empDone,
+                                 List<EmployeeWorkDay> records, List<WorkDayEntry> workDays,
+                                 List<LocalDate> unmarkedAppointmentDates) {
+        Map<LocalDate, EmployeeWorkDay> byDate = new java.util.HashMap<>();
+        for (EmployeeWorkDay record : records) {
+            byDate.put(record.getWorkDate(), record);
+            if (!record.isRemoved()) {
+                workDays.add(new WorkDayEntry(record.getId(), record.getWorkDate(), record.getAmount(),
+                        record.getJustification(), false));
+            }
+        }
+
+        RemunerationType type = employee.getRemunerationType();
+        if (type != null && type.isDaily()) {
+            java.util.Set<LocalDate> appointmentDates = empDone.stream()
+                    .map(this::appointmentDate)
+                    .filter(d -> d != null && !d.isBefore(from) && !d.isAfter(to))
+                    .collect(Collectors.toCollection(java.util.TreeSet::new));
+            BigDecimal rate = employee.getRemunerationValue();
+            for (LocalDate date : appointmentDates) {
+                EmployeeWorkDay record = byDate.get(date);
+                if (record != null) {
+                    if (record.isRemoved()) unmarkedAppointmentDates.add(date);
+                } else if (rate != null) {
+                    workDays.add(new WorkDayEntry(null, date, rate, null, true));
+                }
+            }
+        }
+        workDays.sort(java.util.Comparator.comparing(WorkDayEntry::date));
     }
 
     /**

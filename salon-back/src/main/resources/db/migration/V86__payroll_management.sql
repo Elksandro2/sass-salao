@@ -1,15 +1,18 @@
 -- Gestão de folha de pagamento das colaboradoras (tela "Folha de Pagamento").
 --
--- 1) Dias trabalhados de diarista, um registro por dia. Substitui a contagem automática +
---    ajuste por período (tb_diarista_worked_days_override, V73), que não dizia QUAIS dias foram
---    pagos nem permitia uma diária com valor diferente. A tabela antiga fica no banco só como
---    histórico — não é mais lida pelo sistema.
+-- 1) Dias trabalhados de diarista. Todo dia em que a diarista teve atendimento concluído já
+--    conta como diária automaticamente (sem precisar de linha aqui). Esta tabela guarda só o
+--    que foge disso: um dia trabalhado sem atendimento, um dia com valor diferente do padrão
+--    (com justificativa) ou um dia com atendimento que foi DESMARCADO (removed = TRUE).
+--    Substitui o ajuste por período (tb_diarista_worked_days_override, V73), que não dizia
+--    QUAIS dias foram pagos. A tabela antiga fica no banco só como histórico.
 CREATE TABLE tb_employee_work_day (
     id BIGSERIAL PRIMARY KEY,
     employee_id BIGINT NOT NULL REFERENCES tb_employee(id) ON DELETE CASCADE,
     work_date DATE NOT NULL,
     amount NUMERIC(10, 2) NOT NULL,
     justification VARCHAR(500),
+    removed BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_employee_work_day UNIQUE (employee_id, work_date),
     CONSTRAINT ck_employee_work_day_amount CHECK (amount >= 0)

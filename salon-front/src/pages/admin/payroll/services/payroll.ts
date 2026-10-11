@@ -106,12 +106,15 @@ export interface PayrollSaleLine {
 }
 
 export interface WorkDay {
-  id: number;
+  /** null = dia automático (teve atendimento e não tem registro próprio). */
+  id: number | null;
   employeeId: number;
   date: string;
   amount: number;
   justification: string | null;
   defaultRate: number | null;
+  /** Contou sozinho por ter atendimento concluído no dia. */
+  automatic: boolean;
 }
 
 export interface PayrollAdjustment {
@@ -145,6 +148,7 @@ export interface PayrollEmployeeDetail {
   appointments: PayrollAppointmentLine[];
   productSales: PayrollSaleLine[];
   workDays: WorkDay[];
+  /** Dias com atendimento que foram desmarcados (não contam como diária). */
   unmarkedAppointmentDates: string[];
   adjustments: PayrollAdjustment[];
   payments: PayrollPayment[];
@@ -210,8 +214,9 @@ export const payrollApi = {
     return data;
   },
 
-  deleteWorkDay: async (id: number) => {
-    await api.delete(`/payroll/work-days/${id}`);
+  /** Desmarca um dia — inclusive um dia com atendimento, que senão contaria sozinho. */
+  unmarkWorkDay: async (employeeId: number, date: string) => {
+    await api.post('/payroll/work-days/unmark', { employeeId, date });
   },
 
   createAdjustment: async (input: AdjustmentInput) => {

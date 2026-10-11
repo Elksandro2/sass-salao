@@ -7,6 +7,7 @@ import com.cristiane.salon.models.payroll.dto.PayrollDtos.EmployeeDetailResponse
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.PaymentRequest;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.PaymentResponse;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.SummaryResponse;
+import com.cristiane.salon.models.payroll.dto.PayrollDtos.UnmarkWorkDayRequest;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.WorkDayBulkRequest;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.WorkDayRequest;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos.WorkDayResponse;
@@ -71,6 +72,15 @@ public class PayrollController {
     @Operation(summary = "Marca vários dias trabalhados com a diária padrão (Admin)")
     public ResponseEntity<List<WorkDayResponse>> createWorkDaysBulk(@Valid @RequestBody WorkDayBulkRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(payrollService.createWorkDaysBulk(request));
+    }
+
+    @PostMapping("/work-days/unmark")
+    @PreAuthorize("@verifyUserPermissions.userOwnResourceOrHasPermission(null)")
+    @Auditable(action = "PAYROLL_WORK_DAY_UNMARKED", entityType = "EmployeeWorkDay", captureArgs = true)
+    @Operation(summary = "Desmarca um dia (inclusive um dia com atendimento, que contaria sozinho) (Admin)")
+    public ResponseEntity<Void> unmarkWorkDay(@Valid @RequestBody UnmarkWorkDayRequest request) {
+        payrollService.unmarkWorkDay(request.employeeId(), request.date());
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/work-days/{id}")

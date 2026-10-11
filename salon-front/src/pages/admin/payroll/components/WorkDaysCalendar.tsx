@@ -9,8 +9,10 @@ interface WorkDaysCalendarProps {
   periodStart: string;
   periodEnd: string;
   workDays: WorkDay[];
-  /** Dias em que ela teve atendimento concluído — ajudam a lembrar quais dias ela veio. */
+  /** Dias em que ela teve atendimento concluído — contam sozinhos como diária. */
   appointmentDates: string[];
+  /** Dias com atendimento que foram desmarcados de propósito. */
+  unmarkedDates: string[];
   defaultRate: number | null;
   busyDate: string | null;
   /** Clique num dia ainda não marcado. */
@@ -29,6 +31,7 @@ export const WorkDaysCalendar = ({
   periodEnd,
   workDays,
   appointmentDates,
+  unmarkedDates,
   defaultRate,
   busyDate,
   onMark,
@@ -57,6 +60,7 @@ export const WorkDaysCalendar = ({
 
   const byDate = useMemo(() => new Map(workDays.map((d) => [d.date, d])), [workDays]);
   const withAppointment = useMemo(() => new Set(appointmentDates), [appointmentDates]);
+  const unmarked = useMemo(() => new Set(unmarkedDates), [unmarkedDates]);
 
   const firstWeekday = new Date(year, monthIndex, 1).getDay();
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
@@ -102,17 +106,19 @@ export const WorkDaysCalendar = ({
           const hasAppointment = withAppointment.has(date);
           const custom = day && defaultRate != null && day.amount !== defaultRate;
           const busy = busyDate === date;
+          const wasUnmarked = !day && unmarked.has(date);
           const dayNumber = Number(date.slice(8, 10));
 
           let cls = 'bg-white text-[#3b3036] border-[#eae1e1] hover:border-[#be8a83]';
           if (day) cls = 'bg-[#be8a83] text-white border-[#be8a83] hover:bg-[#a6726b]';
           if (day && custom) cls = 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600';
+          if (wasUnmarked) cls = 'bg-white text-[#7a7074] border-dashed border-[#be8a83]/60 line-through hover:border-[#be8a83]';
           if (!inPeriod) cls = 'bg-transparent text-[#7a7074]/40 border-transparent cursor-default';
 
           const title = day
-            ? `${formatBRL(day.amount)}${day.justification ? ` — ${day.justification}` : ''}`
-            : hasAppointment
-              ? 'Teve atendimento neste dia — clique pra marcar a diária'
+            ? `${formatBRL(day.amount)}${day.automatic ? ' (automático: teve atendimento)' : ''}${day.justification ? ` — ${day.justification}` : ''}`
+            : wasUnmarked
+              ? 'Teve atendimento, mas foi desmarcado — clique pra marcar de novo'
               : 'Clique pra marcar como dia trabalhado';
 
           return (
@@ -148,7 +154,10 @@ export const WorkDaysCalendar = ({
           <span className="h-3 w-3 rounded bg-amber-500" /> valor diferente
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#be8a83]" /> teve atendimento
+          <span className="h-1.5 w-1.5 rounded-full bg-[#be8a83]" /> teve atendimento (conta sozinho)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded border border-dashed border-[#be8a83]" /> desmarcado
         </span>
       </div>
     </div>

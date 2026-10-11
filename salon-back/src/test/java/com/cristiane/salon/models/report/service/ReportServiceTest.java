@@ -414,16 +414,54 @@ class ReportServiceTest {
     }
 
     @Test
-    void computePayroll_diarista_withoutMarkedDays_paysZeroEvenWithAppointments() {
+    void computePayroll_diarista_dayWithAppointmentCountsAutomatically_onceEvenWithSeveralAppointments() {
         Employee ella = employee(7L, "Ella", RemunerationType.DIARISTA, "120.00");
         when(employeeRepository.findAll()).thenReturn(List.of(ella));
         SalonService svc = new SalonService();
         svc.setPrice(new BigDecimal("200.00"));
         svc.setCommissionPercent(new BigDecimal("10")); // ignorado: DIARISTA não recebe comissão de serviço
         when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any()))
-                .thenReturn(List.of(doneAptOn(ella, svc, now)));
+                .thenReturn(List.of(doneAptOn(ella, svc, now.withHour(9)), doneAptOn(ella, svc, now.withHour(15))));
 
-        assertEquals(0, BigDecimal.ZERO.compareTo(payrollOf(7L, monthStart(), monthEnd()).netPayable()));
+        var breakdown = payrollOf(7L, monthStart(), monthEnd());
+
+        assertEquals(1, breakdown.workDaysCount());
+        assertEquals(0, new BigDecimal("120.00").compareTo(breakdown.netPayable()));
+    }
+
+    @Test
+    void computePayroll_diarista_unmarkedDayWithAppointment_doesNotCount() {
+        Employee ella = employee(7L, "Ella", RemunerationType.DIARISTA, "120.00");
+        when(employeeRepository.findAll()).thenReturn(List.of(ella));
+        SalonService svc = new SalonService();
+        svc.setPrice(new BigDecimal("200.00"));
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(doneAptOn(ella, svc, now)));
+        var removed = workDay(7L, today, "0.00");
+        removed.setRemoved(true);
+        when(workDayRepository.findByWorkDateBetweenOrderByWorkDateAsc(any(), any())).thenReturn(List.of(removed));
+
+        var data = reportService.computePayroll(monthStart(), monthEnd()).get(0);
+
+        assertEquals(0, data.breakdown().workDaysCount());
+        assertEquals(List.of(today), data.unmarkedAppointmentDates());
+    }
+
+    @Test
+    void computePayroll_diarista_customValueOnAppointmentDay_replacesTheAutomaticOne() {
+        Employee ella = employee(7L, "Ella", RemunerationType.DIARISTA, "120.00");
+        when(employeeRepository.findAll()).thenReturn(List.of(ella));
+        SalonService svc = new SalonService();
+        svc.setPrice(new BigDecimal("200.00"));
+        when(appointmentRepository.findAllInPeriod(any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(doneAptOn(ella, svc, now)));
+        when(workDayRepository.findByWorkDateBetweenOrderByWorkDateAsc(any(), any()))
+                .thenReturn(List.of(workDay(7L, today, "60.00")));
+
+        var breakdown = payrollOf(7L, monthStart(), monthEnd());
+
+        assertEquals(1, breakdown.workDaysCount());
+        assertEquals(0, new BigDecimal("60.00").compareTo(breakdown.dailyTotal()));
     }
 
     @Test

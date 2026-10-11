@@ -14,7 +14,7 @@ vi.mock('../services/payroll', async (importOriginal) => {
       createWorkDay: vi.fn(),
       createWorkDaysBulk: vi.fn(),
       updateWorkDay: vi.fn(),
-      deleteWorkDay: vi.fn(),
+      unmarkWorkDay: vi.fn(),
       createAdjustment: vi.fn(),
       updateAdjustment: vi.fn(),
       deleteAdjustment: vi.fn(),
@@ -101,8 +101,8 @@ const detail: PayrollEmployeeDetail = {
     { cashFlowId: 3, date: firstDay, description: 'Venda de Produtos: 1x Óleo', amount: 50, commission: 5 },
   ],
   workDays: [
-    { id: 1, employeeId: 7, date: firstDay, amount: 120, justification: null, defaultRate: 120 },
-    { id: 2, employeeId: 7, date: secondDay, amount: 120, justification: null, defaultRate: 120 },
+    { id: 1, employeeId: 7, date: firstDay, amount: 120, justification: null, defaultRate: 120, automatic: false },
+    { id: 2, employeeId: 7, date: secondDay, amount: 120, justification: null, defaultRate: 120, automatic: false },
   ],
   unmarkedAppointmentDates: [thirdDay],
   adjustments: [],
@@ -141,12 +141,12 @@ describe('Payroll page', () => {
     expect(payrollApi.getEmployeeDetail).toHaveBeenCalledWith(7, from, to);
     expect(screen.getByText('Venda de Produtos: 1x Óleo')).toBeInTheDocument();
     expect(screen.getByText('Comissão sobre vendas avulsas')).toBeInTheDocument();
-    expect(screen.getByText(/Marcar 1 dia\(s\) com atendimento/)).toBeInTheDocument();
+    expect(screen.getByText(/Remarcar 1 dia\(s\) desmarcado/)).toBeInTheDocument();
   });
 
-  it('marks an unmarked day with the default rate when the day is clicked', async () => {
+  it('marks again a day with appointment that had been unmarked when it is clicked', async () => {
     vi.mocked(payrollApi.createWorkDay).mockResolvedValue({
-      id: 3, employeeId: 7, date: thirdDay, amount: 120, justification: null, defaultRate: 120,
+      id: 3, employeeId: 7, date: thirdDay, amount: 120, justification: null, defaultRate: 120, automatic: false,
     });
     await act(async () => {
       customRender(<Payroll />);
@@ -164,6 +164,34 @@ describe('Payroll page', () => {
     });
 
     expect(payrollApi.createWorkDay).toHaveBeenCalledWith({ employeeId: 7, date: thirdDay });
+  });
+
+  it('lets the admin unmark a day that counted automatically because of an appointment', async () => {
+    vi.mocked(payrollApi.getEmployeeDetail).mockResolvedValue({
+      ...detail,
+      workDays: [
+        ...detail.workDays,
+        { id: null, employeeId: 7, date: thirdDay, amount: 120, justification: null, defaultRate: 120, automatic: true },
+      ],
+      unmarkedAppointmentDates: [],
+    });
+    await act(async () => {
+      customRender(<Payroll />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Ella'));
+    });
+    await waitFor(() => expect(screen.getByText('Cliente Teste')).toBeInTheDocument());
+
+    const dayButton = screen.getAllByRole('button').find((b) => b.textContent === '3')!;
+    await act(async () => {
+      fireEvent.click(dayButton);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Desmarcar dia'));
+    });
+
+    expect(payrollApi.unmarkWorkDay).toHaveBeenCalledWith(7, thirdDay);
   });
 
   it('opens the payment modal prefilled with the outstanding value from "Marcar como pago"', async () => {

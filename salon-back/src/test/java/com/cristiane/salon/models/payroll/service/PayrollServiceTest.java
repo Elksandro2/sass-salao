@@ -98,7 +98,7 @@ class PayrollServiceTest {
     void getSummary_marksPeriodPaid_whenPaymentsCoverEveryDay_andComputesPaidUntilForEveryone() {
         Employee emp = employee(RemunerationType.SALARIO_FIXO, "1000.00");
         when(reportService.computePayroll(APR_1, APR_30)).thenReturn(List.of(
-                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), breakdownPaying("1000.00"))));
+                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("1000.00"))));
         when(paymentRepository.findAllByOrderByPeriodStartAsc()).thenReturn(List.of(
                 payment(1, APR_1, LocalDate.of(2026, 4, 15), "500"),
                 payment(2, LocalDate.of(2026, 4, 16), APR_30, "500")));
@@ -116,7 +116,7 @@ class PayrollServiceTest {
     void getSummary_partialCoverage_leavesTheDifferenceOutstanding() {
         Employee emp = employee(RemunerationType.SALARIO_FIXO, "1000.00");
         when(reportService.computePayroll(APR_1, APR_30)).thenReturn(List.of(
-                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), breakdownPaying("1000.00"))));
+                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("1000.00"))));
         when(paymentRepository.findAllByOrderByPeriodStartAsc()).thenReturn(List.of(
                 payment(1, APR_1, LocalDate.of(2026, 4, 15), "500")));
 
@@ -131,7 +131,7 @@ class PayrollServiceTest {
     void getSummary_whenSomeoneWasNeverPaid_hasNoGlobalPaidUntil_andNamesWhoIsBehind() {
         Employee emp = employee(RemunerationType.SALARIO_FIXO, "1000.00");
         when(reportService.computePayroll(APR_1, APR_30)).thenReturn(List.of(
-                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), breakdownPaying("1000.00"))));
+                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("1000.00"))));
         when(paymentRepository.findAllByOrderByPeriodStartAsc()).thenReturn(List.of());
 
         var summary = payrollService.getSummary(APR_1, APR_30);
@@ -160,7 +160,7 @@ class PayrollServiceTest {
         when(employeeRepository.findById(1L)).thenReturn(Optional.of(emp));
         when(paymentRepository.findByEmployeeIdOrderByPeriodStartAsc(1L)).thenReturn(List.of());
         when(reportService.computeEmployeePayroll(emp, APR_1, APR_30)).thenReturn(
-                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), breakdownPaying("980.00")));
+                new EmployeePayrollData(emp, true, List.of(), List.of(), List.of(), List.of(), List.of(), breakdownPaying("980.00")));
         when(paymentRepository.save(any())).thenAnswer(inv -> {
             PayrollPayment p = inv.getArgument(0);
             p.setId(5L);
@@ -206,6 +206,37 @@ class PayrollServiceTest {
 
         assertThatThrownBy(() -> payrollService.createWorkDay(new PayrollDtos.WorkDayRequest(1L, APR_1, null, null)))
                 .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void unmarkWorkDay_keepsATombstoneSoTheAppointmentDayDoesNotCountAgain() {
+        Employee emp = employee(RemunerationType.DIARISTA, "120.00");
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(emp));
+        when(workDayRepository.findByEmployeeIdAndWorkDate(1L, APR_1)).thenReturn(Optional.empty());
+
+        payrollService.unmarkWorkDay(1L, APR_1);
+
+        verify(workDayRepository).save(argThat(d -> d.isRemoved() && d.getWorkDate().equals(APR_1)));
+    }
+
+    @Test
+    void createWorkDay_onAPreviouslyUnmarkedDay_revivesTheSameRecord() {
+        Employee emp = employee(RemunerationType.DIARISTA, "120.00");
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(emp));
+        EmployeeWorkDay tombstone = new EmployeeWorkDay();
+        tombstone.setId(4L);
+        tombstone.setEmployeeId(1L);
+        tombstone.setWorkDate(APR_1);
+        tombstone.setAmount(BigDecimal.ZERO);
+        tombstone.setRemoved(true);
+        when(workDayRepository.findByEmployeeIdAndWorkDate(1L, APR_1)).thenReturn(Optional.of(tombstone));
+        when(workDayRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var response = payrollService.createWorkDay(new PayrollDtos.WorkDayRequest(1L, APR_1, null, null));
+
+        assertThat(response.id()).isEqualTo(4L);
+        assertThat(response.amount()).isEqualByComparingTo("120.00");
+        assertThat(tombstone.isRemoved()).isFalse();
     }
 
     @Test

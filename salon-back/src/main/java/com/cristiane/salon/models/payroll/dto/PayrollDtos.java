@@ -32,18 +32,33 @@ public final class PayrollDtos {
             @NotEmpty(message = "Informe ao menos um dia") List<LocalDate> dates
     ) {}
 
+    public record UnmarkWorkDayRequest(
+            @NotNull(message = "A colaboradora é obrigatória") Long employeeId,
+            @NotNull(message = "A data é obrigatória") LocalDate date
+    ) {}
+
+    /**
+     * @param id          null quando o dia é automático (teve atendimento e não tem registro próprio)
+     * @param defaultRate diária padrão atual da colaboradora — pra tela destacar dia com valor diferente
+     * @param automatic   contou sozinho por ter atendimento concluído no dia
+     */
     public record WorkDayResponse(
             Long id,
             Long employeeId,
             LocalDate date,
             BigDecimal amount,
             String justification,
-            /** Diária padrão atual da colaboradora — pra tela destacar dia com valor diferente. */
-            BigDecimal defaultRate
+            BigDecimal defaultRate,
+            boolean automatic
     ) {
         public static WorkDayResponse of(EmployeeWorkDay day, BigDecimal defaultRate) {
             return new WorkDayResponse(day.getId(), day.getEmployeeId(), day.getWorkDate(), day.getAmount(),
-                    day.getJustification(), defaultRate);
+                    day.getJustification(), defaultRate, false);
+        }
+
+        public static WorkDayResponse of(WorkDayEntry entry, Long employeeId, BigDecimal defaultRate) {
+            return new WorkDayResponse(entry.id(), employeeId, entry.date(), entry.amount(),
+                    entry.justification(), defaultRate, entry.automatic());
         }
     }
 
@@ -192,7 +207,7 @@ public final class PayrollDtos {
             List<AppointmentLine> appointments,
             List<SaleLine> productSales,
             List<WorkDayResponse> workDays,
-            /** Dias do período com atendimento concluído que ainda não foram marcados como trabalhados. */
+            /** Dias do período com atendimento concluído que foram desmarcados (não contam como diária). */
             List<LocalDate> unmarkedAppointmentDates,
             List<AdjustmentResponse> adjustments,
             /** Todos os pagamentos da colaboradora (não só os do período), do mais recente pro mais antigo. */

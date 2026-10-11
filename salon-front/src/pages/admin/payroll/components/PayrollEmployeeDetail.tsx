@@ -179,7 +179,7 @@ export const PayrollEmployeeDetail = ({
       justification: values.justification.trim() || null,
     };
     const ok = await run(
-      () => (workDayModal.workDay
+      () => (workDayModal.workDay?.id != null
         ? payrollApi.updateWorkDay(workDayModal.workDay.id, input)
         : payrollApi.createWorkDay(input)),
       'Erro ao salvar a diária'
@@ -189,8 +189,8 @@ export const PayrollEmployeeDetail = ({
 
   const removeWorkDay = async () => {
     if (!workDayModal?.workDay) return;
-    const id = workDayModal.workDay.id;
-    const ok = await run(() => payrollApi.deleteWorkDay(id), 'Erro ao desmarcar o dia');
+    const { date } = workDayModal;
+    const ok = await run(() => payrollApi.unmarkWorkDay(employeeId, date), 'Erro ao desmarcar o dia');
     if (ok) setWorkDayModal(null);
   };
 
@@ -320,7 +320,7 @@ export const PayrollEmployeeDetail = ({
               detail.unmarkedAppointmentDates.length > 0 && (
                 <SmallButton onClick={markAppointmentDays} disabled={isSaving || defaultRate == null}>
                   <CalendarCheck size={14} />
-                  Marcar {detail.unmarkedAppointmentDates.length} dia(s) com atendimento
+                  Remarcar {detail.unmarkedAppointmentDates.length} dia(s) desmarcado(s)
                 </SmallButton>
               )
             }
@@ -335,14 +335,16 @@ export const PayrollEmployeeDetail = ({
               periodEnd={detail.periodEnd}
               workDays={detail.workDays}
               appointmentDates={appointmentDates}
+              unmarkedDates={detail.unmarkedAppointmentDates}
               defaultRate={defaultRate}
               busyDate={busyDate}
               onMark={markDay}
               onOpenDay={(day) => setWorkDayModal({ date: day.date, workDay: day })}
             />
             <p className="text-[11px] text-[#7a7074]">
-              Clique num dia vazio pra marcar com a diária padrão; clique num dia marcado pra mudar o valor
-              (com justificativa) ou desmarcar.
+              Dia com atendimento já conta como diária sozinho. Clique num dia marcado pra mudar o valor
+              (com justificativa) ou desmarcar; clique num dia vazio pra marcar um dia trabalhado sem
+              atendimento.
             </p>
           </Section>
         ) : (

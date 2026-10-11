@@ -12,9 +12,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 /**
- * Um dia trabalhado por uma diarista (Diarista ou Diária + Comissão). Cada dia é um registro
- * próprio — dá pra saber exatamente quais dias foram pagos e, quando a diária daquele dia foi
- * diferente da padrão (meio período, feriado...), o valor e o porquê.
+ * Exceção à diária automática de uma diarista (Diarista ou Diária + Comissão). Dia com
+ * atendimento concluído já conta sozinho com a diária padrão; aqui fica só o que foge disso:
+ * dia trabalhado sem atendimento, dia com valor diferente (meio período, feriado...) e o porquê,
+ * ou dia com atendimento que foi desmarcado ({@link #removed}).
  */
 @Getter
 @Setter
@@ -41,6 +42,10 @@ public class EmployeeWorkDay {
     /** Por que este dia teve valor diferente da diária padrão (obrigatório nesse caso). */
     @Column(length = 500)
     private String justification;
+
+    /** Dia desmarcado de propósito — não conta como diária mesmo tendo atendimento. */
+    @Column(nullable = false)
+    private boolean removed;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

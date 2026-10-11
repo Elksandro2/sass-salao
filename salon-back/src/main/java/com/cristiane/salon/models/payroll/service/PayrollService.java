@@ -41,7 +41,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -145,17 +144,9 @@ public class PayrollService {
 
         BigDecimal defaultRate = employee.getRemunerationValue();
         List<WorkDayResponse> workDays = data.workDays().stream()
-                .map(d -> WorkDayResponse.of(d, defaultRate))
+                .map(d -> WorkDayResponse.of(d, employee.getId(), defaultRate))
                 .toList();
-
-        Set<LocalDate> marked = data.workDays().stream().map(EmployeeWorkDay::getWorkDate)
-                .collect(Collectors.toSet());
-        List<LocalDate> unmarked = data.doneAppointments().stream()
-                .map(reportService::appointmentDate)
-                .filter(Objects::nonNull)
-                .filter(d -> !marked.contains(d))
-                .collect(Collectors.toCollection(TreeSet::new))
-                .stream().toList();
+        List<LocalDate> unmarked = data.unmarkedAppointmentDates();
 
         List<AdjustmentResponse> adjustments = data.adjustments().stream().map(AdjustmentResponse::of).toList();
 
@@ -242,34 +233,47 @@ public class PayrollService {
 
     // --- Dias trabalhados -----------------------------------------------------------------------
 
+    /**
+     * Marca um dia como trabalhado. Se o dia tinha sido desmarcado antes (ou é um dia com
+     * atendimento que estava desmarcado), reaproveita o registro em vez de duplicar.
+     */
     @Transactional
     public WorkDayResponse createWorkDay(WorkDayRequest request) {
         Employee employee = findDailyEmployee(request.employeeId());
-        if (workDayRepository.findByEmployeeIdAndWorkDate(employee.getId(), request.date()).isPresent()) {
+        EmployeeWorkDay day = workDayRepository.findByEmployeeIdAndWorkDate(employee.getId(), request.date())
+                .orElse(null);
+        if (day != null && !day.isRemoved()) {
             throw new BadRequestException("Este dia já está marcado como trabalhado.");
         }
-        EmployeeWorkDay day = new EmployeeWorkDay();
-        day.setEmployeeId(employee.getId());
-        day.setWorkDate(request.date());
+        if (day == null) {
+            day = new EmployeeWorkDay();
+            day.setEmployeeId(employee.getId());
+            day.setWorkDate(request.date());
+        }
+        day.setRemoved(false);
         applyWorkDayValues(day, employee, request.amount(), request.justification());
         return WorkDayResponse.of(workDayRepository.save(day), employee.getRemunerationValue());
     }
 
-    /** Marca vários dias de uma vez com a diária padrão (ex.: "marcar os dias com atendimento").
-     *  Dias já marcados são ignorados, não sobrescritos. */
+    /** Remarca de uma vez, com a diária padrão, os dias informados (ex.: os dias com atendimento
+     *  que tinham sido desmarcados). Dia já marcado é ignorado, não sobrescrito. */
     @Transactional
     public List<WorkDayResponse> createWorkDaysBulk(WorkDayBulkRequest request) {
         Employee employee = findDailyEmployee(request.employeeId());
         BigDecimal rate = requireDefaultRate(employee);
         List<WorkDayResponse> created = new ArrayList<>();
         for (LocalDate date : new TreeSet<>(request.dates())) {
-            if (date == null || workDayRepository.findByEmployeeIdAndWorkDate(employee.getId(), date).isPresent()) {
-                continue;
+            if (date == null) continue;
+            EmployeeWorkDay day = workDayRepository.findByEmployeeIdAndWorkDate(employee.getId(), date).orElse(null);
+            if (day != null && !day.isRemoved()) continue;
+            if (day == null) {
+                day = new EmployeeWorkDay();
+                day.setEmployeeId(employee.getId());
+                day.setWorkDate(date);
             }
-            EmployeeWorkDay day = new EmployeeWorkDay();
-            day.setEmployeeId(employee.getId());
-            day.setWorkDate(date);
+            day.setRemoved(false);
             day.setAmount(rate);
+            day.setJustification(null);
             created.add(WorkDayResponse.of(workDayRepository.save(day), rate));
         }
         return created;
@@ -286,16 +290,36 @@ public class PayrollService {
             }
             day.setWorkDate(request.date());
         }
+        day.setRemoved(false);
         applyWorkDayValues(day, employee, request.amount(), request.justification());
         return WorkDayResponse.of(workDayRepository.save(day), employee.getRemunerationValue());
     }
 
+    /**
+     * Desmarca um dia. Não apaga o registro: guarda como "desmarcado", porque um dia com
+     * atendimento voltaria a contar sozinho como diária se simplesmente sumisse daqui.
+     */
+    @Transactional
+    public void unmarkWorkDay(Long employeeId, LocalDate date) {
+        Employee employee = findEmployee(employeeId);
+        EmployeeWorkDay day = workDayRepository.findByEmployeeIdAndWorkDate(employee.getId(), date)
+                .orElseGet(() -> {
+                    EmployeeWorkDay fresh = new EmployeeWorkDay();
+                    fresh.setEmployeeId(employee.getId());
+                    fresh.setWorkDate(date);
+                    return fresh;
+                });
+        day.setRemoved(true);
+        day.setAmount(BigDecimal.ZERO);
+        day.setJustification(null);
+        workDayRepository.save(day);
+    }
+
     @Transactional
     public void deleteWorkDay(Long id) {
-        if (!workDayRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Dia trabalhado não encontrado");
-        }
-        workDayRepository.deleteById(id);
+        EmployeeWorkDay day = workDayRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Dia trabalhado não encontrado"));
+        unmarkWorkDay(day.getEmployeeId(), day.getWorkDate());
     }
 
     /** Valor do dia: o informado, ou a diária padrão. Diferente da padrão exige justificativa. */
