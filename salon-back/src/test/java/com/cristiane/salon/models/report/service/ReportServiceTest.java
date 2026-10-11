@@ -74,6 +74,9 @@ class ReportServiceTest {
     @Mock
     private com.cristiane.salon.models.payroll.repository.PayrollPaymentRepository paymentRepository;
 
+    @Mock
+    private com.cristiane.salon.models.payroll.repository.PayrollSalaryPaymentRepository salaryPaymentRepository;
+
     // SalonClock real, não mock: os testes dependem do "hoje"/"agora" de verdade no fuso
     // do salão, e um mock devolveria null silenciosamente.
     @Spy
@@ -618,6 +621,21 @@ class ReportServiceTest {
         var breakdown = payrollOf(7L, monthStart(), monthEnd());
         assertEquals(0, new BigDecimal("4.00").compareTo(breakdown.appointmentProductCommission()));
         assertEquals(0, BigDecimal.ZERO.compareTo(breakdown.serviceCommission()));
+    }
+
+    @Test
+    void monthlySalary_isTheWholeMonth_proportionalOnlyInTheHiringMonth_andZeroWhenInactive() {
+        Employee alice = employee(1L, "Alice", RemunerationType.SALARIO_FIXO, "3000.00");
+        var profile = new com.cristiane.salon.models.staff.entity.StaffProfile();
+        profile.setHiredAt(LocalDate.of(2026, 4, 16));
+        when(staffProfileRepository.findByUserId(101L)).thenReturn(java.util.Optional.of(profile));
+
+        assertEquals(0, new BigDecimal("1500.00").compareTo(reportService.monthlySalary(alice, java.time.YearMonth.of(2026, 4))));
+        assertEquals(0, new BigDecimal("3000.00").compareTo(reportService.monthlySalary(alice, java.time.YearMonth.of(2026, 5))));
+        assertEquals(0, BigDecimal.ZERO.compareTo(reportService.monthlySalary(alice, java.time.YearMonth.of(2026, 3))));
+
+        alice.getUser().setActive(false);
+        assertEquals(0, BigDecimal.ZERO.compareTo(reportService.monthlySalary(alice, java.time.YearMonth.of(2026, 5))));
     }
 
     @Test

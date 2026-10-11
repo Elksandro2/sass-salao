@@ -31,10 +31,11 @@ public class PayrollPayment {
     @Column(name = "employee_id", nullable = false)
     private Long employeeId;
 
-    @Column(name = "period_start", nullable = false)
+    /** Dias pagos; null (junto com periodEnd) num pagamento só de salário (ver V89). */
+    @Column(name = "period_start")
     private LocalDate periodStart;
 
-    @Column(name = "period_end", nullable = false)
+    @Column(name = "period_end")
     private LocalDate periodEnd;
 
     /** Quanto o sistema calculou pra este período no momento do registro (congelado). */

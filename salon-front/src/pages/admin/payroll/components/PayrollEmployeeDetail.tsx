@@ -16,7 +16,7 @@ import {
   type PayrollPayment,
   type WorkDay,
 } from '../services/payroll';
-import { formatBRL, formatShortDate } from '../payrollUtils';
+import { describePayment, formatBRL, formatShortDate, salaryMonthLabel } from '../payrollUtils';
 import { remunerationIsDaily } from '../../../../utils/remuneration';
 import { useAlert } from '../../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../../utils/apiError';
@@ -301,14 +301,15 @@ export const PayrollEmployeeDetail = ({
   // --- Pagamentos ---
   const savePayment = async (values: PaymentFormValues) => {
     if (!paymentModal) return;
-    if (!values.periodStart || !values.periodEnd || !values.paidAt) {
-      await showError('Preencha o período e a data do pagamento.');
+    if (!values.paidAt) {
+      await showError('Preencha a data do pagamento.');
       return;
     }
     const input = {
       employeeId,
       periodStart: values.periodStart,
       periodEnd: values.periodEnd,
+      salaryMonths: values.salaryMonths,
       paidAt: values.paidAt,
       paymentMethod: values.paymentMethod || null,
       notes: values.notes.trim() || null,
@@ -325,7 +326,7 @@ export const PayrollEmployeeDetail = ({
 
   const deletePayment = (p: PayrollPayment) =>
     confirm(
-      `Excluir o pagamento de ${formatShortDate(p.periodStart)} a ${formatShortDate(p.periodEnd)}? O período volta a ficar em aberto.`,
+      `Excluir o pagamento (${describePayment(p)})? Isso volta a ficar em aberto.`,
       async () => {
         await run(() => payrollApi.deletePayment(p.id), 'Erro ao excluir o pagamento');
       },
@@ -368,6 +369,7 @@ export const PayrollEmployeeDetail = ({
           employeeId,
           periodStart: p.periodStart,
           periodEnd: p.periodEnd,
+          salaryMonths: p.salaryMonths.map((s) => s.month),
           paidAt: p.paidAt,
           paymentMethod: p.paymentMethod,
           notes: p.notes,
@@ -429,13 +431,16 @@ export const PayrollEmployeeDetail = ({
         {/* Composição */}
         <Section title="De onde vem o valor">
           <div className="rounded-xl border border-[#eae1e1] bg-white p-4 space-y-1.5">
-            {b.fixedSalary > 0 && (
+            {summary.salaryMonths.map((s) => (
               <Line
-                label="Salário fixo"
-                value={b.fixedSalary}
-                hint="Proporcional aos dias do período"
+                key={s.month}
+                label={`Salário de ${salaryMonthLabel(s.month)}`}
+                value={s.amount}
+                hint={
+                  s.paid ? `Pago${s.paidAt ? ` em ${formatShortDate(s.paidAt)}` : ''}` : 'Pendente'
+                }
               />
-            )}
+            ))}
             {(isDaily || b.workDaysCount > 0) && (
               <Line
                 label={`Diárias (${b.workDaysCount} dia${b.workDaysCount === 1 ? '' : 's'})`}
@@ -456,9 +461,8 @@ export const PayrollEmployeeDetail = ({
             )}
             {b.additions > 0 && <Line label="Bonificações e acréscimos" value={b.additions} />}
             {b.discounts > 0 && <Line label="Descontos" value={b.discounts} negative />}
-            <Line label="Custo da folha no período" value={b.salonCost} strong />
             {b.advances > 0 && <Line label="Vales já entregues" value={b.advances} negative />}
-            <Line label="Valor do período" value={b.netPayable} strong />
+            <Line label="Valor do período" value={summary.payableAmount} strong />
             {summary.paidInPeriod > 0 && (
               <Line
                 label={
@@ -675,7 +679,16 @@ export const PayrollEmployeeDetail = ({
                 {detail.payments.map((p) => (
                   <tr key={p.id} className={p.changedSincePayment ? 'bg-amber-50/60' : undefined}>
                     <td className="px-3 py-2 text-[#3b3036] whitespace-nowrap">
-                      {formatShortDate(p.periodStart)} a {formatShortDate(p.periodEnd)}
+                      {p.periodStart && p.periodEnd ? (
+                        `${formatShortDate(p.periodStart)} a ${formatShortDate(p.periodEnd)}`
+                      ) : (
+                        <span className="text-[#7a7074]">só salário</span>
+                      )}
+                      {p.salaryMonths.map((s) => (
+                        <span key={s.month} className="block text-[11px] text-[#7a7074]">
+                          Salário de {salaryMonthLabel(s.month)} · {formatBRL(s.amount)}
+                        </span>
+                      ))}
                       {p.notes && (
                         <span className="block text-[11px] text-[#7a7074]">{p.notes}</span>
                       )}
@@ -748,6 +761,7 @@ export const PayrollEmployeeDetail = ({
           filterTo={to}
           paidRanges={summary.paidRanges}
           unpaidRanges={summary.unpaidRanges}
+          salaryMonths={summary.salaryMonths}
           items={periodItems}
           isSaving={isSaving}
           onClose={() => setPaymentModal(null)}
@@ -759,8 +773,6 @@ export const PayrollEmployeeDetail = ({
           employeeId={employeeId}
           employeeName={name}
           payment={paymentModal.payment}
-          defaultPeriodStart={paymentModal.payment.periodStart}
-          defaultPeriodEnd={paymentModal.payment.periodEnd}
           isSaving={isSaving}
           onClose={() => setPaymentModal(null)}
           onSubmit={savePayment}

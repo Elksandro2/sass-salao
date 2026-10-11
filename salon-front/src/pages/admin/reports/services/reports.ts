@@ -21,6 +21,8 @@ export interface EmployeeFinanceResponse {
   paidRanges: PaidRange[];
   /** Dias do filtro sem nenhum pagamento registrado. */
   unpaidRanges: PaidRange[];
+  /** Salário fixo de cada mês do filtro: pago (quando) ou pendente. */
+  salaryMonths: { month: string; amount: number; paid: boolean; paidAt: string | null }[];
 }
 
 export interface PaidRange {
@@ -137,7 +139,9 @@ export const reportsApi = {
     const params: Record<string, string> = {};
     if (from) params.from = from;
     if (to) params.to = to;
-    const { data } = await api.get<ServicePricingAnalysisResponse>('/reports/service-pricing', { params });
+    const { data } = await api.get<ServicePricingAnalysisResponse>('/reports/service-pricing', {
+      params,
+    });
     return data;
   },
 

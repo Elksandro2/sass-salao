@@ -19,6 +19,8 @@ import com.cristiane.salon.models.payroll.dto.EmployeePayrollData;
 import com.cristiane.salon.models.payroll.dto.PayrollBreakdown;
 import com.cristiane.salon.models.payroll.dto.PayrollDtos;
 import com.cristiane.salon.models.payroll.entity.PayrollPayment;
+import com.cristiane.salon.models.payroll.entity.PayrollSalaryPayment;
+import com.cristiane.salon.models.payroll.repository.PayrollSalaryPaymentRepository;
 import com.cristiane.salon.models.payroll.repository.PayrollPaymentRepository;
 import com.cristiane.salon.models.payroll.service.PaymentCoverage;
 import com.cristiane.salon.models.payroll.dto.WorkDayEntry;
@@ -82,6 +84,7 @@ public class ReportService {
     private final PayrollAdjustmentRepository adjustmentRepository;
     private final StaffProfileRepository staffProfileRepository;
     private final PayrollPaymentRepository paymentRepository;
+    private final PayrollSalaryPaymentRepository salaryPaymentRepository;
     private final SalonClock salonClock;
 
     /** Padrão de todos os filtros de período: o mês corrente inteiro (do dia 1 ao último dia). */
@@ -367,8 +370,13 @@ public class ReportService {
         BigDecimal totalFixedExpenses = fixedExpenseRepository.sumAmountByDateBetween(from, to);
 
         List<EmployeePayrollData> payroll = computePayroll(from, to);
-        Map<Long, List<PayrollPayment>> paymentsByEmployee = paymentRepository.findAllByOrderByPeriodStartAsc().stream()
+        List<PayrollPayment> allPayments = paymentRepository.findAllByOrderByPeriodStartAsc();
+        Map<Long, List<PayrollPayment>> paymentsByEmployee = allPayments.stream()
                 .collect(Collectors.groupingBy(PayrollPayment::getEmployeeId));
+        Map<Long, LocalDate> paidAtById = allPayments.stream()
+                .collect(Collectors.toMap(PayrollPayment::getId, PayrollPayment::getPaidAt, (a, b) -> a));
+        Map<Long, List<PayrollSalaryPayment>> salariesByEmployee = salaryPaymentRepository.findAll().stream()
+                .collect(Collectors.groupingBy(PayrollSalaryPayment::getEmployeeId));
         List<EmployeeFinanceResponse> employeeFinanceDetails = new ArrayList<>();
 
         // "Salários" aqui é tudo que não é comissão: salário fixo proporcional, diárias e os
@@ -396,7 +404,9 @@ public class ReportService {
                     showDays ? breakdown.workDaysCount() : null,
                     breakdown.netPayable(),
                     coverage(PaymentCoverage.paidRanges(paymentsByEmployee.getOrDefault(employee.getId(), List.of()), from, to)),
-                    coverage(PaymentCoverage.unpaidRanges(paymentsByEmployee.getOrDefault(employee.getId(), List.of()), from, to))
+                    coverage(pendingDayRanges(employee, PaymentCoverage.unpaidRanges(
+                            paymentsByEmployee.getOrDefault(employee.getId(), List.of()), from, to), from, to, breakdown)),
+                    salaryMonthsOf(employee, salariesByEmployee.getOrDefault(employee.getId(), List.of()), paidAtById, from, to)
             ));
         }
 
@@ -421,6 +431,44 @@ public class ReportService {
 
         return new FinancialReportResponse(income, expense, totalSalaryPaid, totalCommissionPaid,
                 totalFixedExpenses, netProfit, employeeFinanceDetails, period);
+    }
+
+    /** Só as faixas sem pagamento que têm algo a pagar (comissão, diária, lançamento) — salário
+     *  é mensal e aparece à parte. */
+    private List<PaymentCoverage.Range> pendingDayRanges(Employee employee, List<PaymentCoverage.Range> gaps,
+                                                         LocalDate from, LocalDate to, PayrollBreakdown whole) {
+        List<PaymentCoverage.Range> pending = new ArrayList<>();
+        for (PaymentCoverage.Range gap : gaps) {
+            PayrollBreakdown b = gap.start().equals(from) && gap.end().equals(to)
+                    ? whole
+                    : computeEmployeePayroll(employee, gap.start(), gap.end()).breakdown();
+            if (b.netPayable().subtract(b.fixedSalary()).signum() != 0) {
+                pending.add(gap);
+            }
+        }
+        return pending;
+    }
+
+    /** Salário fixo de cada mês tocado por [from, to]: pago (com a data) ou pendente. */
+    private List<PayrollDtos.SalaryMonthStatus> salaryMonthsOf(Employee employee, List<PayrollSalaryPayment> paid,
+                                                               Map<Long, LocalDate> paidAtById,
+                                                               LocalDate from, LocalDate to) {
+        Map<LocalDate, PayrollSalaryPayment> byMonth = paid.stream()
+                .collect(Collectors.toMap(PayrollSalaryPayment::getSalaryMonth, s -> s, (a, b) -> a));
+        List<PayrollDtos.SalaryMonthStatus> result = new ArrayList<>();
+        for (java.time.YearMonth m = java.time.YearMonth.from(from); !m.isAfter(java.time.YearMonth.from(to)); m = m.plusMonths(1)) {
+            PayrollSalaryPayment line = byMonth.get(m.atDay(1));
+            if (line != null) {
+                result.add(new PayrollDtos.SalaryMonthStatus(m.atDay(1), line.getAmount(), true,
+                        paidAtById.get(line.getPaymentId())));
+            } else {
+                BigDecimal amount = monthlySalary(employee, m);
+                if (amount.signum() > 0) {
+                    result.add(new PayrollDtos.SalaryMonthStatus(m.atDay(1), amount, false, null));
+                }
+            }
+        }
+        return result;
     }
 
     private static List<PayrollDtos.CoverageRange> coverage(List<PaymentCoverage.Range> ranges) {
@@ -629,6 +677,28 @@ public class ReportService {
             cursor = segmentEnd.plusDays(1);
         }
         return total;
+    }
+
+    /**
+     * Salário fixo do mês inteiro, como é pago na folha (o lucro do relatório continua
+     * proporcional aos dias filtrados — ver {@link #proratedMonthlySalary}). Primeiro mês de
+     * quem foi contratada no meio dele sai proporcional desde a admissão; antes da admissão,
+     * desligada ou sem salário fixo, zero.
+     */
+    public BigDecimal monthlySalary(Employee employee, java.time.YearMonth month) {
+        RemunerationType type = employee.getRemunerationType();
+        boolean active = employee.getUser() == null || Boolean.TRUE.equals(employee.getUser().getActive());
+        if (!active || type == null || !type.hasFixedSalary() || employee.getRemunerationValue() == null) {
+            return BigDecimal.ZERO;
+        }
+        LocalDate start = month.atDay(1);
+        LocalDate end = month.atEndOfMonth();
+        LocalDate hiredAt = hiredAtOf(employee);
+        if (hiredAt != null) {
+            if (hiredAt.isAfter(end)) return BigDecimal.ZERO;
+            if (hiredAt.isAfter(start)) start = hiredAt;
+        }
+        return proratedMonthlySalary(employee.getRemunerationValue(), start, end);
     }
 
     private LocalDate hiredAtOf(Employee employee) {

@@ -8,12 +8,13 @@ import {
   PAYMENT_METHODS,
   payrollApi,
   type CoverageRange,
+  type SalaryMonthStatus,
   type PayrollAdjustment,
   type PayrollAdjustmentType,
   type PayrollPayment,
   type WorkDay,
 } from '../services/payroll';
-import { formatBRL, formatShortDate, todayIso } from '../payrollUtils';
+import { formatBRL, formatShortDate, salaryMonthLabel, todayIso } from '../payrollUtils';
 
 const inputCls = 'input-premium';
 const labelCls = 'label-premium';
@@ -69,8 +70,11 @@ const CancelButton = ({ onClick }: { onClick: () => void }) => (
 // ─── Pagamento ──────────────────────────────────────────────────────────────
 
 export interface PaymentFormValues {
-  periodStart: string;
-  periodEnd: string;
+  /** null nos dois = pagamento só de salário. */
+  periodStart: string | null;
+  periodEnd: string | null;
+  /** Meses (dia 1, "AAAA-MM-01") cujo salário fixo entra no pagamento. */
+  salaryMonths: string[];
   paidAt: string;
   paymentMethod: string;
   notes: string;
@@ -79,36 +83,34 @@ export interface PaymentFormValues {
 interface PaymentModalProps {
   employeeId: number;
   employeeName: string;
-  /** Pagamento existente (edição) ou null (novo). */
-  payment: PayrollPayment | null;
-  defaultPeriodStart: string;
-  defaultPeriodEnd: string;
+  /** Pagamento já registrado sendo editado. */
+  payment: PayrollPayment;
   isSaving: boolean;
   onClose: () => void;
   onSubmit: (values: PaymentFormValues) => void;
 }
 
 /**
- * Editar pagamento já registrado. O valor não é digitado: é sempre o que o sistema
- * calcula pro período escolhido (prévia ao vivo). Pagar diferente se faz com um lançamento
- * (bônus/desconto) antes. As datas são livres — a API recusa dia que já está em outro pagamento.
+ * Editar pagamento já registrado (Pagamentos realizados). Datas dos dias são editáveis (a API
+ * recusa dia já pago em outro pagamento); salários já incluídos podem ser tirados. O valor não
+ * é digitado: é sempre o calculado (prévia ao vivo).
  */
 export const PaymentModal = ({
   employeeId,
   employeeName,
   payment,
-  defaultPeriodStart,
-  defaultPeriodEnd,
   isSaving,
   onClose,
   onSubmit,
 }: PaymentModalProps) => {
+  const hasDays = payment.periodStart != null;
   const [values, setValues] = useState<PaymentFormValues>({
-    periodStart: payment?.periodStart ?? defaultPeriodStart,
-    periodEnd: payment?.periodEnd ?? defaultPeriodEnd,
-    paidAt: payment?.paidAt ?? todayIso(),
-    paymentMethod: payment?.paymentMethod ?? 'PIX',
-    notes: payment?.notes ?? '',
+    periodStart: payment.periodStart,
+    periodEnd: payment.periodEnd,
+    salaryMonths: payment.salaryMonths.map((s) => s.month),
+    paidAt: payment.paidAt,
+    paymentMethod: payment.paymentMethod ?? 'PIX',
+    notes: payment.notes ?? '',
   });
   const [preview, setPreview] = useState<{
     amount: number | null;
@@ -122,10 +124,12 @@ export const PaymentModal = ({
   const set = (patch: Partial<PaymentFormValues>) => setValues((prev) => ({ ...prev, ...patch }));
 
   const invalidOrder =
-    !!values.periodStart && !!values.periodEnd && values.periodStart > values.periodEnd;
+    hasDays && !!values.periodStart && !!values.periodEnd && values.periodStart > values.periodEnd;
+  const missingDates = hasDays && (!values.periodStart || !values.periodEnd);
+  const monthsKey = values.salaryMonths.join(',');
 
   useEffect(() => {
-    if (!values.periodStart || !values.periodEnd || values.periodStart > values.periodEnd) {
+    if (invalidOrder || missingDates) {
       setPreview({ amount: null, conflict: null, loading: false });
       return;
     }
@@ -133,7 +137,12 @@ export const PaymentModal = ({
     setPreview((prev) => ({ ...prev, loading: true }));
     const timer = setTimeout(() => {
       payrollApi
-        .previewPayment(employeeId, values.periodStart, values.periodEnd, payment?.id)
+        .previewPayment(employeeId, {
+          periodStart: hasDays ? values.periodStart : null,
+          periodEnd: hasDays ? values.periodEnd : null,
+          salaryMonths: values.salaryMonths,
+          ignorePaymentId: payment.id,
+        })
         .then(
           (p) =>
             !cancelled &&
@@ -145,13 +154,26 @@ export const PaymentModal = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [employeeId, values.periodStart, values.periodEnd, payment?.id]);
+  }, [employeeId, values.periodStart, values.periodEnd, monthsKey, payment.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const blocked = invalidOrder || !!preview.conflict || preview.loading || !values.paidAt;
+  const blocked =
+    invalidOrder ||
+    missingDates ||
+    !!preview.conflict ||
+    preview.loading ||
+    preview.amount == null ||
+    !values.paidAt;
+
+  const toggleMonth = (month: string) =>
+    set({
+      salaryMonths: values.salaryMonths.includes(month)
+        ? values.salaryMonths.filter((m) => m !== month)
+        : [...values.salaryMonths, month].sort(),
+    });
 
   return (
     <ModalShell
-      title={payment ? 'Editar pagamento' : 'Marcar período como pago'}
+      title="Editar pagamento"
       subtitle={employeeName}
       onClose={onClose}
       footer={
@@ -163,38 +185,70 @@ export const PaymentModal = ({
             onClick={() => onSubmit(values)}
             className="btn-premium text-sm px-5 py-2.5 disabled:opacity-50"
           >
-            {isSaving ? 'Salvando...' : payment ? 'Salvar' : 'Registrar pagamento'}
+            {isSaving ? 'Salvando...' : 'Salvar'}
           </button>
         </>
       }
     >
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label htmlFor="pay-start" className={labelCls}>
-            De
-          </label>
-          <input
-            id="pay-start"
-            type="date"
-            className={inputCls}
-            value={values.periodStart}
-            onChange={(e) => set({ periodStart: e.target.value })}
-          />
+      {hasDays ? (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="pay-start" className={labelCls}>
+              Dias — de
+            </label>
+            <input
+              id="pay-start"
+              type="date"
+              className={inputCls}
+              value={values.periodStart ?? ''}
+              onChange={(e) => set({ periodStart: e.target.value })}
+            />
+          </div>
+          <div>
+            <label htmlFor="pay-end" className={labelCls}>
+              até
+            </label>
+            <input
+              id="pay-end"
+              type="date"
+              className={inputCls}
+              value={values.periodEnd ?? ''}
+              onChange={(e) => set({ periodEnd: e.target.value })}
+            />
+          </div>
         </div>
-        <div>
-          <label htmlFor="pay-end" className={labelCls}>
-            Até
-          </label>
-          <input
-            id="pay-end"
-            type="date"
-            className={inputCls}
-            value={values.periodEnd}
-            onChange={(e) => set({ periodEnd: e.target.value })}
-          />
+      ) : (
+        <p className="text-xs text-[#7a7074]">
+          Pagamento só de salário (sem dias de comissão/diária).
+        </p>
+      )}
+      {invalidOrder && <p className="text-xs text-rose-600">O "de" precisa ser antes do "até".</p>}
+
+      {payment.salaryMonths.length > 0 && (
+        <div className="space-y-1.5">
+          <span className={labelCls}>Salário fixo incluído</span>
+          {payment.salaryMonths.map((s) => (
+            <label
+              key={s.month}
+              className="flex items-center justify-between gap-2 rounded-lg border border-[#eae1e1] px-3 py-2 text-sm cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={values.salaryMonths.includes(s.month)}
+                  onChange={() => toggleMonth(s.month)}
+                />
+                Salário de {salaryMonthLabel(s.month)}
+              </span>
+              <span className="text-xs text-[#7a7074]">{formatBRL(s.amount)}</span>
+            </label>
+          ))}
+          <p className="text-[11px] text-[#7a7074]">
+            Desmarcar tira o salário deste pagamento — ele volta a ficar pendente.
+          </p>
         </div>
-      </div>
-      {invalidOrder && <p className="text-xs text-rose-600">O "De" precisa ser antes do "Até".</p>}
+      )}
+
       {preview.conflict && (
         <p className="text-xs text-rose-600 rounded-lg bg-rose-50 border border-rose-200 px-3 py-2">
           {preview.conflict}
@@ -202,25 +256,19 @@ export const PaymentModal = ({
       )}
 
       <div className="rounded-xl border border-[#eae1e1] bg-[#fcf9f9]/50 px-4 py-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7a7074]">
-          Valor do período
-        </p>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7a7074]">Valor</p>
         <p className="text-2xl font-extrabold text-[#3b3036]" data-testid="payment-preview-amount">
           {preview.loading ? '…' : preview.amount != null ? formatBRL(preview.amount) : '—'}
         </p>
         <p className="text-[11px] text-[#7a7074] mt-1">
-          Calculado pelo sistema (salário, diárias, comissões e lançamentos do período). Pra pagar
-          diferente, lance um bônus ou desconto antes de registrar.
+          Calculado pelo sistema. Pra pagar diferente, lance um bônus ou desconto antes.
         </p>
-        {payment &&
-          payment.amountPaid !== preview.amount &&
-          preview.amount != null &&
-          !preview.loading && (
-            <p className="text-[11px] font-semibold text-amber-700 mt-1">
-              Registrado hoje: {formatBRL(payment.amountPaid)} — ao salvar passa a ser{' '}
-              {formatBRL(preview.amount)}.
-            </p>
-          )}
+        {payment.amountPaid !== preview.amount && preview.amount != null && !preview.loading && (
+          <p className="text-[11px] font-semibold text-amber-700 mt-1">
+            Registrado hoje: {formatBRL(payment.amountPaid)} — ao salvar passa a ser{' '}
+            {formatBRL(preview.amount)}.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -265,15 +313,8 @@ export const PaymentModal = ({
           className={`${inputCls} resize-none`}
           value={values.notes}
           onChange={(e) => set({ notes: e.target.value })}
-          placeholder="Ex.: pago em duas vezes"
         />
       </div>
-      {values.periodStart && values.periodEnd && !invalidOrder && (
-        <p className="text-[11px] text-[#7a7074]">
-          Cobre {formatShortDate(values.periodStart)} a {formatShortDate(values.periodEnd)}. Não
-          gera lançamento no Fluxo de Caixa — a folha já sai do lucro no relatório.
-        </p>
-      )}
     </ModalShell>
   );
 };
@@ -527,8 +568,10 @@ interface MarkPaidModalProps {
   filterTo: string;
   /** Pagamentos que tocam o filtro (período real de cada um). */
   paidRanges: CoverageRange[];
-  /** Dias do filtro que ainda não foram pagos. */
+  /** Dias do filtro que ainda não foram pagos e têm algo a pagar. */
   unpaidRanges: CoverageRange[];
+  /** Salário fixo de cada mês do filtro, pago ou pendente. */
+  salaryMonths: SalaryMonthStatus[];
   items: PeriodItem[];
   isSaving: boolean;
   onClose: () => void;
@@ -543,10 +586,11 @@ const clip = (r: CoverageRange, from: string, to: string) => ({
 });
 
 /**
- * "Marcar como pago" do período filtrado. As datas não são digitadas: vêm do filtro, e se parte
- * dele já foi paga o período é encurtado sozinho pros dias pendentes (com escolha quando os
- * dias pendentes ficam separados). Lista tudo que compõe a folha nesses dias — verde = já pago,
- * laranja = pendente. O valor é sempre o calculado.
+ * "Marcar como pago" do período filtrado. Os dias não são digitados: vêm do filtro, e se parte
+ * dele já foi paga o período é encurtado sozinho pros dias pendentes (com escolha quando os dias
+ * pendentes ficam separados). O salário fixo é MENSAL: cada mês pendente do filtro vem marcado e
+ * pode ser desmarcado pra ficar pra outro pagamento; mês já pago nem aparece como opção. Dá pra
+ * registrar só salário. O valor é sempre o calculado.
  */
 export const MarkPaidModal = ({
   employeeId,
@@ -555,53 +599,58 @@ export const MarkPaidModal = ({
   filterTo,
   paidRanges,
   unpaidRanges,
+  salaryMonths,
   items,
   isSaving,
   onClose,
   onSubmit,
 }: MarkPaidModalProps) => {
+  const pendingSalaries = salaryMonths.filter((s) => !s.paid);
+  const paidSalaries = salaryMonths.filter((s) => s.paid);
   const [selected, setSelected] = useState(0);
+  const [months, setMonths] = useState<string[]>(pendingSalaries.map((s) => s.month));
   const [paidAt, setPaidAt] = useState(todayIso());
   const [paymentMethod, setPaymentMethod] = useState('PIX');
   const [notes, setNotes] = useState('');
   const [preview, setPreview] = useState<{
     amount: number | null;
     conflict: string | null;
-    fixedSalary: number;
     loading: boolean;
-  }>({ amount: null, conflict: null, fixedSalary: 0, loading: true });
+  }>({
+    amount: null,
+    conflict: null,
+    loading: true,
+  });
 
   const target = unpaidRanges[selected] ?? null;
-  const nothingToPay = unpaidRanges.length === 0;
+  const nothingToPay = unpaidRanges.length === 0 && pendingSalaries.length === 0;
+  const emptySelection = !target && months.length === 0;
   const adjusted = !!target && (target.start !== filterFrom || target.end !== filterTo);
+  const monthsKey = months.join(',');
 
   useEffect(() => {
-    if (!target) {
-      setPreview({ amount: null, conflict: null, fixedSalary: 0, loading: false });
+    if (!target && months.length === 0) {
+      setPreview({ amount: null, conflict: null, loading: false });
       return;
     }
     let cancelled = false;
     setPreview((prev) => ({ ...prev, loading: true }));
     payrollApi
-      .previewPayment(employeeId, target.start, target.end)
+      .previewPayment(employeeId, {
+        periodStart: target?.start ?? null,
+        periodEnd: target?.end ?? null,
+        salaryMonths: months,
+      })
       .then(
         (p) =>
           !cancelled &&
-          setPreview({
-            amount: p.calculatedAmount,
-            conflict: p.conflict,
-            fixedSalary: p.breakdown?.fixedSalary ?? 0,
-            loading: false,
-          })
+          setPreview({ amount: p.calculatedAmount, conflict: p.conflict, loading: false })
       )
-      .catch(
-        () =>
-          !cancelled && setPreview({ amount: null, conflict: null, fixedSalary: 0, loading: false })
-      );
+      .catch(() => !cancelled && setPreview({ amount: null, conflict: null, loading: false }));
     return () => {
       cancelled = true;
     };
-  }, [employeeId, target?.start, target?.end]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [employeeId, target?.start, target?.end, monthsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const visibleItems = items
     .filter((i) => i.date >= filterFrom && i.date <= filterTo)
@@ -615,11 +664,16 @@ export const MarkPaidModal = ({
 
   const blocked =
     nothingToPay ||
-    !target ||
+    emptySelection ||
     !!preview.conflict ||
     preview.loading ||
     preview.amount == null ||
     !paidAt;
+
+  const toggleMonth = (month: string) =>
+    setMonths((prev) =>
+      prev.includes(month) ? prev.filter((m) => m !== month) : [...prev, month].sort()
+    );
 
   return (
     <ModalShell
@@ -633,10 +687,10 @@ export const MarkPaidModal = ({
             type="button"
             disabled={isSaving || blocked}
             onClick={() =>
-              target &&
               onSubmit({
-                periodStart: target.start,
-                periodEnd: target.end,
+                periodStart: target?.start ?? null,
+                periodEnd: target?.end ?? null,
+                salaryMonths: months,
                 paidAt,
                 paymentMethod,
                 notes,
@@ -670,56 +724,114 @@ export const MarkPaidModal = ({
         <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
           Todo o período filtrado já está pago.
         </p>
-      ) : unpaidRanges.length > 1 ? (
-        <div className="space-y-1.5">
-          <span className={labelCls}>
-            Os dias pendentes estão separados — escolha qual pagar agora
-          </span>
-          {unpaidRanges.map((r, i) => (
-            <label
-              key={r.start}
-              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer ${
-                i === selected ? 'border-[#be8a83] bg-[#fdf6f5]' : 'border-[#eae1e1]'
-              }`}
-            >
-              <input
-                type="radio"
-                name="unpaid-range"
-                checked={i === selected}
-                onChange={() => setSelected(i)}
-              />
-              {formatShortDate(r.start)} a {formatShortDate(r.end)}
-            </label>
-          ))}
-        </div>
-      ) : null}
-
-      {target && (
-        <div className="rounded-xl border border-[#eae1e1] bg-[#fcf9f9]/50 px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7a7074]">
-            Período deste pagamento
-          </p>
-          <p className="text-sm font-bold text-[#3b3036]" data-testid="mark-paid-period">
-            {formatShortDate(target.start)} a {formatShortDate(target.end)}
-          </p>
-          {adjusted && (
-            <p className="text-[11px] text-[#7a7074]">
-              Ajustado pros dias que ainda não foram pagos.
+      ) : (
+        <>
+          {/* Dias (comissões, diárias, bônus, descontos) */}
+          {unpaidRanges.length > 1 ? (
+            <div className="space-y-1.5">
+              <span className={labelCls}>Dias pendentes separados — escolha qual pagar agora</span>
+              {unpaidRanges.map((r, i) => (
+                <label
+                  key={r.start}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer ${
+                    i === selected ? 'border-[#be8a83] bg-[#fdf6f5]' : 'border-[#eae1e1]'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="unpaid-range"
+                    checked={i === selected}
+                    onChange={() => setSelected(i)}
+                  />
+                  {formatShortDate(r.start)} a {formatShortDate(r.end)}
+                </label>
+              ))}
+            </div>
+          ) : null}
+          {target ? (
+            <div className="rounded-xl border border-[#eae1e1] bg-[#fcf9f9]/50 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7a7074]">
+                Dias deste pagamento
+              </p>
+              <p className="text-sm font-bold text-[#3b3036]" data-testid="mark-paid-period">
+                {formatShortDate(target.start)} a {formatShortDate(target.end)}
+              </p>
+              {adjusted && (
+                <p className="text-[11px] text-[#7a7074]">
+                  Ajustado pros dias que ainda não foram pagos.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-[#7a7074]" data-testid="mark-paid-period">
+              Nenhum dia pendente com valor a pagar — só salário.
             </p>
           )}
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7a7074] mt-3">
-            Valor
-          </p>
-          <p
-            className="text-2xl font-extrabold text-[#3b3036]"
-            data-testid="payment-preview-amount"
-          >
-            {preview.loading ? '…' : preview.amount != null ? formatBRL(preview.amount) : '—'}
-          </p>
-          <p className="text-[11px] text-[#7a7074]">
-            Calculado pelo sistema. Pra pagar diferente, lance um bônus ou desconto antes.
-          </p>
-        </div>
+
+          {/* Salário fixo mensal */}
+          {(pendingSalaries.length > 0 || paidSalaries.length > 0) && (
+            <div className="space-y-1.5">
+              <span className={labelCls}>Salário fixo (mensal)</span>
+              {pendingSalaries.map((s) => (
+                <label
+                  key={s.month}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm cursor-pointer"
+                >
+                  <span className="flex items-center gap-2 text-[#3b3036]">
+                    <input
+                      type="checkbox"
+                      aria-label={`Salário de ${salaryMonthLabel(s.month)}`}
+                      checked={months.includes(s.month)}
+                      onChange={() => toggleMonth(s.month)}
+                    />
+                    Salário de {salaryMonthLabel(s.month)}
+                  </span>
+                  <span className="font-semibold text-amber-700">{formatBRL(s.amount)}</span>
+                </label>
+              ))}
+              {pendingSalaries.some((s) => !months.includes(s.month)) && (
+                <p className="text-[11px] text-[#7a7074]">
+                  O salário desmarcado fica pendente pra outro pagamento.
+                </p>
+              )}
+              {paidSalaries.map((s) => (
+                <p
+                  key={s.month}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-700"
+                >
+                  <span>
+                    Salário de {salaryMonthLabel(s.month)} já pago
+                    {s.paidAt ? ` em ${formatShortDate(s.paidAt)}` : ''}
+                  </span>
+                  <span className="font-semibold">{formatBRL(s.amount)}</span>
+                </p>
+              ))}
+            </div>
+          )}
+
+          <div className="rounded-xl border border-[#eae1e1] bg-[#fcf9f9]/50 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7a7074]">
+              Valor
+            </p>
+            <p
+              className="text-2xl font-extrabold text-[#3b3036]"
+              data-testid="payment-preview-amount"
+            >
+              {emptySelection
+                ? '—'
+                : preview.loading
+                  ? '…'
+                  : preview.amount != null
+                    ? formatBRL(preview.amount)
+                    : '—'}
+            </p>
+            <p className="text-[11px] text-[#7a7074]">
+              {emptySelection
+                ? 'Nada selecionado pra pagar.'
+                : 'Calculado pelo sistema. Pra pagar diferente, lance um bônus ou desconto antes.'}
+            </p>
+          </div>
+        </>
       )}
       {preview.conflict && (
         <p className="text-xs text-rose-600 rounded-lg bg-rose-50 border border-rose-200 px-3 py-2">
@@ -728,18 +840,9 @@ export const MarkPaidModal = ({
       )}
 
       <div className="space-y-1">
-        <span className={labelCls}>Folha no período filtrado</span>
+        <span className={labelCls}>Comissões, diárias e lançamentos no período filtrado</span>
         <ul className="rounded-xl border border-[#eae1e1] divide-y divide-[#eae1e1]/60 max-h-56 overflow-y-auto">
-          {target && preview.fixedSalary > 0 && (
-            <li className="flex items-center justify-between gap-2 px-3 py-2 text-xs bg-amber-50/60">
-              <span className="text-[#3b3036]">
-                <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-amber-500" />
-                Salário fixo ({formatShortDate(target.start)} a {formatShortDate(target.end)})
-              </span>
-              <span className="font-semibold text-amber-700">{formatBRL(preview.fixedSalary)}</span>
-            </li>
-          )}
-          {visibleItems.length === 0 && !(target && preview.fixedSalary > 0) && (
+          {visibleItems.length === 0 && (
             <li className="px-3 py-2 text-xs text-[#7a7074]">Nada lançado nesses dias.</li>
           )}
           {visibleItems.map((item) => {

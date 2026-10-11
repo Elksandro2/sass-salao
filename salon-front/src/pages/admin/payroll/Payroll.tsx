@@ -41,7 +41,8 @@ const STATUS_STYLE: Record<PeriodStatus, { label: string; cls: string }> = {
 const compositionLabel = (item: PayrollEmployeeSummary) => {
   const b = item.breakdown;
   const parts: string[] = [];
-  if (b.fixedSalary > 0) parts.push('salário');
+  if (item.salaryMonths.length > 0)
+    parts.push(item.salaryMonths.length === 1 ? 'salário' : `${item.salaryMonths.length} salários`);
   if (b.workDaysCount > 0)
     parts.push(`${b.workDaysCount} diária${b.workDaysCount === 1 ? '' : 's'}`);
   if (b.totalCommission > 0) parts.push('comissões');
@@ -294,7 +295,7 @@ export const Payroll = () => {
                               {compositionLabel(item)}
                             </td>
                             <td className="px-5 py-4 text-sm font-extrabold text-[#be8a83] text-right whitespace-nowrap">
-                              {formatBRL(item.breakdown.netPayable)}
+                              {formatBRL(item.payableAmount)}
                               {item.outstanding > 0 && item.periodStatus !== 'EM_ABERTO' && (
                                 <span className="block text-[11px] font-semibold text-rose-600">
                                   falta {formatBRL(item.outstanding)}
@@ -336,9 +337,10 @@ export const Payroll = () => {
                                     {formatShortDate(item.lastPayment.paidAt)}
                                   </span>
                                   <span className="block text-[11px] text-[#7a7074]">
-                                    {formatBRL(item.lastPayment.amountPaid)} · ref.{' '}
-                                    {formatShortDate(item.lastPayment.periodStart)} a{' '}
-                                    {formatShortDate(item.lastPayment.periodEnd)}
+                                    {formatBRL(item.lastPayment.amountPaid)} ·{' '}
+                                    {item.lastPayment.periodStart && item.lastPayment.periodEnd
+                                      ? `ref. ${formatShortDate(item.lastPayment.periodStart)} a ${formatShortDate(item.lastPayment.periodEnd)}`
+                                      : 'só salário'}
                                   </span>
                                 </>
                               ) : (

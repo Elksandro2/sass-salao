@@ -145,10 +145,11 @@ public class PayrollController {
     @Operation(summary = "Valor que será registrado ao marcar o período como pago e conflito de datas (Admin)")
     public ResponseEntity<PaymentPreview> previewPayment(
             @RequestParam Long employeeId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodStart,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodEnd,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodEnd,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) List<LocalDate> salaryMonths,
             @RequestParam(required = false) Long ignorePaymentId) {
-        return ResponseEntity.ok(payrollService.previewPayment(employeeId, periodStart, periodEnd, ignorePaymentId));
+        return ResponseEntity.ok(payrollService.previewPayment(employeeId, periodStart, periodEnd, salaryMonths, ignorePaymentId));
     }
 
     @PostMapping("/payments")

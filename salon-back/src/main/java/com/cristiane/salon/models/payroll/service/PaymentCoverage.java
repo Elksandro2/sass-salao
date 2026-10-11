@@ -27,6 +27,7 @@ public final class PaymentCoverage {
      */
     public static List<Range> paidRanges(List<PayrollPayment> payments, LocalDate from, LocalDate to) {
         List<PayrollPayment> touching = payments.stream()
+                .filter(p -> p.getPeriodStart() != null) // pagamento só de salário não cobre dias
                 .filter(p -> !p.getPeriodEnd().isBefore(from) && !p.getPeriodStart().isAfter(to))
                 .sorted(Comparator.comparing(PayrollPayment::getPeriodStart))
                 .toList();

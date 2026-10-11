@@ -78,6 +78,8 @@ const summary: PayrollSummary = {
       paidRanges: [],
       unpaidRanges: [{ start: from, end: to, amount: null }],
       pendingDifference: 0,
+      payableAmount: 265,
+      salaryMonths: [],
       hasPaymentGaps: false,
     },
   ],

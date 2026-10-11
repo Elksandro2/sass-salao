@@ -30,6 +30,12 @@ import { useAuth } from '../../../hooks/useAuth';
 import { formatApiDate } from '../../../utils/datetime';
 
 const inputCls = 'input-premium';
+
+/** "2026-10-01" → "outubro/2026". */
+const monthName = (month: string) => {
+  const d = new Date(`${month}T12:00:00`);
+  return `${d.toLocaleDateString('pt-BR', { month: 'long' })}/${d.getFullYear()}`;
+};
 const labelCls = 'label-premium';
 
 export const Reports = () => {
@@ -76,7 +82,12 @@ export const Reports = () => {
     setIsGeneratingPDF(true);
     try {
       // Busca o fluxo de caixa de novo antes de desenhar o PDF (dado sempre fresco no documento)
-      const cfPage = await cashFlowApi.findByPeriod(dateFrom || undefined, dateTo || undefined, 0, 1000);
+      const cfPage = await cashFlowApi.findByPeriod(
+        dateFrom || undefined,
+        dateTo || undefined,
+        0,
+        1000
+      );
       const cfData = cfPage.content;
 
       const doc = new jsPDF();
@@ -120,7 +131,13 @@ export const Reports = () => {
       autoTable(doc, {
         startY: currentY,
         head: [
-          ['Receitas', 'Despesas Gerais', 'Comissões, Salários, Diárias e Extras', 'Gastos Fixos', 'Lucro Líquido'],
+          [
+            'Receitas',
+            'Despesas Gerais',
+            'Comissões, Salários, Diárias e Extras',
+            'Gastos Fixos',
+            'Lucro Líquido',
+          ],
         ],
         body: [
           [
@@ -146,7 +163,10 @@ export const Reports = () => {
           doc.addPage();
           currentY = 20;
         }
-        currentY = drawSectionHeader('2. Detalhamento de Remunerações por Colaborador(a)', currentY);
+        currentY = drawSectionHeader(
+          '2. Detalhamento de Remunerações por Colaborador(a)',
+          currentY
+        );
 
         const employeeRows = financial.employeeFinanceDetails.map((emp) => {
           const typeStr = remunerationLabel(emp.remunerationType);
@@ -175,10 +195,15 @@ export const Reports = () => {
             `R$ ${(emp.estimatedPayment ?? 0).toFixed(2)}`,
             [
               ...(emp.paidRanges ?? []).map(
-                (r) => `${formatApiDate(r.start)} a ${formatApiDate(r.end)}: R$ ${(r.amount ?? 0).toFixed(2)}`
+                (r) =>
+                  `${formatApiDate(r.start)} a ${formatApiDate(r.end)}: R$ ${(r.amount ?? 0).toFixed(2)}`
               ),
               ...(emp.unpaidRanges ?? []).map(
                 (r) => `Sem pagamento de ${formatApiDate(r.start)} a ${formatApiDate(r.end)}`
+              ),
+              ...(emp.salaryMonths ?? []).map(
+                (s) =>
+                  `Salário ${monthName(s.month)}: ${s.paid ? `pago R$ ${s.amount.toFixed(2)}` : 'pendente'}`
               ),
             ].join('\n'),
           ];
@@ -186,7 +211,17 @@ export const Reports = () => {
 
         autoTable(doc, {
           startY: currentY,
-          head: [['Nome', 'Tipo', 'Base', 'Atend.', 'Valor Atendimentos', 'Pagamento Estimado', 'Período Pago']],
+          head: [
+            [
+              'Nome',
+              'Tipo',
+              'Base',
+              'Atend.',
+              'Valor Atendimentos',
+              'Pagamento Estimado',
+              'Período Pago',
+            ],
+          ],
           body: employeeRows,
           theme: 'striped',
           headStyles: { fillColor: [59, 48, 54], textColor: [255, 255, 255], fontStyle: 'bold' },
@@ -303,7 +338,10 @@ export const Reports = () => {
   const chartDataRevenue = Object.entries(revenueByDate)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, amount]) => ({
-      Data: new Date(`${date}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+      Data: new Date(`${date}T12:00:00`).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+      }),
       Receita: amount,
     }));
 
@@ -429,7 +467,9 @@ export const Reports = () => {
                       Comissões, salários, diárias e extras
                     </p>
                     <p className="text-xl font-extrabold text-indigo-600">
-                      {formatBRL((financial?.totalSalaryPaid ?? 0) + (financial?.totalCommissionPaid ?? 0))}
+                      {formatBRL(
+                        (financial?.totalSalaryPaid ?? 0) + (financial?.totalCommissionPaid ?? 0)
+                      )}
                     </p>
                   </div>
                   <div className="bg-white rounded-2xl border border-[#eae1e1]/80 p-5 shadow-sm transition-all duration-300 relative overflow-hidden group">
@@ -534,7 +574,10 @@ export const Reports = () => {
                                 </td>
                                 <td className="px-6 py-4 text-xs whitespace-nowrap">
                                   {(emp.paidRanges ?? []).map((r) => (
-                                    <span key={r.start} className="block font-semibold text-emerald-700">
+                                    <span
+                                      key={r.start}
+                                      className="block font-semibold text-emerald-700"
+                                    >
                                       {formatApiDate(r.start)} a {formatApiDate(r.end)} ·{' '}
                                       {formatBRL(r.amount ?? 0)}
                                     </span>
@@ -543,6 +586,15 @@ export const Reports = () => {
                                     <span key={r.start} className="block text-rose-600">
                                       Nenhuma quantia quitada de {formatApiDate(r.start)} a{' '}
                                       {formatApiDate(r.end)}
+                                    </span>
+                                  ))}
+                                  {(emp.salaryMonths ?? []).map((s) => (
+                                    <span
+                                      key={s.month}
+                                      className={`block ${s.paid ? 'font-semibold text-emerald-700' : 'text-rose-600'}`}
+                                    >
+                                      Salário de {monthName(s.month)}:{' '}
+                                      {s.paid ? `pago · ${formatBRL(s.amount)}` : 'pendente'}
                                     </span>
                                   ))}
                                 </td>

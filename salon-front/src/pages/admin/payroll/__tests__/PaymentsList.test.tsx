@@ -28,6 +28,7 @@ const payment: PayrollPayment = {
   employeeName: 'Ella',
   periodStart: '2026-09-01',
   periodEnd: '2026-09-15',
+  salaryMonths: [],
   calculatedAmount: 600,
   amountPaid: 600,
   paidAt: '2026-09-16',

@@ -17,8 +17,30 @@ vi.mock('../../../../hooks/useAlert', () => ({
 }));
 
 const mockEmployees = [
-  { employeeId: 1, employeeName: 'Mariana', doneAppointmentsCount: 5, doneAppointmentsValue: 500, doneProductsValue: 0, calculatedPayout: 200, estimatedPayment: 200, paidRanges: [], unpaidRanges: [] },
-  { employeeId: 2, employeeName: 'Joana', doneAppointmentsCount: 3, doneAppointmentsValue: 300, doneProductsValue: 0, calculatedPayout: 100, estimatedPayment: 100, paidRanges: [], unpaidRanges: [] },
+  {
+    employeeId: 1,
+    employeeName: 'Mariana',
+    doneAppointmentsCount: 5,
+    doneAppointmentsValue: 500,
+    doneProductsValue: 0,
+    calculatedPayout: 200,
+    estimatedPayment: 200,
+    paidRanges: [],
+    unpaidRanges: [],
+    salaryMonths: [],
+  },
+  {
+    employeeId: 2,
+    employeeName: 'Joana',
+    doneAppointmentsCount: 3,
+    doneAppointmentsValue: 300,
+    doneProductsValue: 0,
+    calculatedPayout: 100,
+    estimatedPayment: 100,
+    paidRanges: [],
+    unpaidRanges: [],
+    salaryMonths: [],
+  },
 ];
 
 const mockHistory = [
@@ -63,7 +85,13 @@ describe('EmployeeFinancialHistorySection', () => {
     });
 
     await waitFor(() => {
-      expect(reportsApi.getEmployeeFinancialHistory).toHaveBeenCalledWith(1, undefined, undefined, 0, 10);
+      expect(reportsApi.getEmployeeFinancialHistory).toHaveBeenCalledWith(
+        1,
+        undefined,
+        undefined,
+        0,
+        10
+      );
     });
 
     expect(screen.getByText('Corte')).toBeInTheDocument();
@@ -74,7 +102,11 @@ describe('EmployeeFinancialHistorySection', () => {
 
   it('passes the date range filters through to the API call', async () => {
     customRender(
-      <EmployeeFinancialHistorySection employees={mockEmployees} dateFrom="2026-06-01" dateTo="2026-06-30" />
+      <EmployeeFinancialHistorySection
+        employees={mockEmployees}
+        dateFrom="2026-06-01"
+        dateTo="2026-06-30"
+      />
     );
 
     const select = screen.getByRole('combobox');

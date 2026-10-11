@@ -18,6 +18,8 @@ public record EmployeeFinanceResponse(
         BigDecimal estimatedPayment,
         /** Pagamentos que cobrem o filtro, com o período real de cada um (contíguos unidos). */
         java.util.List<com.cristiane.salon.models.payroll.dto.PayrollDtos.CoverageRange> paidRanges,
-        /** Dias do filtro sem nenhum pagamento registrado. */
-        java.util.List<com.cristiane.salon.models.payroll.dto.PayrollDtos.CoverageRange> unpaidRanges
+        /** Dias do filtro sem pagamento e com algo a pagar (comissão, diária, lançamento). */
+        java.util.List<com.cristiane.salon.models.payroll.dto.PayrollDtos.CoverageRange> unpaidRanges,
+        /** Salário fixo de cada mês do filtro: pago (quando) ou pendente. */
+        java.util.List<com.cristiane.salon.models.payroll.dto.PayrollDtos.SalaryMonthStatus> salaryMonths
 ) {}

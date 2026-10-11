@@ -30,7 +30,8 @@ function formatDate(item: AppointmentFinancialResponse): string {
     const period = item.scheduledPeriod ? ` — ${PERIOD_LABELS[item.scheduledPeriod]}` : '';
     return `${new Date(item.scheduledDate + 'T12:00:00').toLocaleDateString('pt-BR')}${period}`;
   }
-  if (item.preferredDate) return new Date(item.preferredDate + 'T12:00:00').toLocaleDateString('pt-BR');
+  if (item.preferredDate)
+    return new Date(item.preferredDate + 'T12:00:00').toLocaleDateString('pt-BR');
   return '—';
 }
 
@@ -76,7 +77,10 @@ export const EmployeeFinancialHistorySection = ({ employees, dateFrom, dateTo }:
         setHistory(response.content);
         setTotalPages(response.totalPages || 1);
       } catch (err) {
-        const msg = getApiErrorMessage(err, 'Erro ao carregar histórico financeiro do profissional.');
+        const msg = getApiErrorMessage(
+          err,
+          'Erro ao carregar histórico financeiro do profissional.'
+        );
         await showError(msg);
       } finally {
         setIsLoading(false);
@@ -88,7 +92,11 @@ export const EmployeeFinancialHistorySection = ({ employees, dateFrom, dateTo }:
   const columns = [
     { key: 'date', label: 'Data', render: formatDate },
     { key: 'serviceName', label: 'Serviço' },
-    { key: 'price', label: 'Preço', render: (item: AppointmentFinancialResponse) => formatBRL(item.price) },
+    {
+      key: 'price',
+      label: 'Preço',
+      render: (item: AppointmentFinancialResponse) => formatBRL(item.price),
+    },
     {
       key: 'status',
       label: 'Status',
@@ -98,7 +106,9 @@ export const EmployeeFinancialHistorySection = ({ employees, dateFrom, dateTo }:
       key: 'paymentStatus',
       label: 'Pagamento',
       render: (item: AppointmentFinancialResponse) =>
-        item.paymentStatus ? (PAYMENT_STATUS_LABELS[item.paymentStatus] ?? item.paymentStatus) : '—',
+        item.paymentStatus
+          ? (PAYMENT_STATUS_LABELS[item.paymentStatus] ?? item.paymentStatus)
+          : '—',
     },
   ];
 

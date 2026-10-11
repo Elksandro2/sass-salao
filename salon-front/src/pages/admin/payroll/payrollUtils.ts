@@ -40,3 +40,36 @@ export const monthLabel = (year: number, monthIndex: number) => {
   });
   return label.charAt(0).toUpperCase() + label.slice(1);
 };
+
+/** "2026-10-01" → "outubro/2026". */
+export const salaryMonthLabel = (month: string) => {
+  const d = parseIsoDate(month);
+  return `${d.toLocaleDateString('pt-BR', { month: 'long' })}/${d.getFullYear()}`;
+};
+
+interface PaymentLike {
+  periodStart: string | null;
+  periodEnd: string | null;
+  salaryMonths: { month: string }[];
+}
+
+/** Dias que o pagamento cobre; pagamento só de salário cobre os meses do salário. */
+export const paymentSpan = (p: PaymentLike) => {
+  if (p.periodStart && p.periodEnd) return { from: p.periodStart, to: p.periodEnd };
+  const months = p.salaryMonths.map((s) => s.month).sort();
+  const first = months[0] ?? todayIso();
+  const last = parseIsoDate(months.at(-1) ?? first);
+  return { from: first, to: monthRange(last.getFullYear(), last.getMonth()).to };
+};
+
+/** "01/10/2026 a 15/10/2026 · salário de outubro/2026" (ou só uma das partes). */
+export const describePayment = (p: PaymentLike) => {
+  const parts: string[] = [];
+  if (p.periodStart && p.periodEnd) {
+    parts.push(`${formatShortDate(p.periodStart)} a ${formatShortDate(p.periodEnd)}`);
+  }
+  if (p.salaryMonths.length > 0) {
+    parts.push(`salário de ${p.salaryMonths.map((s) => salaryMonthLabel(s.month)).join(', ')}`);
+  }
+  return parts.join(' · ');
+};

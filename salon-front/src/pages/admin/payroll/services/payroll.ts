@@ -76,17 +76,30 @@ export interface PayrollEmployeeSummary {
   /** Pagamento mais recente (null = nunca pago) — não depende do filtro de datas. */
   lastPayment: {
     paidAt: string;
-    periodStart: string;
-    periodEnd: string;
+    /** null = pagamento só de salário. */
+    periodStart: string | null;
+    periodEnd: string | null;
     amountPaid: number;
   } | null;
   /** Pagamentos que tocam o filtro, com o período real de cada um (contíguos unidos). */
   paidRanges: CoverageRange[];
-  /** Dias do filtro sem nenhum pagamento. */
+  /** Dias do filtro sem pagamento e com algo a pagar (comissão, diária, lançamento). */
   unpaidRanges: CoverageRange[];
   /** Diferença entre o recalculado de hoje e o registrado nos pagamentos do filtro. Positivo = falta pagar. */
   pendingDifference: number;
   hasPaymentGaps: boolean;
+  /** O que a folha do filtro vale com o salário MENSAL (cada mês tocado, inteiro). */
+  payableAmount: number;
+  /** Salário fixo de cada mês tocado pelo filtro, pago ou pendente. */
+  salaryMonths: SalaryMonthStatus[];
+}
+
+/** Salário fixo de um mês ({@code month} = "AAAA-MM-01"). */
+export interface SalaryMonthStatus {
+  month: string;
+  amount: number;
+  paid: boolean;
+  paidAt: string | null;
 }
 
 export interface PayrollSummary {
@@ -153,8 +166,11 @@ export interface PayrollPayment {
   id: number;
   employeeId: number;
   employeeName: string;
-  periodStart: string;
-  periodEnd: string;
+  /** Dias pagos — null num pagamento só de salário. */
+  periodStart: string | null;
+  periodEnd: string | null;
+  /** Salários fixos mensais quitados neste pagamento. */
+  salaryMonths: { month: string; amount: number }[];
   calculatedAmount: number;
   amountPaid: number;
   paidAt: string;
@@ -194,8 +210,11 @@ export interface AdjustmentInput {
 
 export interface PaymentInput {
   employeeId: number;
-  periodStart: string;
-  periodEnd: string;
+  /** null nos dois = pagamento só de salário. */
+  periodStart: string | null;
+  periodEnd: string | null;
+  /** Meses ("AAAA-MM-01") cujo salário fixo entra no pagamento. */
+  salaryMonths: string[];
   paidAt: string;
   paymentMethod?: string | null;
   notes?: string | null;
@@ -275,14 +294,22 @@ export const payrollApi = {
   },
 
   /** Valor que será registrado ao marcar [periodStart, periodEnd] como pago, e conflito de datas. */
+  /** Valor que será registrado (dias + salários escolhidos) e o problema, se houver. */
   previewPayment: async (
     employeeId: number,
-    periodStart: string,
-    periodEnd: string,
-    ignorePaymentId?: number
+    input: {
+      periodStart: string | null;
+      periodEnd: string | null;
+      salaryMonths: string[];
+      ignorePaymentId?: number;
+    }
   ) => {
-    const params: Record<string, string | number> = { employeeId, periodStart, periodEnd };
-    if (ignorePaymentId) params.ignorePaymentId = ignorePaymentId;
+    // URLSearchParams repete a chave (salaryMonths=a&salaryMonths=b), formato que o Spring entende.
+    const params = new URLSearchParams({ employeeId: String(employeeId) });
+    if (input.periodStart) params.append('periodStart', input.periodStart);
+    if (input.periodEnd) params.append('periodEnd', input.periodEnd);
+    input.salaryMonths.forEach((m) => params.append('salaryMonths', m));
+    if (input.ignorePaymentId) params.append('ignorePaymentId', String(input.ignorePaymentId));
     const { data } = await api.get<{
       calculatedAmount: number;
       conflict: string | null;

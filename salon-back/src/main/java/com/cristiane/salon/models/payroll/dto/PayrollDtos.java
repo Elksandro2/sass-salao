@@ -91,13 +91,18 @@ public final class PayrollDtos {
     // --- Pagamentos (período quitado) ---------------------------------------------------------
 
     /**
-     * Registro de "período pago". O valor NÃO vem daqui: é sempre o que o sistema calcula pro
-     * período — pagar diferente se faz com um lançamento (bônus/desconto) antes.
+     * Registro de pagamento da folha. O valor NÃO vem daqui: é sempre o que o sistema calcula —
+     * pagar diferente se faz com um lançamento (bônus/desconto) antes.
+     *
+     * @param periodStart  dias pagos (comissões, diárias, bônus, descontos) — null junto com
+     *                     periodEnd num pagamento só de salário
+     * @param salaryMonths meses cujo salário fixo é quitado neste pagamento (qualquer dia do mês)
      */
     public record PaymentRequest(
             @NotNull(message = "A colaboradora é obrigatória") Long employeeId,
-            @NotNull(message = "O início do período é obrigatório") LocalDate periodStart,
-            @NotNull(message = "O fim do período é obrigatório") LocalDate periodEnd,
+            LocalDate periodStart,
+            LocalDate periodEnd,
+            List<LocalDate> salaryMonths,
             @NotNull(message = "A data do pagamento é obrigatória") LocalDate paidAt,
             @Size(max = 20) String paymentMethod,
             @Size(max = 1000, message = "A observação deve ter no máximo 1000 caracteres") String notes
@@ -107,8 +112,11 @@ public final class PayrollDtos {
             Long id,
             Long employeeId,
             String employeeName,
+            /** Dias pagos — null num pagamento só de salário. */
             LocalDate periodStart,
             LocalDate periodEnd,
+            /** Salários fixos mensais quitados neste pagamento. */
+            List<SalaryLine> salaryMonths,
             /** Valor que o sistema calculou quando o pagamento foi registrado. */
             BigDecimal calculatedAmount,
             BigDecimal amountPaid,
@@ -172,8 +180,18 @@ public final class PayrollDtos {
              *  filtro (algo foi editado depois de pago). Positivo = falta pagar. */
             BigDecimal pendingDifference,
             /** Há um buraco entre pagamentos registrados (algum período no meio ficou sem pagar). */
-            boolean hasPaymentGaps
+            boolean hasPaymentGaps,
+            /** O que a folha deste filtro vale com o salário MENSAL (cada mês tocado, inteiro). */
+            BigDecimal payableAmount,
+            /** Salário fixo de cada mês tocado pelo filtro, pago ou pendente. */
+            List<SalaryMonthStatus> salaryMonths
     ) {}
+
+    /** Salário de um mês dentro de um pagamento ({@code month} = dia 1 do mês). */
+    public record SalaryLine(LocalDate month, BigDecimal amount) {}
+
+    /** Salário fixo de um mês: quanto, e se já foi quitado (e quando). */
+    public record SalaryMonthStatus(LocalDate month, BigDecimal amount, boolean paid, LocalDate paidAt) {}
 
     /** Faixa de dias; {@code amount} = soma paga na faixa (null em faixa sem pagamento). */
     public record CoverageRange(LocalDate start, LocalDate end, BigDecimal amount) {}

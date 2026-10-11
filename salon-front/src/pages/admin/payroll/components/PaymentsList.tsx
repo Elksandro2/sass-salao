@@ -3,7 +3,14 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, Pencil, Trash2, X } from 'lucide-react';
 import { PAYMENT_METHODS, payrollApi, type PayrollPayment } from '../services/payroll';
 import { employeesApi, type EmployeeData } from '../../employees/services/employees';
-import { currentMonthRange, formatBRL, formatShortDate } from '../payrollUtils';
+import {
+  currentMonthRange,
+  formatBRL,
+  formatShortDate,
+  describePayment,
+  paymentSpan,
+  salaryMonthLabel,
+} from '../payrollUtils';
 import { PaymentModal, type PaymentFormValues } from './PayrollModals';
 import { PayrollEmployeeDetail } from './PayrollEmployeeDetail';
 import { useAlert } from '../../../../hooks/useAlert';
@@ -68,6 +75,7 @@ export const PaymentsList = () => {
         employeeId: editTarget.employeeId,
         periodStart: values.periodStart,
         periodEnd: values.periodEnd,
+        salaryMonths: values.salaryMonths,
         paidAt: values.paidAt,
         paymentMethod: values.paymentMethod || null,
         notes: values.notes.trim() || null,
@@ -83,7 +91,7 @@ export const PaymentsList = () => {
 
   const remove = (p: PayrollPayment) =>
     confirm(
-      `Excluir o pagamento de ${p.employeeName} (${formatShortDate(p.periodStart)} a ${formatShortDate(p.periodEnd)})? Esses dias voltam a ficar em aberto.`,
+      `Excluir o pagamento de ${p.employeeName} (${describePayment(p)})? Isso volta a ficar em aberto.`,
       async () => {
         try {
           await payrollApi.deletePayment(p.id);
@@ -199,7 +207,16 @@ export const PaymentsList = () => {
                       {p.employeeName}
                     </td>
                     <td className="px-5 py-4 text-sm text-[#3b3036] whitespace-nowrap">
-                      {formatShortDate(p.periodStart)} a {formatShortDate(p.periodEnd)}
+                      {p.periodStart && p.periodEnd ? (
+                        `${formatShortDate(p.periodStart)} a ${formatShortDate(p.periodEnd)}`
+                      ) : (
+                        <span className="text-[#7a7074]">só salário</span>
+                      )}
+                      {p.salaryMonths.map((s) => (
+                        <span key={s.month} className="block text-[11px] text-[#7a7074]">
+                          Salário de {salaryMonthLabel(s.month)} · {formatBRL(s.amount)}
+                        </span>
+                      ))}
                       {p.notes && (
                         <span className="block text-[11px] text-[#7a7074]">{p.notes}</span>
                       )}
@@ -254,8 +271,6 @@ export const PaymentsList = () => {
           employeeId={editTarget.employeeId}
           employeeName={editTarget.employeeName}
           payment={editTarget}
-          defaultPeriodStart={editTarget.periodStart}
-          defaultPeriodEnd={editTarget.periodEnd}
           isSaving={isSaving}
           onClose={() => setEditTarget(null)}
           onSubmit={saveEdit}
@@ -272,8 +287,8 @@ export const PaymentsList = () => {
                     {detailTarget.employeeName}
                   </h3>
                   <p className="text-xs text-[#7a7074] mt-0.5">
-                    Folha de {formatShortDate(detailTarget.periodStart)} a{' '}
-                    {formatShortDate(detailTarget.periodEnd)}
+                    Folha de {formatShortDate(paymentSpan(detailTarget).from)} a{' '}
+                    {formatShortDate(paymentSpan(detailTarget).to)}
                   </p>
                 </div>
                 <button
@@ -291,8 +306,8 @@ export const PaymentsList = () => {
               <div className="overflow-y-auto flex-1 min-h-0">
                 <PayrollEmployeeDetail
                   employeeId={detailTarget.employeeId}
-                  from={detailTarget.periodStart}
-                  to={detailTarget.periodEnd}
+                  from={paymentSpan(detailTarget).from}
+                  to={paymentSpan(detailTarget).to}
                   onChanged={load}
                 />
               </div>
