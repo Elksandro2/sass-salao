@@ -339,5 +339,7 @@ class PayrollServiceTest {
 
         assertThat(preview.calculatedAmount()).isEqualByComparingTo("1000.00");
         assertThat(preview.conflict()).contains("01/04/2026 a 15/04/2026");
+        assertThat(preview.breakdown()).isNotNull();
+        assertThat(preview.breakdown().fixedSalary()).isEqualByComparingTo("1000.00");
     }
 }

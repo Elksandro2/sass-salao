@@ -16,13 +16,15 @@ import {
   type PayrollPayment,
   type WorkDay,
 } from '../services/payroll';
-import { formatBRL, formatShortDate, suggestPaymentPeriod } from '../payrollUtils';
+import { formatBRL, formatShortDate } from '../payrollUtils';
 import { remunerationIsDaily } from '../../../../utils/remuneration';
 import { useAlert } from '../../../../hooks/useAlert';
 import { getApiErrorMessage } from '../../../../utils/apiError';
 import {
   AdjustmentModal,
+  MarkPaidModal,
   PaymentModal,
+  type PeriodItem,
   WorkDayModal,
   type AdjustmentFormValues,
   type PaymentFormValues,
@@ -374,7 +376,38 @@ export const PayrollEmployeeDetail = ({
     );
 
   const changedPayments = detail.payments.filter((p) => p.changedSincePayment);
-  const suggested = suggestPaymentPeriod(detail.payments, from);
+  // Itens da folha no período, pra lista colorida (já pago / pendente) do "Marcar como pago".
+  const periodItems: PeriodItem[] = [
+    ...detail.appointments
+      .filter((a) => a.serviceCommission + a.productCommission > 0)
+      .map((a) => ({
+        key: `apt-${a.appointmentId}`,
+        date: a.date,
+        label: `Comissão · ${a.clientName ?? 'atendimento'} (${a.serviceNames})`,
+        amount: a.serviceCommission + a.productCommission,
+      })),
+    ...detail.productSales
+      .filter((sale) => sale.commission > 0)
+      .map((sale) => ({
+        key: `sale-${sale.cashFlowId}`,
+        date: sale.date,
+        label: `Comissão · ${sale.description}`,
+        amount: sale.commission,
+      })),
+    ...detail.workDays.map((d) => ({
+      key: `day-${d.date}`,
+      date: d.date,
+      label: d.automatic ? 'Diária (dia com atendimento)' : 'Diária',
+      amount: d.amount,
+    })),
+    ...detail.adjustments.map((a) => ({
+      key: `adj-${a.id}`,
+      date: a.date,
+      label: `${ADJUSTMENT_LABELS[a.type]}${a.description ? ` · ${a.description}` : ''}`,
+      amount: a.amount,
+      negative: !a.addition,
+    })),
+  ];
 
   return (
     <div className="px-4 sm:px-6 py-5 bg-[#fcf9f9]/50 border-t border-[#eae1e1] space-y-6">
@@ -621,7 +654,7 @@ export const PayrollEmployeeDetail = ({
         title="Pagamentos registrados"
         action={
           <SmallButton onClick={() => setPaymentModal({ payment: null })}>
-            <Wallet size={14} /> Marcar período como pago
+            <Wallet size={14} /> Marcar como pago
           </SmallButton>
         }
       >
@@ -707,13 +740,27 @@ export const PayrollEmployeeDetail = ({
         }}
       />
 
-      {paymentModal && (
+      {paymentModal && paymentModal.payment == null && (
+        <MarkPaidModal
+          employeeId={employeeId}
+          employeeName={name}
+          filterFrom={from}
+          filterTo={to}
+          paidRanges={summary.paidRanges}
+          unpaidRanges={summary.unpaidRanges}
+          items={periodItems}
+          isSaving={isSaving}
+          onClose={() => setPaymentModal(null)}
+          onSubmit={savePayment}
+        />
+      )}
+      {paymentModal && paymentModal.payment != null && (
         <PaymentModal
           employeeId={employeeId}
           employeeName={name}
           payment={paymentModal.payment}
-          defaultPeriodStart={suggested.from}
-          defaultPeriodEnd={suggested.to}
+          defaultPeriodStart={paymentModal.payment.periodStart}
+          defaultPeriodEnd={paymentModal.payment.periodEnd}
           isSaving={isSaving}
           onClose={() => setPaymentModal(null)}
           onSubmit={savePayment}

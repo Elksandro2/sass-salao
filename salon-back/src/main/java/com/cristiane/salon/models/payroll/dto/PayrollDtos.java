@@ -179,7 +179,7 @@ public final class PayrollDtos {
     public record CoverageRange(LocalDate start, LocalDate end, BigDecimal amount) {}
 
     /** Prévia do "marcar como pago": valor que será registrado e, se houver, o conflito de datas. */
-    public record PaymentPreview(BigDecimal calculatedAmount, String conflict) {}
+    public record PaymentPreview(BigDecimal calculatedAmount, String conflict, BreakdownResponse breakdown) {}
 
     /** Data em que foi pago, a que período se refere e quanto. */
     public record LastPayment(LocalDate paidAt, LocalDate periodStart, LocalDate periodEnd, BigDecimal amountPaid) {}

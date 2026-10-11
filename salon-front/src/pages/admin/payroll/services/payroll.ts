@@ -283,10 +283,11 @@ export const payrollApi = {
   ) => {
     const params: Record<string, string | number> = { employeeId, periodStart, periodEnd };
     if (ignorePaymentId) params.ignorePaymentId = ignorePaymentId;
-    const { data } = await api.get<{ calculatedAmount: number; conflict: string | null }>(
-      '/payroll/payments/preview',
-      { params }
-    );
+    const { data } = await api.get<{
+      calculatedAmount: number;
+      conflict: string | null;
+      breakdown: PayrollBreakdown | null;
+    }>('/payroll/payments/preview', { params });
     return data;
   },
 

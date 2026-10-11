@@ -426,9 +426,11 @@ public class PayrollService {
     public PaymentPreview previewPayment(Long employeeId, LocalDate start, LocalDate end, Long ignorePaymentId) {
         Employee employee = findEmployee(employeeId);
         String conflict = periodProblem(employeeId, start, end, ignorePaymentId);
-        BigDecimal amount = start.isAfter(end) ? BigDecimal.ZERO
-                : reportService.computeEmployeePayroll(employee, start, end).breakdown().netPayable();
-        return new PaymentPreview(amount, conflict);
+        if (start.isAfter(end)) {
+            return new PaymentPreview(BigDecimal.ZERO, conflict, null);
+        }
+        var breakdown = reportService.computeEmployeePayroll(employee, start, end).breakdown();
+        return new PaymentPreview(breakdown.netPayable(), conflict, BreakdownResponse.of(breakdown));
     }
 
     @Transactional

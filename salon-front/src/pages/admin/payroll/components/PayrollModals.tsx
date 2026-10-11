@@ -7,6 +7,7 @@ import {
   ADJUSTMENT_LABELS,
   PAYMENT_METHODS,
   payrollApi,
+  type CoverageRange,
   type PayrollAdjustment,
   type PayrollAdjustmentType,
   type PayrollPayment,
@@ -88,7 +89,7 @@ interface PaymentModalProps {
 }
 
 /**
- * Marcar período como pago / editar pagamento. O valor não é digitado: é sempre o que o sistema
+ * Editar pagamento já registrado. O valor não é digitado: é sempre o que o sistema
  * calcula pro período escolhido (prévia ao vivo). Pagar diferente se faz com um lançamento
  * (bônus/desconto) antes. As datas são livres — a API recusa dia que já está em outro pagamento.
  */
@@ -500,6 +501,326 @@ export const WorkDayModal = ({
           value={values.justification}
           onChange={(e) => setValues((prev) => ({ ...prev, justification: e.target.value }))}
           placeholder="Ex.: meio período, feriado, ficou até mais tarde..."
+        />
+      </div>
+    </ModalShell>
+  );
+};
+
+// ─── Marcar como pago (período do filtro) ───────────────────────────────────
+
+/** Um item da folha no período, pra lista colorida do "Marcar como pago". */
+export interface PeriodItem {
+  key: string;
+  date: string;
+  label: string;
+  amount: number;
+  /** Desconto (abate do valor). */
+  negative?: boolean;
+}
+
+interface MarkPaidModalProps {
+  employeeId: number;
+  employeeName: string;
+  /** Período do filtro do topo — as datas do pagamento saem daqui, não são digitadas. */
+  filterFrom: string;
+  filterTo: string;
+  /** Pagamentos que tocam o filtro (período real de cada um). */
+  paidRanges: CoverageRange[];
+  /** Dias do filtro que ainda não foram pagos. */
+  unpaidRanges: CoverageRange[];
+  items: PeriodItem[];
+  isSaving: boolean;
+  onClose: () => void;
+  onSubmit: (values: PaymentFormValues) => void;
+}
+
+const inRange = (date: string, r: { start: string; end: string }) =>
+  date >= r.start && date <= r.end;
+const clip = (r: CoverageRange, from: string, to: string) => ({
+  start: r.start < from ? from : r.start,
+  end: r.end > to ? to : r.end,
+});
+
+/**
+ * "Marcar como pago" do período filtrado. As datas não são digitadas: vêm do filtro, e se parte
+ * dele já foi paga o período é encurtado sozinho pros dias pendentes (com escolha quando os
+ * dias pendentes ficam separados). Lista tudo que compõe a folha nesses dias — verde = já pago,
+ * laranja = pendente. O valor é sempre o calculado.
+ */
+export const MarkPaidModal = ({
+  employeeId,
+  employeeName,
+  filterFrom,
+  filterTo,
+  paidRanges,
+  unpaidRanges,
+  items,
+  isSaving,
+  onClose,
+  onSubmit,
+}: MarkPaidModalProps) => {
+  const [selected, setSelected] = useState(0);
+  const [paidAt, setPaidAt] = useState(todayIso());
+  const [paymentMethod, setPaymentMethod] = useState('PIX');
+  const [notes, setNotes] = useState('');
+  const [preview, setPreview] = useState<{
+    amount: number | null;
+    conflict: string | null;
+    fixedSalary: number;
+    loading: boolean;
+  }>({ amount: null, conflict: null, fixedSalary: 0, loading: true });
+
+  const target = unpaidRanges[selected] ?? null;
+  const nothingToPay = unpaidRanges.length === 0;
+  const adjusted = !!target && (target.start !== filterFrom || target.end !== filterTo);
+
+  useEffect(() => {
+    if (!target) {
+      setPreview({ amount: null, conflict: null, fixedSalary: 0, loading: false });
+      return;
+    }
+    let cancelled = false;
+    setPreview((prev) => ({ ...prev, loading: true }));
+    payrollApi
+      .previewPayment(employeeId, target.start, target.end)
+      .then(
+        (p) =>
+          !cancelled &&
+          setPreview({
+            amount: p.calculatedAmount,
+            conflict: p.conflict,
+            fixedSalary: p.breakdown?.fixedSalary ?? 0,
+            loading: false,
+          })
+      )
+      .catch(
+        () =>
+          !cancelled && setPreview({ amount: null, conflict: null, fixedSalary: 0, loading: false })
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeId, target?.start, target?.end]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const visibleItems = items
+    .filter((i) => i.date >= filterFrom && i.date <= filterTo)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const status = (date: string) =>
+    paidRanges.some((r) => inRange(date, r))
+      ? 'paid'
+      : target && inRange(date, target)
+        ? 'included'
+        : 'later';
+
+  const blocked =
+    nothingToPay ||
+    !target ||
+    !!preview.conflict ||
+    preview.loading ||
+    preview.amount == null ||
+    !paidAt;
+
+  return (
+    <ModalShell
+      title="Marcar como pago"
+      subtitle={employeeName}
+      onClose={onClose}
+      footer={
+        <>
+          <CancelButton onClick={onClose} />
+          <button
+            type="button"
+            disabled={isSaving || blocked}
+            onClick={() =>
+              target &&
+              onSubmit({
+                periodStart: target.start,
+                periodEnd: target.end,
+                paidAt,
+                paymentMethod,
+                notes,
+              })
+            }
+            className="btn-premium text-sm px-5 py-2.5 disabled:opacity-50"
+          >
+            {isSaving ? 'Salvando...' : 'Registrar pagamento'}
+          </button>
+        </>
+      }
+    >
+      <div className="text-xs text-[#7a7074] space-y-1">
+        <p>
+          Período filtrado:{' '}
+          <strong className="text-[#3b3036]">
+            {formatShortDate(filterFrom)} a {formatShortDate(filterTo)}
+          </strong>
+        </p>
+        {paidRanges.map((r) => {
+          const c = clip(r, filterFrom, filterTo);
+          return (
+            <p key={r.start} className="text-emerald-700 font-semibold">
+              Dias {formatShortDate(c.start)} a {formatShortDate(c.end)} já pagos
+            </p>
+          );
+        })}
+      </div>
+
+      {nothingToPay ? (
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+          Todo o período filtrado já está pago.
+        </p>
+      ) : unpaidRanges.length > 1 ? (
+        <div className="space-y-1.5">
+          <span className={labelCls}>
+            Os dias pendentes estão separados — escolha qual pagar agora
+          </span>
+          {unpaidRanges.map((r, i) => (
+            <label
+              key={r.start}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer ${
+                i === selected ? 'border-[#be8a83] bg-[#fdf6f5]' : 'border-[#eae1e1]'
+              }`}
+            >
+              <input
+                type="radio"
+                name="unpaid-range"
+                checked={i === selected}
+                onChange={() => setSelected(i)}
+              />
+              {formatShortDate(r.start)} a {formatShortDate(r.end)}
+            </label>
+          ))}
+        </div>
+      ) : null}
+
+      {target && (
+        <div className="rounded-xl border border-[#eae1e1] bg-[#fcf9f9]/50 px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7a7074]">
+            Período deste pagamento
+          </p>
+          <p className="text-sm font-bold text-[#3b3036]" data-testid="mark-paid-period">
+            {formatShortDate(target.start)} a {formatShortDate(target.end)}
+          </p>
+          {adjusted && (
+            <p className="text-[11px] text-[#7a7074]">
+              Ajustado pros dias que ainda não foram pagos.
+            </p>
+          )}
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7a7074] mt-3">
+            Valor
+          </p>
+          <p
+            className="text-2xl font-extrabold text-[#3b3036]"
+            data-testid="payment-preview-amount"
+          >
+            {preview.loading ? '…' : preview.amount != null ? formatBRL(preview.amount) : '—'}
+          </p>
+          <p className="text-[11px] text-[#7a7074]">
+            Calculado pelo sistema. Pra pagar diferente, lance um bônus ou desconto antes.
+          </p>
+        </div>
+      )}
+      {preview.conflict && (
+        <p className="text-xs text-rose-600 rounded-lg bg-rose-50 border border-rose-200 px-3 py-2">
+          {preview.conflict}
+        </p>
+      )}
+
+      <div className="space-y-1">
+        <span className={labelCls}>Folha no período filtrado</span>
+        <ul className="rounded-xl border border-[#eae1e1] divide-y divide-[#eae1e1]/60 max-h-56 overflow-y-auto">
+          {target && preview.fixedSalary > 0 && (
+            <li className="flex items-center justify-between gap-2 px-3 py-2 text-xs bg-amber-50/60">
+              <span className="text-[#3b3036]">
+                <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-amber-500" />
+                Salário fixo ({formatShortDate(target.start)} a {formatShortDate(target.end)})
+              </span>
+              <span className="font-semibold text-amber-700">{formatBRL(preview.fixedSalary)}</span>
+            </li>
+          )}
+          {visibleItems.length === 0 && !(target && preview.fixedSalary > 0) && (
+            <li className="px-3 py-2 text-xs text-[#7a7074]">Nada lançado nesses dias.</li>
+          )}
+          {visibleItems.map((item) => {
+            const st = status(item.date);
+            const cls =
+              st === 'paid' ? 'bg-emerald-50/60' : st === 'included' ? 'bg-amber-50/60' : '';
+            const dot = st === 'paid' ? 'bg-emerald-500' : 'bg-amber-500';
+            const valueCls = st === 'paid' ? 'text-emerald-700' : 'text-amber-700';
+            return (
+              <li
+                key={item.key}
+                data-status={st}
+                className={`flex items-center justify-between gap-2 px-3 py-2 text-xs ${cls}`}
+              >
+                <span className="text-[#3b3036] min-w-0">
+                  <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${dot}`} />
+                  {formatShortDate(item.date)} · {item.label}
+                  {st === 'later' && (
+                    <span className="text-[#7a7074]"> (fica pra outro pagamento)</span>
+                  )}
+                </span>
+                <span className={`font-semibold whitespace-nowrap ${valueCls}`}>
+                  {item.negative ? '− ' : ''}
+                  {formatBRL(item.amount)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="flex gap-4 text-[11px] text-[#7a7074]">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" /> já pago
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-amber-500" /> pendente
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="mark-paid-date" className={labelCls}>
+            Pago em
+          </label>
+          <input
+            id="mark-paid-date"
+            type="date"
+            className={inputCls}
+            value={paidAt}
+            onChange={(e) => setPaidAt(e.target.value)}
+          />
+        </div>
+        <div>
+          <label htmlFor="mark-paid-method" className={labelCls}>
+            Forma
+          </label>
+          <select
+            id="mark-paid-method"
+            className={inputCls}
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value)}
+          >
+            {Object.entries(PAYMENT_METHODS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label htmlFor="mark-paid-notes" className={labelCls}>
+          Observação (opcional)
+        </label>
+        <textarea
+          id="mark-paid-notes"
+          rows={2}
+          maxLength={1000}
+          className={`${inputCls} resize-none`}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
         />
       </div>
     </ModalShell>

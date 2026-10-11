@@ -56,6 +56,7 @@ describe('PaymentsList', () => {
     vi.mocked(payrollApi.previewPayment).mockResolvedValue({
       calculatedAmount: 900,
       conflict: 'Parte deste período já foi paga: 16/09/2026 a 30/09/2026 (pago em 01/10/2026).',
+      breakdown: null,
     });
     await act(async () => {
       customRender(<PaymentsList />);
@@ -64,7 +65,9 @@ describe('PaymentsList', () => {
       fireEvent.click(screen.getByLabelText('Editar pagamento'));
     });
 
-    await waitFor(() => expect(screen.getByText(/Parte deste período já foi paga/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Parte deste período já foi paga/)).toBeInTheDocument()
+    );
     expect(screen.getByText('Salvar')).toBeDisabled();
     expect(payrollApi.updatePayment).not.toHaveBeenCalled();
   });

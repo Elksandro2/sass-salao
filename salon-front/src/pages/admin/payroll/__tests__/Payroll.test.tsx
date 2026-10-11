@@ -148,7 +148,11 @@ describe('Payroll page', () => {
     vi.clearAllMocks();
     vi.mocked(payrollApi.getSummary).mockResolvedValue(summary);
     vi.mocked(payrollApi.getEmployeeDetail).mockResolvedValue(detail);
-    vi.mocked(payrollApi.previewPayment).mockResolvedValue({ calculatedAmount: 265, conflict: null });
+    vi.mocked(payrollApi.previewPayment).mockResolvedValue({
+      calculatedAmount: 265,
+      conflict: null,
+      breakdown: null,
+    });
   });
 
   it('shows the summary and the last payment column', async () => {
@@ -259,7 +263,7 @@ describe('Payroll page', () => {
     await waitFor(() => expect(screen.getByText('modal-agendamento-11')).toBeInTheDocument());
   });
 
-  it('opens the payment modal with the calculated (locked) value and the suggested period', async () => {
+  it('opens "Marcar como pago" locked to the filter, with the calculated value', async () => {
     await act(async () => {
       customRender(<Payroll />);
     });
@@ -269,13 +273,16 @@ describe('Payroll page', () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByText('Marcar período como pago', { selector: 'h3' })).toBeInTheDocument()
+      expect(screen.getByText('Marcar como pago', { selector: 'h3' })).toBeInTheDocument()
     );
-    // valor travado: vem da prévia do sistema, não é um campo editável
-    await waitFor(() => expect(screen.getByTestId('payment-preview-amount').textContent).toContain('265,00'));
+    await waitFor(() =>
+      expect(screen.getByTestId('payment-preview-amount').textContent).toContain('265,00')
+    );
+    // nada pago ainda: o período é exatamente o do filtro, sem campo de data editável
+    expect(screen.getByTestId('mark-paid-period').textContent).toContain(
+      new Date(`${from}T12:00:00`).toLocaleDateString('pt-BR')
+    );
+    expect(document.body.querySelector('#pay-start')).toBeNull(); // sem campo de data no modal
     expect(screen.queryByLabelText('Valor pago')).not.toBeInTheDocument();
-    // nunca pago: sugere o mês inteiro
-    expect((screen.getByLabelText('De', { selector: '#pay-start' }) as HTMLInputElement).value).toBe(from);
-    expect((screen.getByLabelText('Até', { selector: '#pay-end' }) as HTMLInputElement).value).toBe(to);
   });
 });
