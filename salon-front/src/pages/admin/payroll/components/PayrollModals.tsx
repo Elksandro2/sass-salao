@@ -588,9 +588,9 @@ const clip = (r: CoverageRange, from: string, to: string) => ({
 /**
  * "Marcar como pago" do período filtrado. Os dias não são digitados: vêm do filtro, e se parte
  * dele já foi paga o período é encurtado sozinho pros dias pendentes (com escolha quando os dias
- * pendentes ficam separados). O salário fixo é MENSAL: cada mês pendente do filtro vem marcado e
- * pode ser desmarcado pra ficar pra outro pagamento; mês já pago nem aparece como opção. Dá pra
- * registrar só salário. O valor é sempre o calculado.
+ * pendentes ficam separados). Mostra só o que entra AGORA; o que já foi pago aparece resumido no
+ * topo. O salário fixo é MENSAL: cada mês pendente vem marcado e pode ser desmarcado pra ficar
+ * pra outro pagamento. Dá pra registrar só salário. O valor é sempre o calculado.
  */
 export const MarkPaidModal = ({
   employeeId,
@@ -625,7 +625,6 @@ export const MarkPaidModal = ({
   const target = unpaidRanges[selected] ?? null;
   const nothingToPay = unpaidRanges.length === 0 && pendingSalaries.length === 0;
   const emptySelection = !target && months.length === 0;
-  const adjusted = !!target && (target.start !== filterFrom || target.end !== filterTo);
   const monthsKey = months.join(',');
 
   useEffect(() => {
@@ -652,15 +651,13 @@ export const MarkPaidModal = ({
     };
   }, [employeeId, target?.start, target?.end, monthsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const visibleItems = items
-    .filter((i) => i.date >= filterFrom && i.date <= filterTo)
-    .sort((a, b) => a.date.localeCompare(b.date));
-  const status = (date: string) =>
-    paidRanges.some((r) => inRange(date, r))
-      ? 'paid'
-      : target && inRange(date, target)
-        ? 'included'
-        : 'later';
+  // Só o que entra AGORA: itens dentro dos dias escolhidos. O que já foi pago fica fora da lista
+  // (aparece resumido no topo como "já pagos").
+  const includedItems = target
+    ? items
+        .filter((i) => inRange(i.date, target) && !paidRanges.some((r) => inRange(i.date, r)))
+        .sort((a, b) => a.date.localeCompare(b.date))
+    : [];
 
   const blocked =
     nothingToPay ||
@@ -674,6 +671,17 @@ export const MarkPaidModal = ({
     setMonths((prev) =>
       prev.includes(month) ? prev.filter((m) => m !== month) : [...prev, month].sort()
     );
+
+  const alreadyPaid = [
+    ...paidRanges.map((r) => {
+      const c = clip(r, filterFrom, filterTo);
+      return `Dias ${formatShortDate(c.start)} a ${formatShortDate(c.end)}`;
+    }),
+    ...paidSalaries.map(
+      (s) =>
+        `Salário de ${salaryMonthLabel(s.month)}${s.paidAt ? ` (pago em ${formatShortDate(s.paidAt)})` : ''}`
+    ),
+  ];
 
   return (
     <ModalShell
@@ -710,14 +718,14 @@ export const MarkPaidModal = ({
             {formatShortDate(filterFrom)} a {formatShortDate(filterTo)}
           </strong>
         </p>
-        {paidRanges.map((r) => {
-          const c = clip(r, filterFrom, filterTo);
-          return (
-            <p key={r.start} className="text-emerald-700 font-semibold">
-              Dias {formatShortDate(c.start)} a {formatShortDate(c.end)} já pagos
-            </p>
-          );
-        })}
+        {alreadyPaid.length > 0 && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-700">
+            <p className="font-semibold">Já pago (não entra neste pagamento):</p>
+            {alreadyPaid.map((text) => (
+              <p key={text}>✓ {text}</p>
+            ))}
+          </div>
+        )}
       </div>
 
       {nothingToPay ? (
@@ -726,10 +734,11 @@ export const MarkPaidModal = ({
         </p>
       ) : (
         <>
-          {/* Dias (comissões, diárias, bônus, descontos) */}
-          {unpaidRanges.length > 1 ? (
+          {unpaidRanges.length > 1 && (
             <div className="space-y-1.5">
-              <span className={labelCls}>Dias pendentes separados — escolha qual pagar agora</span>
+              <span className={labelCls}>
+                Os dias pendentes estão separados — escolha qual pagar agora
+              </span>
               {unpaidRanges.map((r, i) => (
                 <label
                   key={r.start}
@@ -747,74 +756,80 @@ export const MarkPaidModal = ({
                 </label>
               ))}
             </div>
-          ) : null}
-          {target ? (
-            <div className="rounded-xl border border-[#eae1e1] bg-[#fcf9f9]/50 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7a7074]">
-                Dias deste pagamento
-              </p>
-              <p className="text-sm font-bold text-[#3b3036]" data-testid="mark-paid-period">
-                {formatShortDate(target.start)} a {formatShortDate(target.end)}
-              </p>
-              {adjusted && (
-                <p className="text-[11px] text-[#7a7074]">
-                  Ajustado pros dias que ainda não foram pagos.
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="text-xs text-[#7a7074]" data-testid="mark-paid-period">
-              Nenhum dia pendente com valor a pagar — só salário.
-            </p>
           )}
 
-          {/* Salário fixo mensal */}
-          {(pendingSalaries.length > 0 || paidSalaries.length > 0) && (
-            <div className="space-y-1.5">
-              <span className={labelCls}>Salário fixo (mensal)</span>
+          {/* O que entra neste pagamento */}
+          <div className="space-y-1.5">
+            <span className={labelCls}>O que entra neste pagamento</span>
+            <ul className="rounded-xl border border-[#eae1e1] divide-y divide-[#eae1e1]/60">
+              <li
+                className="px-3 py-2 text-xs text-[#7a7074] bg-[#fcf9f9]/60"
+                data-testid="mark-paid-period"
+              >
+                {target
+                  ? `Dias ${formatShortDate(target.start)} a ${formatShortDate(target.end)}`
+                  : 'Nenhum dia com valor a pagar — só salário.'}
+              </li>
+              {includedItems.map((item) => (
+                <li
+                  key={item.key}
+                  className="flex items-center justify-between gap-2 px-3 py-2 text-xs"
+                >
+                  <span className="text-[#3b3036] min-w-0">
+                    {formatShortDate(item.date)} · {item.label}
+                  </span>
+                  <span className="font-semibold whitespace-nowrap text-[#3b3036]">
+                    {item.negative ? '− ' : ''}
+                    {formatBRL(item.amount)}
+                  </span>
+                </li>
+              ))}
+              {target && includedItems.length === 0 && (
+                <li className="px-3 py-2 text-xs text-[#7a7074]">
+                  Sem comissões, diárias ou lançamentos nesses dias.
+                </li>
+              )}
               {pendingSalaries.map((s) => (
-                <label
-                  key={s.month}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm cursor-pointer"
-                >
-                  <span className="flex items-center gap-2 text-[#3b3036]">
-                    <input
-                      type="checkbox"
-                      aria-label={`Salário de ${salaryMonthLabel(s.month)}`}
-                      checked={months.includes(s.month)}
-                      onChange={() => toggleMonth(s.month)}
-                    />
-                    Salário de {salaryMonthLabel(s.month)}
-                  </span>
-                  <span className="font-semibold text-amber-700">{formatBRL(s.amount)}</span>
-                </label>
+                <li key={s.month} className="px-3 py-2 text-xs">
+                  <label className="flex items-center justify-between gap-2 cursor-pointer">
+                    <span className="flex items-center gap-2 text-[#3b3036]">
+                      <input
+                        type="checkbox"
+                        aria-label={`Salário de ${salaryMonthLabel(s.month)}`}
+                        checked={months.includes(s.month)}
+                        onChange={() => toggleMonth(s.month)}
+                      />
+                      Salário de {salaryMonthLabel(s.month)}
+                    </span>
+                    <span
+                      className={`font-semibold whitespace-nowrap ${
+                        months.includes(s.month) ? 'text-[#3b3036]' : 'text-[#7a7074] line-through'
+                      }`}
+                    >
+                      {formatBRL(s.amount)}
+                    </span>
+                  </label>
+                </li>
               ))}
-              {pendingSalaries.some((s) => !months.includes(s.month)) && (
-                <p className="text-[11px] text-[#7a7074]">
-                  O salário desmarcado fica pendente pra outro pagamento.
-                </p>
-              )}
-              {paidSalaries.map((s) => (
-                <p
-                  key={s.month}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-700"
-                >
-                  <span>
-                    Salário de {salaryMonthLabel(s.month)} já pago
-                    {s.paidAt ? ` em ${formatShortDate(s.paidAt)}` : ''}
-                  </span>
-                  <span className="font-semibold">{formatBRL(s.amount)}</span>
-                </p>
-              ))}
-            </div>
-          )}
+            </ul>
+            {pendingSalaries.some((s) => !months.includes(s.month)) && (
+              <p className="text-[11px] text-[#7a7074]">
+                O salário desmarcado fica pendente pra outro pagamento.
+              </p>
+            )}
+          </div>
 
-          <div className="rounded-xl border border-[#eae1e1] bg-[#fcf9f9]/50 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7a7074]">
-              Valor
-            </p>
+          <div className="rounded-xl border border-[#be8a83]/40 bg-[#fdf6f5] px-4 py-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#7a7074]">
+                Total deste pagamento
+              </p>
+              <p className="text-[11px] text-[#7a7074]">
+                {emptySelection ? 'Nada selecionado pra pagar.' : 'Calculado pelo sistema.'}
+              </p>
+            </div>
             <p
-              className="text-2xl font-extrabold text-[#3b3036]"
+              className="text-2xl font-extrabold text-[#3b3036] whitespace-nowrap"
               data-testid="payment-preview-amount"
             >
               {emptySelection
@@ -825,12 +840,10 @@ export const MarkPaidModal = ({
                     ? formatBRL(preview.amount)
                     : '—'}
             </p>
-            <p className="text-[11px] text-[#7a7074]">
-              {emptySelection
-                ? 'Nada selecionado pra pagar.'
-                : 'Calculado pelo sistema. Pra pagar diferente, lance um bônus ou desconto antes.'}
-            </p>
           </div>
+          <p className="text-[11px] text-[#7a7074] -mt-2">
+            Pra pagar diferente, lance um bônus ou desconto antes de registrar.
+          </p>
         </>
       )}
       {preview.conflict && (
@@ -838,49 +851,6 @@ export const MarkPaidModal = ({
           {preview.conflict}
         </p>
       )}
-
-      <div className="space-y-1">
-        <span className={labelCls}>Comissões, diárias e lançamentos no período filtrado</span>
-        <ul className="rounded-xl border border-[#eae1e1] divide-y divide-[#eae1e1]/60 max-h-56 overflow-y-auto">
-          {visibleItems.length === 0 && (
-            <li className="px-3 py-2 text-xs text-[#7a7074]">Nada lançado nesses dias.</li>
-          )}
-          {visibleItems.map((item) => {
-            const st = status(item.date);
-            const cls =
-              st === 'paid' ? 'bg-emerald-50/60' : st === 'included' ? 'bg-amber-50/60' : '';
-            const dot = st === 'paid' ? 'bg-emerald-500' : 'bg-amber-500';
-            const valueCls = st === 'paid' ? 'text-emerald-700' : 'text-amber-700';
-            return (
-              <li
-                key={item.key}
-                data-status={st}
-                className={`flex items-center justify-between gap-2 px-3 py-2 text-xs ${cls}`}
-              >
-                <span className="text-[#3b3036] min-w-0">
-                  <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${dot}`} />
-                  {formatShortDate(item.date)} · {item.label}
-                  {st === 'later' && (
-                    <span className="text-[#7a7074]"> (fica pra outro pagamento)</span>
-                  )}
-                </span>
-                <span className={`font-semibold whitespace-nowrap ${valueCls}`}>
-                  {item.negative ? '− ' : ''}
-                  {formatBRL(item.amount)}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-        <div className="flex gap-4 text-[11px] text-[#7a7074]">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" /> já pago
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-amber-500" /> pendente
-          </span>
-        </div>
-      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>

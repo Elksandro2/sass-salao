@@ -61,19 +61,17 @@ describe('MarkPaidModal', () => {
       );
     });
 
-    expect(screen.getByText('Dias 01/10/2026 a 15/10/2026 já pagos')).toBeInTheDocument();
-    expect(screen.getByTestId('mark-paid-period').textContent).toBe('16/10/2026 a 31/10/2026');
+    expect(screen.getByText('✓ Dias 01/10/2026 a 15/10/2026')).toBeInTheDocument();
+    expect(screen.getByTestId('mark-paid-period').textContent).toBe('Dias 16/10/2026 a 31/10/2026');
     expect(screen.getByLabelText('Salário de outubro/2026')).toBeChecked();
     expect(payrollApi.previewPayment).toHaveBeenCalledWith(7, {
       periodStart: '2026-10-16',
       periodEnd: '2026-10-31',
       salaryMonths: ['2026-10-01'],
     });
-    expect(screen.getByText(/Ana \(Corte\)/).closest('li')).toHaveAttribute('data-status', 'paid');
-    expect(screen.getByText(/Bia \(Escova\)/).closest('li')).toHaveAttribute(
-      'data-status',
-      'included'
-    );
+    // só o que entra agora: o item do dia 05 (já pago) não aparece
+    expect(screen.queryByText(/Ana \(Corte\)/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Bia \(Escova\)/)).toBeInTheDocument();
 
     await waitFor(() => expect(screen.getByText('Registrar pagamento')).not.toBeDisabled());
     await act(async () => {
@@ -135,7 +133,7 @@ describe('MarkPaidModal', () => {
     });
 
     expect(
-      screen.getByText(/Salário de outubro\/2026 já pago em 31\/10\/2026/)
+      screen.getByText('✓ Salário de outubro/2026 (pago em 31/10/2026)')
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('Salário de outubro/2026')).not.toBeInTheDocument();
     expect(payrollApi.previewPayment).toHaveBeenCalledWith(7, {
@@ -164,7 +162,7 @@ describe('MarkPaidModal', () => {
     });
 
     expect(
-      screen.getByText('Nenhum dia pendente com valor a pagar — só salário.')
+      screen.getByText('Nenhum dia com valor a pagar — só salário.')
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Salário de outubro/2026')).toBeChecked();
     expect(screen.getByLabelText('Salário de novembro/2026')).toBeChecked();
@@ -217,11 +215,11 @@ describe('MarkPaidModal', () => {
       );
     });
 
-    expect(screen.getByTestId('mark-paid-period').textContent).toBe('01/10/2026 a 09/10/2026');
+    expect(screen.getByTestId('mark-paid-period').textContent).toBe('Dias 01/10/2026 a 09/10/2026');
     await act(async () => {
       fireEvent.click(screen.getByLabelText('16/10/2026 a 31/10/2026'));
     });
-    expect(screen.getByTestId('mark-paid-period').textContent).toBe('16/10/2026 a 31/10/2026');
+    expect(screen.getByTestId('mark-paid-period').textContent).toBe('Dias 16/10/2026 a 31/10/2026');
   });
 
   it('does not allow saving when the whole filtered period, salary included, is already paid', async () => {
