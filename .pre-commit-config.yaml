@@ -1,0 +1,14 @@
+# Instalar: pip install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+  - repo: local
+    hooks:
+      - id: tsc-front
+        name: tsc (salon-front)
+        entry: bash -c 'cd salon-front && npx tsc -b'
+        language: system
+        files: ^salon-front/.*\.(ts|tsx)$
+        pass_filenames: false

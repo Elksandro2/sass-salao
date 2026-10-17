@@ -49,3 +49,5 @@ admin_credentials.txt
 
 # Claude Code local settings (pessoal, não compartilhado com o time)
 .claude/settings.local.json
+# knowledge graph local
+graphify-out/
